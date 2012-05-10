@@ -1,0 +1,9 @@
+Version 0.1 Alpha
+	- Initial version.
+	- Requires Globus Toolkit 5.2.0
+	- Tested against HPSS 7.3.3p4
+	- Supports only single node transfers (no striping).
+	- Hardcoded for unix authentication.
+	- No throttling when creating data buffers.
+	- COS determined by file size.
+	- Very little testing done.

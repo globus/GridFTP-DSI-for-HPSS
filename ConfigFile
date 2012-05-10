@@ -1,0 +1,10 @@
+# Format of this file is:
+#  Key Value
+#  No spaces except between Key and Value
+
+# (required) Name of the HPSS user in the keytab file that the GridFTP
+# server will use to authenticate to HPSS
+LoginName gridftp
+
+# (required) Keytab file containing the user's credentials
+KeytabFile keytab
