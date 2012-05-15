@@ -1,0 +1,155 @@
+For the latest build instructions, see https://github.com/JasonAlt/GridFTP-DSI-for-HPSS/wiki/Installation-of-Version-0.1-Alpha
+
+BUILD GRIDFTP
+=============
+
+You'll need to download and build Globus Toolkit 5.2.0. Follow the instructions in the INSTALL file to build gridftp. Since HPSS is 32bit (until the 7.4 release), be sure to build the toolkit 32bit:
+
+globus$ ./configure --prefix=/usr/local/globus-5.2.0 --with-flavor=gcc32dbg
+
+globus$ make gridftp
+
+globus$ make install
+
+BUILD AND INSTALL HPSS
+======================
+
+This is beyond the scope of this article but you should have a working HPSS installation. This version of the DSI was built against HPSS 7.3.3p4.
+
+Build and Install the DSI
+
+Build the HPSS DSI with the following options. Note that kerberos authentication is not yet supported.
+
+./configure --with-globus=/usr/local/globus-5.2.0 --with-globus-flavor=gcc32dbg --with-hpssdir=/opt/hpss --with-unixauth
+Install the DSI into the Globus Toolkit installation directory:
+
+make install
+
+ADD A GRIDFTP USER FOR HPSS
+===========================
+
+The HPSS user 'gridftp' is a special user; his only purpose is to allow the DSI to authenticate to HPSS. When a user logs into the GridFTP server, the DSI will authenticate to HPSS as the special user 'gridftp' and then immediately change it's credentials to the user that just logged into the GridFTP server.
+
+Add the new user 'gridftp' to the password file used by HPSS. You can determine which password file is in use by checking the value of HPSS_UNIX_USE_SYSTEM_COMMANDS in /var/hpss/etc/env.conf. If it is set to TRUE (or if it is not present in the file), HPSS is using /etc/passwd. Otherwise, look for /var/hpss/etc/passwd. Whichever file you use, your entry should look something like the following:
+
+gridftp:x:316:316:GridFTP Server:/home/gridftp:/bin/bash
+Next, you must give this new user 'control' permission to the core server's client interface:
+
+[root@hpss gridftp_hpss_dsi_0_1]# /opt/hpss/bin/hpss_server_acl
+
+hsa> acl -m
+
+1) Mover (blynken)
+
+2) Log Daemon
+
+3) Mover (wynken)
+
+4) SCSI PVR
+
+5) Mover (nod)
+
+6) Log Client (hpss)
+
+7) Migration/Purge Server
+
+8) Core Server
+
+9) SSM System Manager
+
+10) Location Server
+
+11) PVL
+
+12) Mover (ahab)
+
+13) Startup Daemon (hpss)
+
+Select a server
+
+Choose an item by number (RET to cancel):
+
+8
+1) PVL Mount Notification Interface (v1) 007ff347-e533-1cc6-b22d-02608c2cedf4
+
+2) Realtime Monitor Interface (v1) 80c9a256-2f13-11d3-a0c8-000001341966
+
+3) Client Interface (v1) 32ba9692-4667-11d6-aa3a-0004ac49692b
+
+4) Account Validation Interface (v1) 647f22a8-a1e9-11d3-a739-000001341966
+
+Select an interface
+
+Choose an item by number (RET to cancel):
+
+3
+hsa> add user gridftp c
+
+hsa> show
+
+perms - type - ID (name) - realm ID (realm)
+
+rw-c-d- - user - 304 (hpssssm) - 81000 (hpss.ncsa.illinois.edu)
+
+hsa> quit
+
+rw-c-dt - user - 308 (hpssmps) - 81000 (hpss.ncsa.illinois.edu)
+
+rw-c--- - user - 309 (hpssfs) - 81000 (hpss.ncsa.illinois.edu)
+
+r--c--- - user - 315 (hpssftp) - 81000 (hpss.ncsa.illinois.edu)
+
+---c--- - user - 316 (gridftp) - 81000 (hpss.ncsa.illinois.edu)
+
+------t - any_other
+.... set a password for user gridftp ...
+
+Now you'll need to create a keytab file for the gridftp user. This will be used by the DSI in order to authenticate to HPSS:
+
+[root@hpss gridftp_hpss_dsi_0_1]# /opt/hpss/bin/hpss_unix_keytab -f /var/hpss/etc/gridftp.keytab add gridftp
+
+CONFIGURING XINETD
+==================
+
+The globus gridftp server does not need to run as a privileged user. You should create a system account for this purpose. It is important to make sure that both the keytab files generated above and the GSI host key are both owned by this system account. In the following example, I will use the system account 'gridftp'. Since our HPSS installation currently uses the system password file (instead of the HPSS specific password file) this is the same account created earlier for authentication to HPSS. However, if your site uses the HPSS specific password file, you will need to create a separate system account for the GridFTP server process (they may both have the same name).
+
+Add an entry to /etc/services for the default gsiftp port:
+
+gsiftp 2811/tcp # GSI FTP
+Here's an example xinetd entry (/etc/xinetd.d/gridftp):
+
+service gsiftp
+
+{
+
+flags       = IPv4
+
+wait        = no
+
+user        = gridftp
+
+# You may need to set group depending upon the account chosen
+
+#group       = 
+
+server      = /usr/local/globus/sbin/globus-gridftp-server
+
+# auth-level 6 = 2 for frontend default + 4 for no-change-uid/gid
+
+#  0 - Disables all authorization checks
+
+#  1 - Authorize identity
+
+#  2 - Authorize all file/resource accesses (Default for fronend)
+
+#  4 - Disable changing process uid to authenticated user
+
+server_args = -inetd -exec /usr/local/globus/sbin/globus-gridftp-server -auth-level 7 -dsi hpss 
+
+env         = GRIDMAP=/etc/grid-security/grid-mapfile GLOBUS_THREAD_MODEL=pthread
+
+socket_type = stream
+
+per_source  = 100
+
+}
