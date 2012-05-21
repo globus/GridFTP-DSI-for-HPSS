@@ -19528,6 +19528,11 @@ if test "${with_krb5auth+set}" = set; then
   hpssauthlibs="$hpssauthlibs -lhpsskrb5auth"
 fi;
 
+if test "${hpssauthlibs+set}" != set; then
+	echo "Must specifiy one of --with-unixauth or --with-krb5auth"
+	exit
+fi
+
 HPSS_AUTH_LIBS=$hpssauthlibs
 
 
