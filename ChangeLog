@@ -1,3 +1,10 @@
+Version 0.2 Alpha
+	- Remove globus_gridftp_server_hpss_data.c
+	- [BUG 4] Added check for --with-unixauth or --with-krb5auth
+	- [BUG 1] Ported to Globus Toolkit 5.2.1
+	- [BUG 6] Fixed gap handling
+	- [BUG 8] Fixed SIGABRT on file retrieve
+
 Version 0.1 Alpha
 	- Initial version.
 	- Requires Globus Toolkit 5.2.0

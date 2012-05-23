@@ -509,9 +509,9 @@ globus_i_gfs_hpss_module_get_emtpy_buffer(transfer_request_t *  TransferRequest,
 		{
 			/* Remove the next free buffer from the list. */
 			buffer_s = TransferRequest->Buffers.EmptyBufferChain;
-			if (buffer_s->Next != NULL)
-				buffer_s->Next->Prev = buffer_s->Prev;
 			TransferRequest->Buffers.EmptyBufferChain = buffer_s->Next;
+			if (TransferRequest->Buffers.EmptyBufferChain != NULL)
+				TransferRequest->Buffers.EmptyBufferChain->Prev = NULL;
 
 			/* Save the buffer. */
 			*Buffer = buffer_s->Data;
@@ -859,7 +859,8 @@ priorities.COSNamePriority = REQUIRED_PRIORITY;
 	pio_params.FileStripeWidth = hints_out.StripeWidth;
 	pio_params.IOTimeOutSecs   = 0;
 	pio_params.Transport       = HPSS_PIO_MVR_SELECT;
-	pio_params.Options         = 0; /* HPSS_PIO_HANDLE_GAP; */
+	/* Don't use HPSS_PIO_HANDLE_GAP, it's bugged in HPSS 7.4. */
+	pio_params.Options         = 0;
 
 	/* Now call the start routine. */
 	retval = hpss_PIOStart(&pio_params, &PIORequest->Coordinator.StripeGroup);
@@ -923,6 +924,11 @@ globus_i_gfs_hpss_module_destroy_pio(pio_request_t * PIORequest)
 	GlobusGFSHpssDebugExit();
 }
 
+/*
+ * Due to a bug in hpss_PIORegister(), each time we call hpss_PIOExecute(), this callback
+ * receives the buffer passed to hpss_PIORegister(). To avoid this bug, we must copy the
+ * buffer instead of exchanging it. This is HPSS bug 1660.
+ */
 static int
 globus_i_gfs_hpss_module_pio_register_read_callback(
 	void         *  UserArg,
@@ -933,6 +939,7 @@ globus_i_gfs_hpss_module_pio_register_read_callback(
 	int             retval          = 0;
 	pio_request_t * pio_request     = NULL;
 	globus_off_t    transfer_offset = 0;
+	char          * empty_buffer    = NULL;
 
     GlobusGFSName(globus_i_gfs_hpss_module_pio_register_read_callback);
     GlobusGFSHpssDebugEnter();
@@ -946,29 +953,27 @@ globus_i_gfs_hpss_module_pio_register_read_callback(
 	/* Convert the transfer offset */
 	CONVERT_U64_TO_LONGLONG(TransferOffset, transfer_offset);
 
-	/* Release our full buffer. */
-	retval = globus_i_gfs_hpss_module_release_full_buffer(pio_request->TransferRequest,
-	                                                      *Buffer,
-	                                                      transfer_offset,
-	                                                      *BufferLength);
-	if (retval != 0)
-		goto cleanup;
+	if (*BufferLength != 0)
+	{
+		/* Get an empty buffer. */
+		retval = globus_i_gfs_hpss_module_get_emtpy_buffer(pio_request->TransferRequest,
+		                                                   &empty_buffer);
+		if (retval != 0)
+			goto cleanup;
 
-	/* Release our reference to the buffer. */
-	*Buffer = NULL;
+		/* Copy the buffer. */
+		memcpy(empty_buffer, *Buffer, *BufferLength);
 
-	/* Get an empty buffer. */
-	retval = globus_i_gfs_hpss_module_get_emtpy_buffer(pio_request->TransferRequest, (char **)Buffer);
+		/* Release our full buffer. */
+		retval = globus_i_gfs_hpss_module_release_full_buffer(pio_request->TransferRequest,
+		                                                      empty_buffer,
+		                                                      transfer_offset,
+		                                                      *BufferLength);
+		if (retval != 0)
+			goto cleanup;
+	}
 
 cleanup:
-	/* On error... */
-	if (retval != 0)
-	{
-		/* Deallocate our buffer. */
-		if (*Buffer != NULL)
-			globus_i_gfs_hpss_module_deallocate_buffer(*Buffer);
-		*Buffer = NULL;
-	}
 	GlobusGFSHpssDebugExit();
 
 	/*
@@ -992,6 +997,7 @@ globus_i_gfs_hpss_module_pio_register_write_callback(
 	int             retval          = 0;
 	pio_request_t * pio_request     = NULL;
 	globus_off_t    transfer_offset = 0;
+	globus_size_t   buffer_length   = 0;
 
     GlobusGFSName(globus_i_gfs_hpss_module_pio_register_write_callback);
     GlobusGFSHpssDebugEnter();
@@ -1017,7 +1023,10 @@ globus_i_gfs_hpss_module_pio_register_write_callback(
 	retval = globus_i_gfs_hpss_module_get_full_buffer(pio_request->TransferRequest,
 	                                                  transfer_offset,
 	                                                  Buffer,
-	                                                  BufferLength);
+	                                                  &buffer_length);
+
+	/* Copy out the buffer length. */
+	*BufferLength = buffer_length;
 
 cleanup:
 	/* On error... */
@@ -1092,11 +1101,10 @@ globus_i_gfs_hpss_module_pio_register(void * Arg)
 cleanup:
 	/*
 	 * Deallocate the buffer. On a write request, PIORegister() doesn't pass the buffer to
-	 * the callback so we must deallocate it. On a read operation, it (most likely) passes
-	 * it to the callback and then ends up on the full chain.
+	 * the callback so we must deallocate it. On a read operation, there's a bug in 
+	 * hpss_PIORegister() which forces us to copy the data out instead of exchanging buffers.
 	 */
-	if (pio_request->TransferRequest->RequestType == WRITE_REQUEST)
-		globus_i_gfs_hpss_module_deallocate_buffer(buffer);
+	globus_i_gfs_hpss_module_deallocate_buffer(buffer);
 
 	globus_mutex_lock(&pio_request->Lock);
 	{
@@ -1138,9 +1146,18 @@ globus_i_gfs_hpss_module_pio_execute(void * Arg)
 		transfer_offset = cast64m(0);
 	CONVERT_LONGLONG_TO_U64(pio_request->TransferRequest->TransferLength, transfer_length);
 
-/*
+	/*
+	 * During a read from HPSS, if a 'gap' is found, hpss_PIOExecute kicks out with
+	 * gap_info containing the offset and length of the gap. If we specify
+	 * HPSS_PIO_HANDLE_GAP to hpss_PIOStart(), hpss_PIOExecute() will not kickout
+	 * when a gap is encountered, instead it will retry the transfer after the gap.
+	 * 
+	 * To complicate things further, HPSS 7.4 has a bug with HPSS_PIO_HANDLE_GAP which
+	 * causes it to loop forever. So we'll handle looping here. Call report 775.
+	 */
 	do {
-*/
+		memset(&gap_info, 0, sizeof(hpss_pio_gapinfo_t));
+
 		/* Now fire off the HPSS side of the transfer. */
 		retval = hpss_PIOExecute(pio_request->Coordinator.FileFD,
 		                         transfer_offset,
@@ -1149,14 +1166,19 @@ globus_i_gfs_hpss_module_pio_execute(void * Arg)
 		                         &gap_info,
 		                         &bytes_moved);
 
-/*
 		if (retval == 0)
 		{
+			/* Remove the bytes transferred so far. */
 			transfer_length = sub64m(transfer_length, bytes_moved);
+			/* Remove any gap. */
+			transfer_length = sub64m(transfer_length, gap_info.Length);
+
+			/* Add the bytes transferred so far. */
 			transfer_offset = add64m(transfer_offset, bytes_moved);
+			/* Add any gap. */
+			transfer_offset = add64m(transfer_offset, gap_info.Length);
 		}
 	} while (retval == 0 && gt64(transfer_length, cast64m(0)));
-*/
 
 	/* If an error occurred... */
 	if (retval != 0)
