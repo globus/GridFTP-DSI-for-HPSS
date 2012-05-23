@@ -4,6 +4,7 @@ Version 0.2 Alpha
 	- [BUG 1] Ported to Globus Toolkit 5.2.1
 	- [BUG 6] Fixed gap handling
 	- [BUG 8] Fixed SIGABRT on file retrieve
+	- [BUG 9] Fixed timestamps in directory listings
 
 Version 0.1 Alpha
 	- Initial version.

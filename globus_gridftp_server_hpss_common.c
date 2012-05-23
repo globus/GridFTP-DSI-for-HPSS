@@ -70,104 +70,6 @@
 #include "globus_gridftp_server_hpss_common.h"
 #include "globus_gridftp_server_hpss_config.h"
 
-#ifdef NOT
-globus_result_t
-globus_l_gfs_hpss_common_copy_session_info (
-	globus_gfs_session_info_t * Source,
-	globus_gfs_session_info_t * Destination)
-{
-	globus_result_t result = GLOBUS_SUCCESS;
-
-	GlobusGFSName(globus_l_gfs_hpss_common_copy_session_info);
-	GlobusGFSHpssDebugEnter();
-
-	memset(Destination, 0, sizeof(globus_gfs_session_info_t));
-
-	Destination->del_cred  = Source->del_cred;
-	Destination->free_cred = Source->free_cred;
-	Destination->map_user  = Source->map_user;
-
-	if (Source->username != NULL)
-	{
-		Destination->username = globus_libc_strdup(Source->username);
-		if (Destination->username == NULL)
-		{
-			result = GlobusGFSErrorMemory("session info");
-			goto cleanup;
-		}
-	}
-
-	if (Source->password != NULL)
-	{
-		Destination->password = globus_libc_strdup(Source->password);
-		if (Destination->password == NULL)
-		{
-			result = GlobusGFSErrorMemory("session info");
-			goto cleanup;
-		}
-	}
-
-	if (Source->subject != NULL)
-	{
-		Destination->subject = globus_libc_strdup(Source->subject);
-		if (Destination->subject == NULL)
-		{
-			result = GlobusGFSErrorMemory("session info");
-			goto cleanup;
-		}
-	}
-
-	if (Source->cookie != NULL)
-	{
-		Destination->cookie = globus_libc_strdup(Source->cookie);
-		if (Destination->cookie == NULL)
-		{
-			result = GlobusGFSErrorMemory("session info");
-			goto cleanup;
-		}
-	}
-
-	if (Source->host_id != NULL)
-	{
-		Destination->host_id = globus_libc_strdup(Source->host_id);
-		if (Destination->host_id == NULL)
-		{
-			result = GlobusGFSErrorMemory("session info");
-			goto cleanup;
-		}
-	}
-
-	GlobusGFSHpssDebugExit();
-	return GLOBUS_SUCCESS;
-
-cleanup:
-	globus_l_gfs_hpss_common_destroy_session_info(Destination);
-	GlobusGFSHpssDebugExitWithError();
-	return result;
-}
-
-void
-globus_l_gfs_hpss_common_destroy_session_info (
-    globus_gfs_session_info_t * SessionInfo)
-{
-	GlobusGFSName(globus_l_gfs_hpss_common_destroy_session_info);
-	GlobusGFSHpssDebugEnter();
-
-	if (SessionInfo->username != NULL)
-		globus_free(SessionInfo->username);
-	if (SessionInfo->password != NULL)
-		globus_free(SessionInfo->password);
-	if (SessionInfo->subject != NULL)
-		globus_free(SessionInfo->subject);
-	if (SessionInfo->cookie != NULL)
-		globus_free(SessionInfo->cookie);
-	if (SessionInfo->host_id != NULL)
-		globus_free(SessionInfo->host_id);
-
-	GlobusGFSHpssDebugExit();
-}
-#endif /* NOT */
-
 static globus_result_t
 globus_l_gfs_hpss_common_copy_basename(char * Path, char ** BaseName)
 {
@@ -215,9 +117,9 @@ globus_i_gfs_hpss_common_translate_stat(char              * Name,
 	GlobusStat->uid   = HpssStat->st_uid;
 	GlobusStat->gid   = HpssStat->st_gid;
  	GlobusStat->dev   = 0;
-	GlobusStat->atime = HpssStat->st_atime_n;
-	GlobusStat->mtime = HpssStat->st_mtime_n;
-	GlobusStat->ctime = HpssStat->st_ctime_n;
+	GlobusStat->atime = HpssStat->hpss_st_atime;
+	GlobusStat->mtime = HpssStat->hpss_st_mtime;
+	GlobusStat->ctime = HpssStat->hpss_st_ctime;
 	GlobusStat->ino   = cast32m(HpssStat->st_ino);
 	CONVERT_U64_TO_LONGLONG(HpssStat->st_size, GlobusStat->size);
 
@@ -672,14 +574,12 @@ cleanup:
 	return GLOBUS_SUCCESS;
 }
 
-#ifdef NOT
 void
 globus_l_gfs_hpss_common_destroy_result(globus_result_t Result)
 {
 	globus_object_free(globus_error_get(Result));
 }
 
-#endif /* NOT */
 char *
 globus_l_gfs_hpss_common_strndup(char * String, int Length)
 {
