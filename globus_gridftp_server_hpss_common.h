@@ -55,6 +55,11 @@
 #include <globus_debug.h>
 
 /*
+ * HPSS includes.
+ */
+#include <hpss_api.h>
+
+/*
  * This is used to define the debug print statements.
  */
 GlobusDebugDeclare(GLOBUS_GRIDFTP_SERVER_HPSS);
@@ -78,19 +83,22 @@ GlobusDebugDeclare(GLOBUS_GRIDFTP_SERVER_HPSS);
         ("[%s] Exiting with error\n", _gfs_name))
 
 
-
 globus_result_t
-globus_l_gfs_hpss_common_stat(char              *  Path,
-                              globus_bool_t        FileOnly,
-                              globus_bool_t        UseSymlinkInfo,
-                              globus_bool_t        IncludePathStat,
-                              globus_gfs_stat_t ** StatBufArray,
-                              int               *  StatBufCount);
+globus_l_gfs_hpss_common_gfs_stat(char              *  Path,
+                                  globus_bool_t        FileOnly,
+                                  globus_bool_t        UseSymlinkInfo,
+                                  globus_bool_t        IncludePathStat,
+                                  globus_gfs_stat_t ** GfsStatArray,
+                                  int               *  GfsStatCount);
 
 void
-globus_l_gfs_hpss_common_destroy_stat_array(
-    globus_gfs_stat_t * StatBufArray,
-    int                 StatCount);
+globus_l_gfs_hpss_common_destroy_gfs_stat_array(
+    globus_gfs_stat_t * GfsStatArray,
+    int                 GfsStatCount);
+
+globus_result_t
+globus_l_gfs_hpss_common_file_archived(char          * Path,
+                                       globus_bool_t * Archived);
 
 /*
  * Passwd file translations.
@@ -111,7 +119,10 @@ globus_l_gfs_hpss_common_uid_to_username(int     Uid,
 globus_result_t
 globus_l_gfs_hpss_common_groupname_to_gid(char  * GroupName,
                                           gid_t * Gid);
-#ifdef NOT
+
+globus_result_t
+globus_l_gfs_hpss_common_gid_to_groupname(gid_t    Gid,
+                                          char  ** GroupName);
 
 /*
  * Helper to release memory associated with errors.
@@ -119,7 +130,6 @@ globus_l_gfs_hpss_common_groupname_to_gid(char  * GroupName,
 void
 globus_l_gfs_hpss_common_destroy_result(globus_result_t Result);
 
-#endif /* NOT */
 char *
 globus_l_gfs_hpss_common_strndup(char * String, int Length);
 
