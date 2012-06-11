@@ -3,9 +3,10 @@ For the latest build instructions, see https://github.com/JasonAlt/GridFTP-DSI-f
 BUILD GRIDFTP
 =============
 
-You'll need to download and build Globus Toolkit 5.2.0. Follow the instructions in the INSTALL file to build gridftp. Since HPSS is 32bit (until the 7.4 release), be sure to build the toolkit 32bit:
+=======
+You'll need to download and build Globus Toolkit 5.2.x. Follow the instructions in the INSTALL file to build gridftp. Since HPSS is 32bit (until the 7.4 release), be sure to build the toolkit 32bit:
 
-globus$ ./configure --prefix=/usr/local/globus-5.2.0 --with-flavor=gcc32dbg
+globus$ ./configure --prefix=/usr/local/globus-5.2.x --with-flavor=gcc32dbg
 
 globus$ make gridftp
 
@@ -20,7 +21,8 @@ Build and Install the DSI
 
 Build the HPSS DSI with the following options. Note that kerberos authentication is not yet supported.
 
-./configure --with-globus=/usr/local/globus-5.2.0 --with-globus-flavor=gcc32dbg --with-hpssdir=/opt/hpss --with-unixauth
+./configure --with-globus=/usr/local/globus-5.2.x --with-globus-flavor=gcc32dbg --with-hpssdir=/opt/hpss --with-unixauth
+
 Install the DSI into the Globus Toolkit installation directory:
 
 make install
@@ -116,7 +118,7 @@ The globus gridftp server does not need to run as a privileged user. You should 
 Add an entry to /etc/services for the default gsiftp port:
 
 gsiftp 2811/tcp # GSI FTP
-Here's an example xinetd entry (/etc/xinetd.d/gridftp):
+Here's an example xinetd entry (/etc/xinetd.d/gridftp). Note the specific changes for 5.2.0 vs later 5.2.x versions.
 
 service gsiftp
 
@@ -144,7 +146,11 @@ server      = /usr/local/globus/sbin/globus-gridftp-server
 
 #  4 - Disable changing process uid to authenticated user
 
+# For Globus Toolkit versions > 5.2.0, add '-threads 2' to server_args
+
 server_args = -inetd -exec /usr/local/globus/sbin/globus-gridftp-server -auth-level 7 -dsi hpss 
+
+# For Globus Toolkit versions > 5.2.0, remove 'GLOBUS_THREAD_MODEL=pthread' from env
 
 env         = GRIDMAP=/etc/grid-security/grid-mapfile GLOBUS_THREAD_MODEL=pthread
 

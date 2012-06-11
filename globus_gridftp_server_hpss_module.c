@@ -44,6 +44,7 @@
  */
 #include <sys/types.h>
 #include <unistd.h>
+#include <string.h>
 #include <fcntl.h>
 #include <time.h>
 
@@ -56,7 +57,6 @@
  * HPSS includes.
  */
 #include <hpss_api.h>
-/* Temporary include to support 32 bit 7.3.3. */
 #include <u_signed64.h>
 
 /*
@@ -65,7 +65,6 @@
 #include "version.h"
 #include "globus_gridftp_server_hpss_common.h"
 #include "globus_gridftp_server_hpss_config.h"
-/* include "version.h" */
 
 typedef struct buffer {
 	char          * Data;
@@ -75,36 +74,32 @@ typedef struct buffer {
 	struct buffer * Prev;
 } buffer_t;
 
-typedef enum {
-	READ_REQUEST,
-	WRITE_REQUEST,
-} transfer_request_type_t;
-
-typedef struct transfer_request {
-	transfer_request_type_t      RequestType;
-	globus_gfs_operation_t       Operation;
-	globus_gfs_transfer_info_t * TransferInfo;
-	globus_off_t                 TransferLength;
+typedef struct {
+	globus_size_t      BufferLength;
 
 	/* This lock controls the items below it. */
 	globus_mutex_t     Lock;
-	/* globus_mutex_t     Cond; */
-	globus_result_t    Result;
+	int                OptimalBufferCount;
+	int                TotalBufferCount;
+	int                FullBufferCount;
+	buffer_t         * FullBufferChain;
+	int                EmptyBufferCount;
+	buffer_t         * EmptyBufferChain;
+} buffer_handle_t;
 
-	struct {
-		globus_size_t      BufferLength;
-		buffer_t         * FullBufferChain;
-		buffer_t         * EmptyBufferChain;
-
-		/* Indicate that someone is waiting on a specific offset. */
-		globus_cond_t      Cond;
-		globus_bool_t      ValidWaiter;
-		globus_off_t       TransferOffset;
-	} Buffers;
-} transfer_request_t;
+typedef struct {
+	globus_mutex_t    Lock;
+	globus_cond_t     Cond;
+	globus_bool_t     Eof;
+	globus_result_t   Result;
+} transfer_state_t;
 
 typedef struct pio_request {
-	transfer_request_t * TransferRequest;
+	transfer_state_t     * TransferState;
+	buffer_handle_t      * BufferHandle;
+	hpss_pio_operation_t   PioOperation;
+	globus_off_t           FileLength;
+	globus_off_t           FileOffset;
 
 	struct {
 		int            FileFD;
@@ -114,12 +109,56 @@ typedef struct pio_request {
 		hpss_pio_grp_t StripeGroup;
 	} Participant;
 
-	/* Lock controls everything below it. */
-	globus_mutex_t Lock;
-	globus_cond_t  Cond;
+	/* Access controlled via Transfer State lock */
 	globus_bool_t  CoordHasExitted;
 	globus_bool_t  ParticHasExitted;
 } pio_request_t;
+
+typedef struct gridftp_request {
+	transfer_state_t * TransferState;
+	buffer_handle_t  * BufferHandle;
+
+	/* Access controlled via Transfer State lock */
+	globus_off_t       TransferOffset; /* For RETR operations. */
+	int                OpCount; /* Number of outstanding read/writes */
+} gridftp_request_t;
+
+static void
+globus_i_gfs_hpss_module_gridftp_launch_write(globus_gfs_operation_t   Operation,
+                                              gridftp_request_t      * GridFTPRequest);
+
+static void
+globus_i_gfs_hpss_module_gridftp_launch_read(globus_gfs_operation_t   Operation,
+                                             gridftp_request_t      * GridFTPRequest);
+
+static void
+globus_i_gfs_hpss_module_init_transfer_state(transfer_state_t * TransferState)
+{
+	GlobusGFSName(globus_i_gfs_hpss_module_init_transfer_state);
+	GlobusGFSHpssDebugEnter();
+
+	memset(TransferState, 0, sizeof(transfer_state_t));
+	globus_mutex_init(&TransferState->Lock, NULL);
+	globus_cond_init(&TransferState->Cond, NULL);
+	TransferState->Eof          = GLOBUS_FALSE;
+	TransferState->Result       = GLOBUS_SUCCESS;
+
+	GlobusGFSHpssDebugExit();
+}
+
+static void
+globus_i_gfs_hpss_module_destroy_transfer_state(transfer_state_t * TransferState)
+                               
+{
+	GlobusGFSName(globus_i_gfs_hpss_module_destroy_transfer_state);
+	GlobusGFSHpssDebugEnter();
+
+	memset(TransferState, 0, sizeof(transfer_state_t));
+	globus_mutex_destroy(&TransferState->Lock);
+	globus_cond_destroy(&TransferState->Cond);
+
+	GlobusGFSHpssDebugExit();
+}
 
 /*
  * This is used to define the debug print statements.
@@ -161,8 +200,8 @@ globus_i_gfs_hpss_module_auth_to_hpss(
 	}
 
 	/* Indicate that we are doing unix authentication. */
+	api_config.Flags     =  API_USE_CONFIG;
 /* XXX detect this */
-	api_config.Flags     =! API_USE_CONFIG;
 	api_config.AuthnMech =  hpss_authn_mech_unix;
 
 	/* Now set the current HPSS client configuration. */
@@ -224,8 +263,7 @@ cleanup:
 
 /*
  * Called at the start of a new session (control connection) just after
- * GSI authentication. Authenticate to HPSS and save off session info
- * that we'll need later.
+ * GSI authentication. Authenticate to HPSS.
  */
 static void
 globus_l_gfs_hpss_module_session_start(
@@ -234,8 +272,8 @@ globus_l_gfs_hpss_module_session_start(
 {
 	char              * home_directory = NULL;
     globus_result_t     result         = GLOBUS_SUCCESS;
-    globus_gfs_stat_t * stat_buf_array = NULL;
-	int                 stat_buf_count = 0;
+    globus_gfs_stat_t * gfs_stat_array = NULL;
+	int                 gfs_stat_count = 0;
 
     GlobusGFSName(globus_l_gfs_hpss_module_session_start);
     GlobusGFSHpssDebugEnter();
@@ -273,12 +311,12 @@ globus_l_gfs_hpss_module_session_start(
 	 * Let's make sure the home directory exists so we do not drop them into
 	 * oblivion.
 	 */
-	result = globus_l_gfs_hpss_common_stat(home_directory,
-	                                       GLOBUS_TRUE,  /* FileOnly        */
-	                                       GLOBUS_FALSE, /* UseSymlinkInfo  */
-	                                       GLOBUS_TRUE , /* IncludePathStat */
-	                                       &stat_buf_array,
-	                                       &stat_buf_count);
+	result = globus_l_gfs_hpss_common_gfs_stat(home_directory,
+	                                           GLOBUS_TRUE,  /* FileOnly        */
+	                                           GLOBUS_FALSE, /* UseSymlinkInfo  */
+	                                           GLOBUS_TRUE,  /* IncludePathStat */
+	                                           &gfs_stat_array,
+	                                           &gfs_stat_count);
 	if (result != GLOBUS_SUCCESS)
 	{
 		/* Make the error message a little more obvious. */
@@ -288,7 +326,7 @@ globus_l_gfs_hpss_module_session_start(
 	}
 
 	/* It exists, that's good enough for us. */
-	globus_l_gfs_hpss_common_destroy_stat_array(stat_buf_array, stat_buf_count);
+	globus_l_gfs_hpss_common_destroy_gfs_stat_array(gfs_stat_array, gfs_stat_count);
 
 	/*
 	 * Inform the server that we are done. If we do not pass in a username, the
@@ -324,8 +362,6 @@ cleanup:
 static void
 globus_l_gfs_hpss_module_session_end(void * Arg)
 {
-	/* session_handle_t * session_handle = NULL; */
-
 	GlobusGFSName(globus_l_gfs_hpss_module_session_end);
 	GlobusGFSHpssDebugEnter();
 
@@ -340,403 +376,246 @@ globus_l_gfs_hpss_module_session_end(void * Arg)
 	GlobusGFSHpssDebugExit();
 }
 
-static void
-globus_i_gfs_hpss_module_init_buffers(transfer_request_t * TransferRequest,
-	                                  globus_size_t        BufferLength)
-{
-	GlobusGFSName(globus_i_gfs_hpss_module_init_buffers);
-	GlobusGFSHpssDebugEnter();
-
-	globus_assert(TransferRequest->Buffers.FullBufferChain  == NULL);
-	globus_assert(TransferRequest->Buffers.EmptyBufferChain == NULL);
-	globus_assert(TransferRequest->Buffers.ValidWaiter      == GLOBUS_FALSE);
-
-	/* Save off the length used for each buffer. */
-	TransferRequest->Buffers.BufferLength = BufferLength;
-
-	/* Initialize the condition. */
-	globus_cond_init(&TransferRequest->Buffers.Cond, NULL);
-
-	GlobusGFSHpssDebugExit();
-}
-
-static int
-globus_i_gfs_hpss_module_allocate_buffer(transfer_request_t *  TransferRequest,
-                                         char               ** Buffer)
-{
-	int retval = 0;
-
-	GlobusGFSName(globus_i_gfs_hpss_module_allocate_buffer);
-	GlobusGFSHpssDebugEnter();
-
-	globus_mutex_lock(&TransferRequest->Lock);
-	{
-		/* Allocate the buffer. */
-		*Buffer = (char *) globus_malloc(TransferRequest->Buffers.BufferLength);
-		if (*Buffer == NULL)
-		{
-			/* Save the error. */
-			if (TransferRequest->Result == GLOBUS_SUCCESS)
-				TransferRequest->Result =  GlobusGFSErrorMemory("buffer");
-
-			retval = 1;
-		}
-	}
-	globus_mutex_unlock(&TransferRequest->Lock);
-
-	if (retval != 0)
-	{
-		GlobusGFSHpssDebugExitWithError();
-		return retval;
-	}
-
-	GlobusGFSHpssDebugExit();
-	return 0;
-}
+#define GSU_MAX_USERNAME_LENGTH 256
 
 static void
-globus_i_gfs_hpss_module_deallocate_buffer(void * Buffer)
+globus_l_gfs_hpss_module_list_single_line(
+    hpss_stat_t * HpssStat,
+	char        * FullPath,
+    char        * Buffer,
+    int           BufferLength)
 {
-	GlobusGFSName(globus_i_gfs_hpss_module_deallocate_buffer);
+	globus_result_t   result = GLOBUS_SUCCESS;
+	char              archive[3];
+	globus_bool_t     archived  = GLOBUS_FALSE;
+	char            * name      = NULL;
+	char            * username  = NULL;
+	char            * groupname = NULL;
+	char              user[GSU_MAX_USERNAME_LENGTH];
+	char              grp[GSU_MAX_USERNAME_LENGTH];
+	struct tm       * tm;
+	char              perms[11];
+	time_t            mtime;
+	char            * month_lookup[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+	                                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+	GlobusGFSName(globus_l_gfs_hpss_module_list_single_line);
 	GlobusGFSHpssDebugEnter();
 
-	if (Buffer != NULL)
-		globus_free(Buffer);
+	strcpy(perms, "----------");
+
+	/* Grab the local time. */
+	mtime = HpssStat->hpss_st_mtime;
+	tm = localtime(&mtime);
+
+	/* Ignore the return values for now. */
+	result = globus_l_gfs_hpss_common_uid_to_username(HpssStat->st_uid, &username);
+	globus_l_gfs_hpss_common_destroy_result(result);
+
+	result = globus_l_gfs_hpss_common_gid_to_groupname(HpssStat->st_gid, &groupname);
+	globus_l_gfs_hpss_common_destroy_result(result);
+
+	if(S_ISDIR(HpssStat->st_mode))
+	{
+		perms[0] = 'd';
+	}
+	else if(S_ISLNK(HpssStat->st_mode))
+	{
+		perms[0] = 'l';
+	}
+	else if(S_ISFIFO(HpssStat->st_mode))
+	{
+		perms[0] = 'p';
+	}
+	else if(S_ISCHR(HpssStat->st_mode))
+	{
+		perms[0] = 'c';
+	}
+	else if(S_ISBLK(HpssStat->st_mode))
+	{
+		perms[0] = 'b';
+	}
+
+	if(S_IRUSR & HpssStat->st_mode)
+	{
+		perms[1] = 'r';
+	}
+	if(S_IWUSR & HpssStat->st_mode)
+	{
+		perms[2] = 'w';
+	}
+	if(S_IXUSR & HpssStat->st_mode)
+	{
+		perms[3] = 'x';
+	}
+	if(S_IRGRP & HpssStat->st_mode)
+	{
+		perms[4] = 'r';
+	}
+	if(S_IWGRP & HpssStat->st_mode)
+	{
+		perms[5] = 'w';
+	}
+	if(S_IXGRP & HpssStat->st_mode)
+	{
+		perms[6] = 'x';
+	}
+	if(S_IROTH & HpssStat->st_mode)
+	{
+		perms[7] = 'r';
+	}
+	if(S_IWOTH & HpssStat->st_mode)
+	{
+		perms[8] = 'w';
+	}
+	if(S_IXOTH & HpssStat->st_mode)
+	{
+		perms[9] = 'x';
+	}
+
+	if (username != NULL)
+	{
+		/* Field width of 8 and max 8 characters. */
+		snprintf(user, sizeof(user), "%8.8s", username);
+	} else
+	{
+		/* Field width of 8 with space padding. */
+		snprintf(user, sizeof(user), "%8d", HpssStat->st_uid);
+	}
+
+	if (groupname != NULL)
+	{
+		/* Field width of 8 and max 8 characters. */
+		snprintf(grp, sizeof(grp), "%8.8s", groupname);
+	} else
+	{
+		/* Field width of 8 with space padding. */
+		snprintf(grp, sizeof(grp), "%8d", HpssStat->st_gid);
+	}
+
+	name = strrchr(FullPath, '/');
+	if (name == NULL)
+		name = FullPath;
+	else
+		name++;
+
+	/* Default archive status. */
+	snprintf(archive, sizeof(archive), "%s", "DK");
+
+	/* If this is a regular file... */
+	if (S_ISREG(HpssStat->st_mode))
+	{
+		/* Determine if it is archived. */
+		result = globus_l_gfs_hpss_common_file_archived(FullPath, &archived);
+		if (result != GLOBUS_SUCCESS)
+		{
+			snprintf(archive, sizeof(archive), "%s", "??");
+			globus_l_gfs_hpss_common_destroy_result(result);
+		} else if (archived == GLOBUS_TRUE)
+		{
+			snprintf(archive, sizeof(archive), "%s", "AR");
+		} else
+		{
+			snprintf(archive, sizeof(archive), "%s", "DK");
+		}
+	}
+
+	snprintf(Buffer, 
+	         BufferLength,
+	         "%s %3d %s %s %s %12"GLOBUS_OFF_T_FORMAT" %s %2d %02d:%02d %s\n",
+	         perms,
+	         HpssStat->st_nlink,
+	         user,
+	         grp,
+	         archive,
+	         HpssStat->st_size,
+	         month_lookup[tm->tm_mon],
+	         tm->tm_mday,
+	         tm->tm_hour,
+	         tm->tm_min,
+	         name);
+
+	if (username != NULL)
+		globus_free(username);
+	if (groupname != NULL)
+		globus_free(groupname);
 
 	GlobusGFSHpssDebugExit();
 }
 
 static void
-globus_i_gfs_hpss_module_destroy_buffers(transfer_request_t * TransferRequest)
+globus_i_gfs_hpss_module_set_optimal_buffer_count(buffer_handle_t        * BufferHandle,
+                                                  globus_gfs_operation_t   Operation)
 {
-	buffer_t * buffer_s = NULL;
+	int optimal_concurrency = 0;
 
-	GlobusGFSName(globus_i_gfs_hpss_module_destroy_buffers);
+	GlobusGFSName(globus_i_gfs_hpss_module_set_optimal_buffer_count);
 	GlobusGFSHpssDebugEnter();
 
-	/* Free the full chain. */
-	while ((buffer_s = TransferRequest->Buffers.FullBufferChain) != NULL)
+	globus_mutex_lock(&BufferHandle->Lock);
 	{
-		TransferRequest->Buffers.FullBufferChain = buffer_s->Next;
-		globus_free(buffer_s->Data);
-		globus_free(buffer_s);
-	}
+		/* Get the optimal concurrency for GridFTP. */
+		globus_gridftp_server_get_optimal_concurrency(Operation, &optimal_concurrency);
 
-	/* Free the empty chain. */
-	while ((buffer_s = TransferRequest->Buffers.EmptyBufferChain) != NULL)
-	{
-		TransferRequest->Buffers.EmptyBufferChain = buffer_s->Next;
-		globus_free(buffer_s->Data);
-		globus_free(buffer_s);
+		/* Add in a couple for PIO. */
+		BufferHandle->OptimalBufferCount = optimal_concurrency + 2;
 	}
-
-	globus_cond_destroy(&TransferRequest->Buffers.Cond);
+	globus_mutex_unlock(&BufferHandle->Lock);
 
 	GlobusGFSHpssDebugExit();
 }
 
-static int
-globus_i_gfs_hpss_module_release_empty_buffer(transfer_request_t * TransferRequest,
-                                              void               * Buffer)
+static void
+globus_i_gfs_hpss_module_init_buffer_handle(globus_gfs_operation_t   Operation,
+                                            buffer_handle_t        * BufferHandle)
 {
-	int        retval   = 1;
-	buffer_t * buffer_s = NULL;
-
-	GlobusGFSName(globus_i_gfs_hpss_module_release_empty_buffer);
+	GlobusGFSName(globus_i_gfs_hpss_module_init_buffer_handle);
 	GlobusGFSHpssDebugEnter();
 
-	/* Safety check in case we are called with a NULL buffer. */
-	if (Buffer == NULL)
-		goto cleanup;
-
-	/* Now put it on the list. */
-	globus_mutex_lock(&TransferRequest->Lock);
-	{
-		do {
-			/*
-			 * Allocate the buffer list entry.
-			 */
-			buffer_s = (buffer_t *) globus_calloc(1, sizeof(buffer_t));
-			if (buffer_s == NULL)
-			{
-				if (TransferRequest->Result == GLOBUS_SUCCESS)
-					TransferRequest->Result = GlobusGFSErrorMemory("buffer_t");
-				break;
-			}
-
-			/* Save the buffer. */
-			buffer_s->Data = Buffer;
-
-			/* Put it on the empty list. */
-			buffer_s->Next = TransferRequest->Buffers.EmptyBufferChain;
-			if (TransferRequest->Buffers.EmptyBufferChain != NULL)
-				TransferRequest->Buffers.EmptyBufferChain->Prev = buffer_s;
-			TransferRequest->Buffers.EmptyBufferChain = buffer_s;
-
-			/* Indicate success. */
-			retval = 0;
-		} while (0);
-	}
-	globus_mutex_unlock(&TransferRequest->Lock);
-	
-	if (retval != 0)
-	{
-		GlobusGFSHpssDebugExitWithError();
-		return retval;
-	}
-
-cleanup:
-	GlobusGFSHpssDebugExit();
-	return 0;
-}
-
-static int
-globus_i_gfs_hpss_module_get_emtpy_buffer(transfer_request_t *  TransferRequest,
-                                          char               ** Buffer)
-{
-	int        retval   = 0;
-	buffer_t * buffer_s = NULL;
-
-	GlobusGFSName(globus_i_gfs_hpss_module_get_emtpy_buffer);
-	GlobusGFSHpssDebugEnter();
-
-	/* Initialize the return value. */
-	*Buffer = NULL;
-
-	globus_mutex_lock(&TransferRequest->Lock);
-	{
-		if (TransferRequest->Buffers.EmptyBufferChain != NULL)
-		{
-			/* Remove the next free buffer from the list. */
-			buffer_s = TransferRequest->Buffers.EmptyBufferChain;
-			if (buffer_s->Next != NULL)
-				buffer_s->Next->Prev = buffer_s->Prev;
-			TransferRequest->Buffers.EmptyBufferChain = buffer_s->Next;
-
-			/* Save the buffer. */
-			*Buffer = buffer_s->Data;
-
-			/* Deallocate the list structure. */
-			globus_free(buffer_s);
-		}
-	}
-	globus_mutex_unlock(&TransferRequest->Lock);
-
-	/* Allocate a new free buffer. */
-	if (*Buffer == NULL)
-		retval = globus_i_gfs_hpss_module_allocate_buffer(TransferRequest, Buffer);
-
-	if (retval != 0)
-	{
-		GlobusGFSHpssDebugExitWithError();
-		return retval;
-	}
-
-	GlobusGFSHpssDebugExit();
-	return 0;
-}
-
-static int
-globus_i_gfs_hpss_module_get_full_buffer(transfer_request_t *  TransferRequest,
-                                         globus_off_t          TransferOffset,
-                                         void               ** Buffer,
-                                         globus_size_t      *  BufferLength)
-{
-	int        retval   = 0;
-	buffer_t * buffer_s = NULL;
-
-	GlobusGFSName(globus_i_gfs_hpss_module_get_full_buffer);
-	GlobusGFSHpssDebugEnter();
-
-	globus_mutex_lock(&TransferRequest->Lock);
-	{
-		do
-		{
-			/* Check if an error has occurred. */
-			if (TransferRequest->Result != GLOBUS_SUCCESS)
-			{
-				retval = 1;
-				break;
-			}
-
-			/* Search the full list for our buffer. */
-			for (buffer_s  = TransferRequest->Buffers.FullBufferChain;
-			     buffer_s != NULL && buffer_s->TransferOffset != TransferOffset;
-			     buffer_s  = buffer_s->Next);
-
-/* XXX just need to wake up if error occurs while waiting on a buffer. */
-			if (buffer_s == NULL)
-			{
-				/* Wait for it. */
-				TransferRequest->Buffers.ValidWaiter = GLOBUS_TRUE;
-				{
-					TransferRequest->Buffers.TransferOffset = TransferOffset;
-					globus_cond_wait(&TransferRequest->Buffers.Cond,
-					                 &TransferRequest->Lock);
-				}
-				TransferRequest->Buffers.ValidWaiter = GLOBUS_FALSE;
-			}
-		} while (buffer_s == NULL);
-
-		/* Either we have a buffer or an error. */
-		if (buffer_s != NULL)
-		{
-			/* Remove it from the list. */
-			if (buffer_s->Prev != NULL)
-				buffer_s->Prev->Next = buffer_s->Next;
-			else
-				TransferRequest->Buffers.FullBufferChain = buffer_s->Next;
-
-			if (buffer_s->Next != NULL)
-				buffer_s->Next->Prev = buffer_s->Prev;
-
-			/* Save the buffer and the number of bytes it contains. */
-			*Buffer       = buffer_s->Data;
-			*BufferLength = buffer_s->DataLength;
-
-			/* Deallocate the buffer. */
-			globus_free(buffer_s);
-		}
-	}
-	globus_mutex_unlock(&TransferRequest->Lock);
-
-	GlobusGFSHpssDebugExit();
-	return retval;
-}
-
-static int
-globus_i_gfs_hpss_module_release_full_buffer(transfer_request_t * TransferRequest,
-                                             void               * Buffer,
-                                             globus_off_t         TransferOffset,
-                                             globus_size_t        BufferLength)
-{
-	int        retval   = 1;
-	buffer_t * buffer_s = NULL;
-
-	GlobusGFSName(globus_i_gfs_hpss_module_release_full_buffer);
-	GlobusGFSHpssDebugEnter();
-
-	/* Safety check in case we are called with a NULL buffer. */
-	if (Buffer == NULL)
-		goto cleanup;
-
-	/* Now put it on the list. */
-	globus_mutex_lock(&TransferRequest->Lock);
-	{
-		do {
-			/*
-			 * Allocate the buffer list entry.
-			 */
-			buffer_s = (buffer_t *) globus_calloc(1, sizeof(buffer_t));
-			if (buffer_s == NULL)
-			{
-				if (TransferRequest->Result == GLOBUS_SUCCESS)
-					TransferRequest->Result = GlobusGFSErrorMemory("buffer_t");
-				break;
-			}
-
-			/* Save the buffer. */
-			buffer_s->Data = Buffer;
-			buffer_s->TransferOffset = TransferOffset;
-			buffer_s->DataLength     = BufferLength;
-
-			/* Put it on the full list. */
-			buffer_s->Next = TransferRequest->Buffers.FullBufferChain;
-			if (TransferRequest->Buffers.FullBufferChain != NULL)
-				TransferRequest->Buffers.FullBufferChain->Prev = buffer_s;
-			TransferRequest->Buffers.FullBufferChain = buffer_s;
-
-			/* If there is a valid waiter... */
-			if (TransferRequest->Buffers.ValidWaiter == GLOBUS_TRUE)
-			{
-				/* If they are waiting for this offset... */
-				if (TransferRequest->Buffers.TransferOffset == TransferOffset)
-				{
-					/* Wake the waiter. */
-					globus_cond_signal(&TransferRequest->Buffers.Cond);
-				}
-			}
-
-			/* Indicate success. */
-			retval = 0;
-		} while (0);
-	}
-	globus_mutex_unlock(&TransferRequest->Lock);
-	
-	if (retval != 0)
-	{
-		GlobusGFSHpssDebugExitWithError();
-		return retval;
-	}
-
-cleanup:
-	GlobusGFSHpssDebugExit();
-	return 0;
-}
-
-
-/* Start our request. */
-static globus_result_t 
-globus_i_gfs_hpss_module_init_transfer_request(transfer_request_type_t      RequestType,
-                                               globus_gfs_operation_t       Operation,
-                                               globus_gfs_transfer_info_t * TransferInfo,
-                                               transfer_request_t         * TransferRequest)
-{
-	globus_size_t       buffer_length = 0;
-	globus_result_t     result        = GLOBUS_SUCCESS;
-	globus_gfs_stat_t * statbuf_array = NULL;
-	int                 statbuf_count = 0;
-
-	GlobusGFSName(globus_i_gfs_hpss_module_init_transfer_request);
-	GlobusGFSHpssDebugEnter();
-
-	memset(TransferRequest, 0, sizeof(transfer_request_t));
-	TransferRequest->RequestType  = RequestType;
-	TransferRequest->Operation    = Operation;
-	TransferRequest->TransferInfo = TransferInfo;
-
-	globus_mutex_init(&TransferRequest->Lock, NULL);
-	globus_cond_init(&TransferRequest->Buffers.Cond, NULL);
-	TransferRequest->Result = GLOBUS_SUCCESS;
+	memset(BufferHandle, 0, sizeof(buffer_handle_t));
 
 	/* Determine the GridFTP blocksize (used as the server's buffer size). */
-	globus_gridftp_server_get_block_size(Operation, &buffer_length);
+	globus_gridftp_server_get_block_size(Operation, 
+	                                    &BufferHandle->BufferLength);
 
-	/* True for STOR. */
-	TransferRequest->TransferLength = TransferRequest->TransferInfo->alloc_size;
+	/* Set our optimal buffer count. */
+	globus_i_gfs_hpss_module_set_optimal_buffer_count(BufferHandle, Operation);
 
-	if (RequestType == READ_REQUEST)
+	globus_mutex_init(&BufferHandle->Lock, NULL);
+
+	GlobusGFSHpssDebugExit();
+}
+
+static globus_result_t
+globus_i_gfs_hpss_module_try_allocate_buffer(buffer_handle_t *  BufferHandle,
+                                             char            ** Buffer)
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(globus_i_gfs_hpss_module_try_allocate_buffer);
+	GlobusGFSHpssDebugEnter();
+
+	*Buffer = NULL;
+
+	globus_mutex_lock(&BufferHandle->Lock);
 	{
-		/* Use the given length. */
-		TransferRequest->TransferLength = TransferRequest->TransferInfo->partial_length;
-
-		/* If the length wasn't given... */
-		if (TransferRequest->TransferInfo->partial_length == -1)
+		if (BufferHandle->TotalBufferCount < BufferHandle->OptimalBufferCount)
 		{
-			/* Stat the file. */
-			result = globus_l_gfs_hpss_common_stat(TransferRequest->TransferInfo->pathname,
-			                                       GLOBUS_TRUE,  /* FileOnly        */
-			                                       GLOBUS_FALSE, /* UseSymlinkInfoi */
-			                                       GLOBUS_TRUE,  /* IncludePathStat */
-			                                       &statbuf_array,
-			                                       &statbuf_count);
-			if (result != GLOBUS_SUCCESS)
-				goto cleanup;
+			/* Allocate the buffer. */
+			*Buffer = (char *) globus_malloc(BufferHandle->BufferLength);
+			if (*Buffer == NULL)
+				result = GlobusGFSErrorMemory("buffer");
 
-			TransferRequest->TransferLength = statbuf_array[0].size;
-
-			/* Adjust for partial offset transfers. */
-			if (TransferRequest->TransferInfo->partial_offset != -1)
-				TransferRequest->TransferLength -= TransferRequest->TransferInfo->partial_offset;
-
-			globus_l_gfs_hpss_common_destroy_stat_array(statbuf_array, statbuf_count);
+			/* If we are successful... */
+			if (result == GLOBUS_SUCCESS)
+			{
+				/* Increment the total buffer count. */
+				BufferHandle->TotalBufferCount++;
+			}
 		}
 	}
+	globus_mutex_unlock(&BufferHandle->Lock);
 
-	/* Initialize the free & empty buffer chains. */
-	globus_i_gfs_hpss_module_init_buffers(TransferRequest, buffer_length);
-
-cleanup:
 	if (result != GLOBUS_SUCCESS)
 	{
 		GlobusGFSHpssDebugExitWithError();
@@ -748,147 +627,78 @@ cleanup:
 }
 
 static void
-globus_i_gfs_hpss_module_destroy_transfer_request(transfer_request_t * TransferRequest)
+globus_i_gfs_hpss_module_destroy_buffer_handle(buffer_handle_t * BufferHandle)
 {
-	GlobusGFSName(globus_i_gfs_hpss_module_destroy_transfer_request);
+	buffer_t * buffer_s = NULL;
+
+	GlobusGFSName(globus_i_gfs_hpss_module_destroy_buffer_handle);
 	GlobusGFSHpssDebugEnter();
 
-	globus_mutex_destroy(&TransferRequest->Lock);
+	/* Free the full chain. */
+	while ((buffer_s = BufferHandle->FullBufferChain) != NULL)
+	{
+		BufferHandle->FullBufferChain = buffer_s->Next;
+		globus_free(buffer_s->Data);
+		globus_free(buffer_s);
+	}
 
-	/* Destroy the buffer chains. */
-	globus_i_gfs_hpss_module_destroy_buffers(TransferRequest);
+	/* Free the empty chain. */
+	while ((buffer_s = BufferHandle->EmptyBufferChain) != NULL)
+	{
+		BufferHandle->EmptyBufferChain = buffer_s->Next;
+		globus_free(buffer_s->Data);
+		globus_free(buffer_s);
+	}
+
+	globus_mutex_destroy(&BufferHandle->Lock);
 
 	GlobusGFSHpssDebugExit();
 }
 
-static globus_result_t
-globus_i_gfs_hpss_module_init_pio(pio_request_t      * PIORequest,
-                                  transfer_request_t * TransferRequest)
+/*
+ *  Get a buffer from the empty chain. If it is full, try to allocate a new
+ *  buffer. New buffers are only allocated if the total buffer count is 
+ *  within the allowed range.
+ */
+static int
+globus_i_gfs_hpss_module_get_empty_buffer(buffer_handle_t *  BufferHandle,
+                                          char            ** Buffer)
 {
-	int                     retval = 0;
-	int                     flags  = 0;
-	void                 *  buffer = NULL;
-	unsigned int            buflen = 0;
-	globus_result_t         result = GLOBUS_SUCCESS;
-	hpss_cos_hints_t        hints_in;
-	hpss_cos_hints_t        hints_out;
-	hpss_pio_params_t       pio_params;
-	hpss_cos_priorities_t   priorities;
+	globus_result_t   result   = GLOBUS_SUCCESS;
+	buffer_t        * buffer_s = NULL;
 
-	GlobusGFSName(globus_i_gfs_hpss_module_init_pio);
+	GlobusGFSName(globus_i_gfs_hpss_module_get_empty_buffer);
 	GlobusGFSHpssDebugEnter();
 
-	/*
-	 * Initialize the pio request structure. 
-	 */
-	memset(PIORequest, 0, sizeof(pio_request_t));
+	/* Initialize the return value. */
+	*Buffer = NULL;
 
-	/* Store the transfer request. */
-	PIORequest->TransferRequest = TransferRequest;
-
-	/* Initialize the lock and condition */
-	globus_mutex_init(&PIORequest->Lock, NULL);
-	globus_cond_init(&PIORequest->Cond, NULL);
-
-	/* Initialize the hints in. */
-	memset(&hints_in, 0, sizeof(hpss_cos_hints_t));
-
-	if (TransferRequest->RequestType == WRITE_REQUEST)
+	globus_mutex_lock(&BufferHandle->Lock);
 	{
-		CONVERT_LONGLONG_TO_U64(TransferRequest->TransferInfo->alloc_size,hints_in.MinFileSize);
-		CONVERT_LONGLONG_TO_U64(TransferRequest->TransferInfo->alloc_size,hints_in.MaxFileSize);
+		if (BufferHandle->EmptyBufferChain != NULL)
+		{
+			/* Remove the next free buffer from the list. */
+			buffer_s = BufferHandle->EmptyBufferChain;
+			BufferHandle->EmptyBufferChain = buffer_s->Next;
+			if (BufferHandle->EmptyBufferChain != NULL)
+				BufferHandle->EmptyBufferChain->Prev = NULL;
+
+			/* Decrement the empty buffer count. */
+			BufferHandle->EmptyBufferCount--;
+
+			/* Save the buffer. */
+			*Buffer = buffer_s->Data;
+
+			/* Deallocate the list structure. */
+			globus_free(buffer_s);
+		}
 	}
+	globus_mutex_unlock(&BufferHandle->Lock);
 
+	/* Allocate a new free buffer. */
+	if (*Buffer == NULL)
+		result = globus_i_gfs_hpss_module_try_allocate_buffer(BufferHandle, Buffer);
 
-/* XXX remove this for release. */
-/*
-strncpy(hints_in.COSName, "GRIDFTP_DSI_TEST", HPSS_MAX_OBJECT_NAME);
-*/
-
-	/* Initialize the hints out. */
-	memset(&hints_out, 0, sizeof(hpss_cos_hints_t));
-
-	/* Initialize the priorities. */
-	memset(&priorities, 0, sizeof(hpss_cos_priorities_t));
-
-	if (TransferRequest->RequestType == WRITE_REQUEST)
-	{
-		priorities.MinFileSizePriority = LOWEST_PRIORITY;
-		priorities.MaxFileSizePriority = LOWEST_PRIORITY;
-	}
-
-/*
-priorities.COSNamePriority = REQUIRED_PRIORITY;
-*/
-
-	/* Set the open flags. */
-	flags = O_RDWR;
-
-	if (TransferRequest->RequestType == WRITE_REQUEST)
-		flags |= O_CREAT;
-
-	if (TransferRequest->TransferInfo->truncate == GLOBUS_TRUE)
-		flags |= O_TRUNC;
-
-	/*
-	 * Open the HPSS file. We need the file's stripe width before we call
-	 * hpss_PIOStart().
-	 */
-	PIORequest->Coordinator.FileFD = hpss_Open(TransferRequest->TransferInfo->pathname,
-	                                           flags,
-	                                           S_IRUSR|S_IWUSR,
-	                                           &hints_in,    /* Hints In      */
-	                                           &priorities,  /* Priorities In */
-	                                           &hints_out);  /* Hints Out     */
-	if (PIORequest->Coordinator.FileFD < 0)
-	{
-        result = GlobusGFSErrorSystemError("hpss_Open", -PIORequest->Coordinator.FileFD);
-		goto cleanup;
-	}
-
-	/*
-	 * Now call hpss_PIOStart() to generate the stripe group will need for both
-	 * hpss_PIOExecute() and hpss_PIORegister().
-	 */
-	pio_params.Operation       = HPSS_PIO_WRITE;
-	if (TransferRequest->RequestType == READ_REQUEST)
-		pio_params.Operation   = HPSS_PIO_READ;
-
-	pio_params.ClntStripeWidth = 1;
-	pio_params.BlockSize       = TransferRequest->Buffers.BufferLength;
-	pio_params.FileStripeWidth = hints_out.StripeWidth;
-	pio_params.IOTimeOutSecs   = 0;
-	pio_params.Transport       = HPSS_PIO_MVR_SELECT;
-	pio_params.Options         = 0; /* HPSS_PIO_HANDLE_GAP; */
-
-	/* Now call the start routine. */
-	retval = hpss_PIOStart(&pio_params, &PIORequest->Coordinator.StripeGroup);
-	if (retval != 0)
-	{
-        result = GlobusGFSErrorSystemError("hpss_PIOStart", -retval);
-		goto cleanup;
-	}
-
-	/*
-	 * Copy the stripe group for the participant.
-	 */
-	retval = hpss_PIOExportGrp(PIORequest->Coordinator.StripeGroup,
-	                           &buffer,
-	                           &buflen);
-	if (retval != 0)
-	{
-        result = GlobusGFSErrorSystemError("hpss_PIOExportGrp", -retval);
-		goto cleanup;
-	}
-
-	retval = hpss_PIOImportGrp(buffer, buflen, &PIORequest->Participant.StripeGroup);
-	if (retval != 0)
-	{
-        result = GlobusGFSErrorSystemError("hpss_PIOImportGrp", -retval);
-		goto cleanup;
-	}
-
-cleanup:
 	if (result != GLOBUS_SUCCESS)
 	{
 		GlobusGFSHpssDebugExitWithError();
@@ -896,33 +706,190 @@ cleanup:
 	}
 
 	GlobusGFSHpssDebugExit();
-	return result;
+	return GLOBUS_SUCCESS;
 }
 
 static void
-globus_i_gfs_hpss_module_destroy_pio(pio_request_t * PIORequest)
+globus_i_gfs_hpss_module_release_empty_buffer(buffer_handle_t * BufferHandle,
+                                              void            * Buffer)
 {
-    GlobusGFSName(globus_i_gfs_hpss_module_destroy_pio);
-    GlobusGFSHpssDebugEnter();
+	buffer_t * buffer_s = NULL;
 
-	/*
-	 * Perform all cleanup on this structure.
-	 */
-	if (PIORequest->Coordinator.FileFD >= 0)
-		hpss_Close(PIORequest->Coordinator.FileFD);
+	GlobusGFSName(globus_i_gfs_hpss_module_release_empty_buffer);
+	GlobusGFSHpssDebugEnter();
 
-	globus_mutex_destroy(&PIORequest->Lock);
-	globus_cond_destroy(&PIORequest->Cond);
+	/* Safety check in case we are called with a NULL buffer. */
+	if (Buffer == NULL)
+		goto cleanup;
 
-	/* 
-	 * XXX Make sure to prevent bug 1999, nothing can
-	 * prevent the seqeuence PIOImport->PIORegister->PIOEnd. Calling
-	 * PIOImport->PIOEnd will cause a segfault.
-	 */
+	globus_mutex_lock(&BufferHandle->Lock);
+	{
+		/*
+		 * Allocate the buffer list entry.
+		 */
+		buffer_s = (buffer_t *) globus_calloc(1, sizeof(buffer_t));
+
+		if (buffer_s == NULL)
+		{
+			/* Memory failure. Deallocate it instead. */
+			globus_free(Buffer);
+			/* Reduce the total buffer count. */
+			BufferHandle->TotalBufferCount--;
+		} else
+		{
+			/*
+			 * Put it on the list.
+			 */
+
+			/* Save the buffer. */
+			buffer_s->Data = Buffer;
+
+			/* Put it on the empty list. */
+			buffer_s->Next = BufferHandle->EmptyBufferChain;
+			if (BufferHandle->EmptyBufferChain != NULL)
+				BufferHandle->EmptyBufferChain->Prev = buffer_s;
+			BufferHandle->EmptyBufferChain = buffer_s;
+
+			/* Increment the empty buffer count. */
+			BufferHandle->EmptyBufferCount++;
+		}
+	}
+	globus_mutex_unlock(&BufferHandle->Lock);
+	
+cleanup:
 
 	GlobusGFSHpssDebugExit();
+	return;
 }
 
+/*
+ * May return SUCCESS and no buffer if buffer not available.
+ */
+static void
+globus_i_gfs_hpss_module_get_full_buffer(buffer_handle_t *  BufferHandle,
+                                         globus_off_t       TransferOffset,
+                                         void            ** Buffer,
+                                         globus_size_t   *  BufferLength)
+{
+	buffer_t * buffer_s = NULL;
+
+	GlobusGFSName(globus_i_gfs_hpss_module_get_full_buffer);
+	GlobusGFSHpssDebugEnter();
+
+	*Buffer = NULL;
+
+	globus_mutex_lock(&BufferHandle->Lock);
+	{
+		/* Search the full list for our buffer. */
+		for (buffer_s  = BufferHandle->FullBufferChain;
+		     buffer_s != NULL && buffer_s->TransferOffset != TransferOffset;
+		     buffer_s  = buffer_s->Next);
+
+		/* Either we have a buffer, an error or EOF. */
+		if (buffer_s != NULL)
+		{
+			/* Remove it from the list. */
+			if (buffer_s->Prev != NULL)
+				buffer_s->Prev->Next = buffer_s->Next;
+			else
+				BufferHandle->FullBufferChain = buffer_s->Next;
+
+			if (buffer_s->Next != NULL)
+				buffer_s->Next->Prev = buffer_s->Prev;
+
+			/* Decrement the full buffer count. */
+			BufferHandle->FullBufferCount--;
+
+			/* Save the buffer and the number of bytes it contains. */
+			*Buffer       = buffer_s->Data;
+			*BufferLength = buffer_s->DataLength;
+
+			/* Deallocate the buffer struct. */
+			globus_free(buffer_s);
+		}
+	}
+	globus_mutex_unlock(&BufferHandle->Lock);
+
+	GlobusGFSHpssDebugExit();
+	return;
+}
+
+static globus_result_t
+globus_i_gfs_hpss_module_release_full_buffer(buffer_handle_t * BufferHandle,
+                                             void            * Buffer,
+                                             globus_off_t      TransferOffset,
+                                             globus_size_t     BufferLength)
+{
+	globus_result_t   result   = GLOBUS_SUCCESS;
+	buffer_t        * buffer_s = NULL;
+
+	GlobusGFSName(globus_i_gfs_hpss_module_release_full_buffer);
+	GlobusGFSHpssDebugEnter();
+
+	/* Safety check in case we are called with a NULL buffer. */
+	if (Buffer == NULL)
+		goto cleanup;
+
+	/* If this buffer contains no data... */
+	if (BufferLength == 0)
+		goto cleanup;
+
+	/* Allocate the buffer list entry. */
+	buffer_s = (buffer_t *) globus_calloc(1, sizeof(buffer_t));
+	if (buffer_s == NULL)
+	{
+		result = GlobusGFSErrorMemory("buffer_t");
+		goto cleanup;
+	}
+
+	/* Save the buffer. */
+	buffer_s->Data           = Buffer;
+	buffer_s->TransferOffset = TransferOffset;
+	buffer_s->DataLength     = BufferLength;
+
+	/* Now put it on the list. */
+	globus_mutex_lock(&BufferHandle->Lock);
+	{
+/*
+ * Assume these are coming in in ascending order.
+ */
+		/* Put it on the full list. */
+		buffer_s->Next = BufferHandle->FullBufferChain;
+		if (BufferHandle->FullBufferChain != NULL)
+			BufferHandle->FullBufferChain->Prev = buffer_s;
+		BufferHandle->FullBufferChain = buffer_s;
+
+		/* Increment the full buffer count. */
+		BufferHandle->FullBufferCount++;
+	}
+	globus_mutex_unlock(&BufferHandle->Lock);
+	
+	/* Release our reference to it. */
+	Buffer = NULL;
+
+cleanup:
+	/* If we still have a reference to the buffer... */
+	if (Buffer != NULL)
+	{
+		/* Put it on the empty list. */
+		globus_i_gfs_hpss_module_release_empty_buffer(BufferHandle, Buffer);
+	}
+
+	if (result != GLOBUS_SUCCESS)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return result;
+	}
+
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+/*
+ * Due to a bug in hpss_PIORegister(), each time we call hpss_PIOExecute(), this callback
+ * receives the buffer passed to hpss_PIORegister(). To avoid this bug, we must copy the
+ * buffer instead of exchanging it. This is HPSS bug 1660.
+ */
 static int
 globus_i_gfs_hpss_module_pio_register_read_callback(
 	void         *  UserArg,
@@ -930,9 +897,10 @@ globus_i_gfs_hpss_module_pio_register_read_callback(
 	unsigned int *  BufferLength,
 	void         ** Buffer)
 {
-	int             retval          = 0;
+	globus_result_t result          = GLOBUS_SUCCESS;
 	pio_request_t * pio_request     = NULL;
 	globus_off_t    transfer_offset = 0;
+	char          * empty_buffer    = NULL;
 
     GlobusGFSName(globus_i_gfs_hpss_module_pio_register_read_callback);
     GlobusGFSHpssDebugEnter();
@@ -946,41 +914,72 @@ globus_i_gfs_hpss_module_pio_register_read_callback(
 	/* Convert the transfer offset */
 	CONVERT_U64_TO_LONGLONG(TransferOffset, transfer_offset);
 
-	/* Release our full buffer. */
-	retval = globus_i_gfs_hpss_module_release_full_buffer(pio_request->TransferRequest,
-	                                                      *Buffer,
-	                                                      transfer_offset,
-	                                                      *BufferLength);
-	if (retval != 0)
-		goto cleanup;
+	if (*BufferLength != 0)
+	{
+		globus_mutex_lock(&pio_request->TransferState->Lock);
+		{
+			/* Get a buffer. */
+			while (empty_buffer == NULL)
+			{
+				/* Check for an error condition first. */
+				if ((result = pio_request->TransferState->Result) != GLOBUS_SUCCESS)
+					goto cleanup;
 
-	/* Release our reference to the buffer. */
-	*Buffer = NULL;
+				/* Get an empty buffer. */
+				result = globus_i_gfs_hpss_module_get_empty_buffer(pio_request->BufferHandle,
+				                                                   &empty_buffer);
 
-	/* Get an empty buffer. */
-	retval = globus_i_gfs_hpss_module_get_emtpy_buffer(pio_request->TransferRequest, (char **)Buffer);
+				/* Break out on error. */
+				if (result != GLOBUS_SUCCESS)
+					break;
+
+				/* If we have no buffer... */
+				if (empty_buffer == NULL)
+				{
+					/* Wait for an event. */
+					globus_cond_wait(&pio_request->TransferState->Cond,
+					                 &pio_request->TransferState->Lock);
+				}
+			}
+
+			/* Copy the buffer. */
+			memcpy(empty_buffer, *Buffer, *BufferLength);
+
+			/* Release our full buffer. */
+			result = globus_i_gfs_hpss_module_release_full_buffer(pio_request->BufferHandle,
+			                                                      empty_buffer,
+			                                                      transfer_offset,
+			                                                      *BufferLength);
+
+			/* If we got an error or successfully release the buffer, we need to
+			 * wake someone.
+			 */
+			globus_cond_broadcast(&pio_request->TransferState->Cond);
 
 cleanup:
-	/* On error... */
-	if (retval != 0)
-	{
-		/* Deallocate our buffer. */
-		if (*Buffer != NULL)
-			globus_i_gfs_hpss_module_deallocate_buffer(*Buffer);
-		*Buffer = NULL;
+			/* Record any errors. */
+			if (result != GLOBUS_SUCCESS && pio_request->TransferState->Result == GLOBUS_SUCCESS)
+				pio_request->TransferState->Result = result;
+
+		}
+		globus_mutex_unlock(&pio_request->TransferState->Lock);
 	}
+
 	GlobusGFSHpssDebugExit();
 
 	/*
 	 * Notice that retval maybe non zero if we succeed but something else
 	 * in the transfer failed.
 	 */
-	return retval;
+	return (result != GLOBUS_SUCCESS);
 }
 
 /*
  * *Buffer is NULL on the first call even though we passed in a buffer
  *  to PIORegister.
+ *
+ *  This is called when PIO expects a buffer. So if we receive EOF, that
+ *  is a problem.
  */
 static int
 globus_i_gfs_hpss_module_pio_register_write_callback(
@@ -989,9 +988,10 @@ globus_i_gfs_hpss_module_pio_register_write_callback(
 	unsigned int *  BufferLength,
 	void         ** Buffer)
 {
-	int             retval          = 0;
-	pio_request_t * pio_request     = NULL;
-	globus_off_t    transfer_offset = 0;
+	globus_result_t   result          = GLOBUS_SUCCESS;
+	pio_request_t   * pio_request     = NULL;
+	globus_off_t      transfer_offset = 0;
+	globus_size_t     buffer_length   = 0;
 
     GlobusGFSName(globus_i_gfs_hpss_module_pio_register_write_callback);
     GlobusGFSHpssDebugEnter();
@@ -1005,42 +1005,56 @@ globus_i_gfs_hpss_module_pio_register_write_callback(
 	/* Convert the transfer offset */
 	CONVERT_U64_TO_LONGLONG(TransferOffset, transfer_offset);
 
-	/* Release our free buffer. */
-	retval = globus_i_gfs_hpss_module_release_empty_buffer(pio_request->TransferRequest, *Buffer);
-	if (retval != 0)
-		goto cleanup;
-
-	/* Release our reference to the buffer. */
-	*Buffer = NULL;
-
-	/* Get the full buffer @ transfer_offset. */
-	retval = globus_i_gfs_hpss_module_get_full_buffer(pio_request->TransferRequest,
-	                                                  transfer_offset,
-	                                                  Buffer,
-	                                                  BufferLength);
-
-cleanup:
-	/* On error... */
-	if (retval != 0)
+	globus_mutex_lock(&pio_request->TransferState->Lock);
 	{
-		/* Deallocate our buffer. */
-		if (*Buffer != NULL)
-			globus_i_gfs_hpss_module_deallocate_buffer(*Buffer);
+		/* Release our free buffer. */
+		globus_i_gfs_hpss_module_release_empty_buffer(pio_request->BufferHandle, *Buffer);
+
+		/* Release our reference to the buffer. */
 		*Buffer = NULL;
+
+		/* Wake anyone waiting on a free buffer. */
+		globus_cond_broadcast(&pio_request->TransferState->Cond);
+
+		while (TRUE)
+		{
+			/* Check for an error condition first. */
+			if ((result = pio_request->TransferState->Result) != GLOBUS_SUCCESS)
+				goto cleanup;
+
+			/* Get the full buffer @ transfer_offset. */
+			globus_i_gfs_hpss_module_get_full_buffer(pio_request->BufferHandle,
+			                                         transfer_offset,
+			                                         Buffer,
+			                                         &buffer_length);
+
+			if (*Buffer != NULL)
+				break;
+
+			/* If we have no buffer, wait for an event to occur. */
+			globus_cond_wait(&pio_request->TransferState->Cond,
+			                 &pio_request->TransferState->Lock);
+		}
+
+/* XXX How to handle an early EOF? */
+
 	}
+cleanup:
+	globus_mutex_unlock(&pio_request->TransferState->Lock);
+
 	GlobusGFSHpssDebugExit();
 
-	/*
-	 * Notice that retval maybe non zero if we succeed but something else
-	 * in the transfer failed.
-	 */
-	return retval;
+	/* Copy out the buffer length. */
+	*BufferLength = buffer_length;
+
+	return (result != GLOBUS_SUCCESS);
 }
 
 static void *
 globus_i_gfs_hpss_module_pio_register(void * Arg)
 {
 	int               retval      = 0;
+	globus_result_t   result      = GLOBUS_SUCCESS;
 	pio_request_t   * pio_request = NULL;
 	char            * buffer      = NULL;
 
@@ -1052,61 +1066,59 @@ globus_i_gfs_hpss_module_pio_register(void * Arg)
 	 */
 	globus_assert(Arg != NULL);
 
-	/* Cast the arg to our transfer request. */
+	/* Cast the arg to our transfer state. */
 	pio_request = (pio_request_t *) Arg;
 
 	/*
-	 * Allocate the buffer. (Is it even used?)
+	 * Get an empty buffer. (Is it even used?)
 	 */
-	retval = globus_i_gfs_hpss_module_allocate_buffer(pio_request->TransferRequest, &buffer);
-	if (retval != 0)
+	result = globus_i_gfs_hpss_module_get_empty_buffer(pio_request->BufferHandle, &buffer);
+	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
-/* BufferLength must be > (hints?) BlockSize */
 	/* Now register this participant. */
 	retval = hpss_PIORegister(
 	             0,              /* Stripe element.      */
 	             0,              /* DataNetAddr (Unused) */
 	             buffer,         /* Buffer               */
-	             pio_request->TransferRequest->Buffers.BufferLength,
+	             pio_request->BufferHandle->BufferLength,
 	             pio_request->Participant.StripeGroup,
-	             pio_request->TransferRequest->RequestType == WRITE_REQUEST ?
+	             pio_request->PioOperation == HPSS_PIO_WRITE ?
 	              globus_i_gfs_hpss_module_pio_register_write_callback:
 	              globus_i_gfs_hpss_module_pio_register_read_callback,
 	             pio_request);
 
 	/* If an error occurred... */
 	if (retval != 0)
-	{
-		globus_mutex_lock(&pio_request->TransferRequest->Lock);
-		{
-			/* Record it. */
-			if (pio_request->TransferRequest->Result == GLOBUS_SUCCESS)
-			{
-				pio_request->TransferRequest->Result = GlobusGFSErrorSystemError("hpss_PIORegister", -retval);
-			}
-		}
-		globus_mutex_unlock(&pio_request->TransferRequest->Lock);
-	}
+		result = GlobusGFSErrorSystemError("hpss_PIORegister", -retval);
 
 cleanup:
 	/*
-	 * Deallocate the buffer. On a write request, PIORegister() doesn't pass the buffer to
-	 * the callback so we must deallocate it. On a read operation, it (most likely) passes
-	 * it to the callback and then ends up on the full chain.
+	 * Release the buffer. On a write request, PIORegister() doesn't pass the buffer to
+	 * the callback so we must release it. On a read operation, there's a bug in 
+	 * hpss_PIORegister() which forces us to copy the data out instead of exchanging buffers.
 	 */
-	if (pio_request->TransferRequest->RequestType == WRITE_REQUEST)
-		globus_i_gfs_hpss_module_deallocate_buffer(buffer);
+	globus_i_gfs_hpss_module_release_empty_buffer(pio_request->BufferHandle, buffer);
 
-	globus_mutex_lock(&pio_request->Lock);
+	globus_mutex_lock(&pio_request->TransferState->Lock);
 	{
+		/* Record our status. */
+		if (pio_request->TransferState->Result == GLOBUS_SUCCESS)
+			pio_request->TransferState->Result =  result;
+
 		/* Record that we have exitted. */
 		pio_request->ParticHasExitted = GLOBUS_TRUE;
 
 		/* Wake anyone that is waiting. */
-		globus_cond_signal(&pio_request->Cond);
+		globus_cond_broadcast(&pio_request->TransferState->Cond);
 	}
-	globus_mutex_unlock(&pio_request->Lock);
+	globus_mutex_unlock(&pio_request->TransferState->Lock);
+
+	if (result != GLOBUS_SUCCESS)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return NULL;
+	}
 
 	GlobusGFSHpssDebugExit();
 	return NULL;
@@ -1116,6 +1128,7 @@ static void *
 globus_i_gfs_hpss_module_pio_execute(void * Arg)
 {
 	int                  retval      = 0;
+	globus_result_t      result      = GLOBUS_SUCCESS;
 	pio_request_t      * pio_request = NULL;
 	u_signed64           bytes_moved;
 	u_signed64           transfer_offset;
@@ -1133,14 +1146,21 @@ globus_i_gfs_hpss_module_pio_execute(void * Arg)
 	/* Cast the arg to our pio request. */
 	pio_request = (pio_request_t *) Arg;
 
-	CONVERT_LONGLONG_TO_U64(pio_request->TransferRequest->TransferInfo->partial_offset, transfer_offset);
-	if (pio_request->TransferRequest->TransferInfo->partial_offset == -1)
-		transfer_offset = cast64m(0);
-	CONVERT_LONGLONG_TO_U64(pio_request->TransferRequest->TransferLength, transfer_length);
+	CONVERT_LONGLONG_TO_U64(pio_request->FileOffset, transfer_offset);
+	CONVERT_LONGLONG_TO_U64(pio_request->FileLength, transfer_length);
 
-/*
+	/*
+	 * During a read from HPSS, if a 'gap' is found, hpss_PIOExecute kicks out with
+	 * gap_info containing the offset and length of the gap. If we specify
+	 * HPSS_PIO_HANDLE_GAP to hpss_PIOStart(), hpss_PIOExecute() will not kickout
+	 * when a gap is encountered, instead it will retry the transfer after the gap.
+	 * 
+	 * To complicate things further, HPSS 7.4 has a bug with HPSS_PIO_HANDLE_GAP which
+	 * causes it to loop forever. So we'll handle looping here. Call report 775.
+	 */
 	do {
-*/
+		memset(&gap_info, 0, sizeof(hpss_pio_gapinfo_t));
+
 		/* Now fire off the HPSS side of the transfer. */
 		retval = hpss_PIOExecute(pio_request->Coordinator.FileFD,
 		                         transfer_offset,
@@ -1149,66 +1169,124 @@ globus_i_gfs_hpss_module_pio_execute(void * Arg)
 		                         &gap_info,
 		                         &bytes_moved);
 
-/*
-		if (retval == 0)
+		if (retval != 0)
 		{
-			transfer_length = sub64m(transfer_length, bytes_moved);
-			transfer_offset = add64m(transfer_offset, bytes_moved);
+			result = GlobusGFSErrorSystemError("hpss_PIOExecute", -retval);
+			break;
 		}
-	} while (retval == 0 && gt64(transfer_length, cast64m(0)));
-*/
 
-	/* If an error occurred... */
-	if (retval != 0)
-	{
-		globus_mutex_lock(&pio_request->TransferRequest->Lock);
-		{
-			/* Record it. */
-			if (pio_request->TransferRequest->Result == GLOBUS_SUCCESS)
-			{
-				pio_request->TransferRequest->Result = GlobusGFSErrorSystemError("hpss_PIOExecute", -retval);
-			}
-		}
-		globus_mutex_unlock(&pio_request->TransferRequest->Lock);
-	}
+		/* Remove the bytes transferred so far. */
+		transfer_length = sub64m(transfer_length, bytes_moved);
+		/* Remove any gap. */
+		transfer_length = sub64m(transfer_length, gap_info.Length);
 
-	globus_mutex_lock(&pio_request->Lock);
+		/* Add the bytes transferred so far. */
+		transfer_offset = add64m(transfer_offset, bytes_moved);
+		/* Add any gap. */
+		transfer_offset = add64m(transfer_offset, gap_info.Length);
+	} while (gt64(transfer_length, cast64m(0)));
+
+	globus_mutex_lock(&pio_request->TransferState->Lock);
 	{
+		/* Record EOF for read operations. */
+		if (pio_request->PioOperation == HPSS_PIO_READ)
+			pio_request->TransferState->Eof = GLOBUS_TRUE;
+
+		/* Record our error status. */
+		if (pio_request->TransferState->Result == GLOBUS_SUCCESS)
+			pio_request->TransferState->Result =  result;
+
 		/* Record that we have exitted. */
 		pio_request->CoordHasExitted = GLOBUS_TRUE;
 
 		/* Wake anyone that is waiting. */
-		globus_cond_signal(&pio_request->Cond);
+		globus_cond_broadcast(&pio_request->TransferState->Cond);
 	}
-	globus_mutex_unlock(&pio_request->Lock);
+	globus_mutex_unlock(&pio_request->TransferState->Lock);
+
+	if (retval != 0)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return NULL;
+	}
 
 	GlobusGFSHpssDebugExit();
 	return NULL;
 }
 
 static globus_result_t
-globus_i_gfs_hpss_module_pio_begin(pio_request_t      * PIORequest,
-                                   transfer_request_t * TransferRequest)
+globus_i_gfs_hpss_module_pio_begin(pio_request_t        * PioRequest,
+                                   int                    HpssFileFD,
+                                   hpss_pio_operation_t   PioOperation,
+                                   globus_off_t           FileOffset,
+                                   globus_off_t           FileLength,
+                                   unsigned32             BlockSize,
+                                   unsigned32             FileStripeWidth,
+                                   transfer_state_t     * TransferState,
+                                   buffer_handle_t      * BufferHandle)
 {
-	int             retval = 0;
-	globus_result_t result = GLOBUS_SUCCESS;
-    globus_thread_t thread;
+	int                 retval = 0;
+	void              * buffer = NULL;
+	unsigned int        buflen = 0;
+	globus_result_t     result = GLOBUS_SUCCESS;
+    globus_thread_t     thread;
+	hpss_pio_params_t   pio_params;
 
     GlobusGFSName(globus_i_gfs_hpss_module_pio_begin);
     GlobusGFSHpssDebugEnter();
 
+	/* Initialize the pio request structure. */
+	memset(PioRequest, 0, sizeof(pio_request_t));
+	PioRequest->TransferState    = TransferState;
+	PioRequest->BufferHandle       = BufferHandle;
+	PioRequest->PioOperation       = PioOperation;
+	PioRequest->FileLength         = FileLength;
+	PioRequest->FileOffset         = FileOffset;
+	PioRequest->Coordinator.FileFD = HpssFileFD;
+
 	/*
-	 * Initialize the PIO structures.
+	 * Don't use HPSS_PIO_HANDLE_GAP, it's bugged in HPSS 7.4.
 	 */
-	result = globus_i_gfs_hpss_module_init_pio(PIORequest, TransferRequest);
-	if (result != GLOBUS_SUCCESS)
+	pio_params.Operation       = PioOperation;
+	pio_params.ClntStripeWidth = 1;
+	pio_params.BlockSize       = BlockSize;
+	pio_params.FileStripeWidth = FileStripeWidth;
+	pio_params.IOTimeOutSecs   = 0;
+	pio_params.Transport       = HPSS_PIO_MVR_SELECT;
+	pio_params.Options         = 0;
+
+	/* Now call the start routine. */
+	retval = hpss_PIOStart(&pio_params, &PioRequest->Coordinator.StripeGroup);
+	if (retval != 0)
+	{
+        result = GlobusGFSErrorSystemError("hpss_PIOStart", -retval);
 		goto cleanup;
+	}
+
+	/*
+	 * Copy the stripe group for the participant.
+	 */
+	retval = hpss_PIOExportGrp(PioRequest->Coordinator.StripeGroup,
+	                           &buffer,
+	                           &buflen);
+	if (retval != 0)
+	{
+        result = GlobusGFSErrorSystemError("hpss_PIOExportGrp", -retval);
+		goto cleanup;
+	}
+
+	retval = hpss_PIOImportGrp(buffer, buflen, &PioRequest->Participant.StripeGroup);
+	if (retval != 0)
+	{
+        result = GlobusGFSErrorSystemError("hpss_PIOImportGrp", -retval);
+		goto cleanup;
+	}
 
 	/* Launch the pio register thread. */
 	retval = globus_thread_create(&thread,
 	                              NULL,
 	                              globus_i_gfs_hpss_module_pio_register,
-	                              PIORequest);
+	                              PioRequest);
 	if (retval != 0)
 	{
 		/* Translate the error. */
@@ -1220,7 +1298,7 @@ globus_i_gfs_hpss_module_pio_begin(pio_request_t      * PIORequest,
 	retval = globus_thread_create(&thread,
 	                              NULL,
 	                              globus_i_gfs_hpss_module_pio_execute,
-	                              PIORequest);
+	                              PioRequest);
 	if (retval != 0)
 	{
 		/* Translate the error. */
@@ -1229,6 +1307,9 @@ globus_i_gfs_hpss_module_pio_begin(pio_request_t      * PIORequest,
 	}
 
 cleanup:
+	if (buffer != NULL)
+		free(buffer);
+
 	if (result != GLOBUS_SUCCESS)
 	{
 		GlobusGFSHpssDebugExitWithError();
@@ -1239,71 +1320,54 @@ cleanup:
     return result;
 }
 
+/* 
+ * XXX Make sure to prevent bug 1999, nothing can
+ * prevent the seqeuence PIOImport->PIORegister->PIOEnd. Calling
+ * PIOImport->PIOEnd will cause a segfault.
+ */
 static void
 globus_i_gfs_hpss_module_pio_end(pio_request_t * PIORequest)
 {
-	GlobusGFSName(globus_gfs_operation_t);
+	GlobusGFSName(globus_i_gfs_hpss_module_pio_end);
 	GlobusGFSHpssDebugEnter();
 
-	globus_mutex_lock(&PIORequest->Lock);
+	globus_mutex_lock(&PIORequest->TransferState->Lock);
 	{
 		while (PIORequest->CoordHasExitted == GLOBUS_FALSE)
 		{
-			globus_cond_wait(&PIORequest->Cond, &PIORequest->Lock);
+			globus_cond_wait(&PIORequest->TransferState->Cond, 
+			                 &PIORequest->TransferState->Lock);
 		}
 		hpss_PIOEnd(PIORequest->Coordinator.StripeGroup);
 
 		while (PIORequest->ParticHasExitted == GLOBUS_FALSE)
 		{
-			globus_cond_wait(&PIORequest->Cond, &PIORequest->Lock);
+			globus_cond_wait(&PIORequest->TransferState->Cond, 
+			                 &PIORequest->TransferState->Lock);
 		}
 		hpss_PIOEnd(PIORequest->Participant.StripeGroup);
 	}
-	globus_mutex_unlock(&PIORequest->Lock);
-
-	globus_i_gfs_hpss_module_destroy_pio(PIORequest);
+	globus_mutex_unlock(&PIORequest->TransferState->Lock);
 
 	GlobusGFSHpssDebugExit();
 }
 
-typedef struct gridftp_request {
-	transfer_request_t * TransferRequest;
 
-	/* This lock controls access to the variables below it. */
-	globus_mutex_t Lock;
-	globus_cond_t  Cond;
-	globus_bool_t  Eof;
-	int            OpCount; /* Number of outstanding read/writes */
-} gridftp_request_t;
-
-static globus_result_t
-globus_i_gfs_hpss_module_gridftp_init_request(gridftp_request_t  * GridFTPRequest,
-                                              transfer_request_t * TransferRequest)
+static void
+globus_i_gfs_hpss_module_init_gridftp_request(gridftp_request_t  * GridFTPRequest,
+                                              transfer_state_t   * TransferState,
+                                              buffer_handle_t    * BufferHandle)
 {
-	GlobusGFSName(globus_i_gfs_hpss_module_gridftp_init_request);
+	GlobusGFSName(globus_i_gfs_hpss_module_init_gridftp_request);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize our request structure. */
 	memset(GridFTPRequest, 0, sizeof(gridftp_request_t));
 
-	GridFTPRequest->TransferRequest = TransferRequest;
-	globus_mutex_init(&GridFTPRequest->Lock, NULL);
-	globus_cond_init(&GridFTPRequest->Cond, NULL);
-	GridFTPRequest->Eof     = GLOBUS_FALSE;
-	GridFTPRequest->OpCount = 0;
-
-	GlobusGFSHpssDebugExit();
-	return GLOBUS_SUCCESS;
-}
-
-static void
-globus_i_gfs_hpss_module_gridftp_destroy_request(gridftp_request_t * GridFTPRequest)
-{
-	GlobusGFSName(globus_i_gfs_hpss_module_gridftp_destroy_request);
-	GlobusGFSHpssDebugEnter();
-
-	globus_mutex_destroy(&GridFTPRequest->Lock);
-	globus_cond_destroy(&GridFTPRequest->Cond);
+	GridFTPRequest->TransferState = TransferState;
+	GridFTPRequest->BufferHandle    = BufferHandle;
+	GridFTPRequest->OpCount         = 0;
+	GridFTPRequest->TransferOffset  = 0;
 
 	GlobusGFSHpssDebugExit();
 }
@@ -1318,7 +1382,7 @@ globus_i_gfs_hpss_module_gridftp_read_callback(
     globus_bool_t            Eof,
     void                   * UserArg)
 {
-	int                 retval          = 0;
+	globus_result_t     result          = GLOBUS_SUCCESS;
 	gridftp_request_t * gridftp_request = NULL;
 
 	GlobusGFSName(globus_i_gfs_hpss_module_gridftp_read_callback);
@@ -1330,53 +1394,70 @@ globus_i_gfs_hpss_module_gridftp_read_callback(
 	/* Cast it to our gridftp request. */
 	gridftp_request = (gridftp_request_t *) UserArg;
 
-	/* If an error did not occur on this read... */
-	if (Result == GLOBUS_SUCCESS)
+	globus_mutex_lock(&gridftp_request->TransferState->Lock);
 	{
-		/* Release it. */
-		if (Length == 0)
-			retval = globus_i_gfs_hpss_module_release_empty_buffer(
-			                                  gridftp_request->TransferRequest,
-		                                      Buffer);
-		else
-			retval = globus_i_gfs_hpss_module_release_full_buffer(
-		                                  	gridftp_request->TransferRequest,
-	                                      	Buffer,
-	                                      	TransferOffset,
-	                                      	Length);
-	}
-
-	/* On error, deallocate the buffer */
-	if (Result != GLOBUS_SUCCESS || retval != 0)
-		globus_i_gfs_hpss_module_deallocate_buffer(Buffer);
-
-	globus_mutex_lock(&gridftp_request->TransferRequest->Lock);
-	{
-		if (Result != GLOBUS_SUCCESS)
+		if (Result == GLOBUS_SUCCESS)
 		{
-			/* Record the error */
-			if (gridftp_request->TransferRequest->Result == GLOBUS_SUCCESS)
-				gridftp_request->TransferRequest->Result = Result;
+			/* Release our good buffer. */
+			result = globus_i_gfs_hpss_module_release_full_buffer(
+			                        gridftp_request->BufferHandle,
+			                        Buffer,
+			                        TransferOffset,
+			                        Length);
+
+			if (result != GLOBUS_SUCCESS)
+				goto cleanup;
+
+			/* Wake anyone waiting on a full buffer. */
+			globus_cond_broadcast(&gridftp_request->TransferState->Cond);
+
+			/* Remove our reference to the buffer. */
+			Buffer = NULL;
 		}
-	}
-	globus_mutex_unlock(&gridftp_request->TransferRequest->Lock);
 
-	globus_mutex_lock(&gridftp_request->Lock);
-	{
-		/* Record EOF. */
-		if (Eof == GLOBUS_TRUE)
-			gridftp_request->Eof = Eof;
+cleanup:
+		/* Save EOF */
+		if (gridftp_request->TransferState->Eof == GLOBUS_FALSE)
+			gridftp_request->TransferState->Eof =  Eof;
 
-		/* Decrement the op count. */
+		/* Decrease the op count. */
 		gridftp_request->OpCount--;
 
-		/* Wake anyone that may be waiting. */
-		if (gridftp_request->OpCount == 0)
-			globus_cond_signal(&gridftp_request->Cond);
-	}
-	globus_mutex_unlock(&gridftp_request->Lock);
+		/* Wake anyone waiting on the op count. */
+		globus_cond_broadcast(&gridftp_request->TransferState->Cond);
 
-	if (Result != GLOBUS_SUCCESS || retval != 0)
+		/* If we received an error... */
+		if (Result != GLOBUS_SUCCESS)
+		{
+			/* If no error has occurred... */
+			if (gridftp_request->TransferState->Result == GLOBUS_SUCCESS)
+			{
+				/* Record the error. */
+				gridftp_request->TransferState->Result = Result;
+
+				/* Wake anyone waiting on anything. */
+				globus_cond_broadcast(&gridftp_request->TransferState->Cond);
+
+				goto cleanup;
+			}
+		}
+
+		/* If we are still holding a buffer. */
+		if (Buffer != NULL)
+		{
+			/* Release it. */
+			globus_i_gfs_hpss_module_release_empty_buffer(gridftp_request->BufferHandle, Buffer);
+
+			/* Wake anyone waiting on an empty buffer. */
+			globus_cond_broadcast(&gridftp_request->TransferState->Cond);
+		}
+	}
+	globus_mutex_unlock(&gridftp_request->TransferState->Lock);
+
+	/* Launch more reads. */
+	globus_i_gfs_hpss_module_gridftp_launch_read(Operation, gridftp_request);
+
+	if (Result != GLOBUS_SUCCESS)
 	{
 		GlobusGFSHpssDebugExitWithError();
 		return;
@@ -1385,124 +1466,90 @@ globus_i_gfs_hpss_module_gridftp_read_callback(
 	GlobusGFSHpssDebugExit();
 }
 
-/* Don't return the error, we will post it. */
+/*
+ * Caller should probably have TransferState->Lock locked and know that we haven't
+ * received EOF and that an error has occurred.
+ */
 static void
-globus_i_gfs_hpss_module_gridftp_read(transfer_request_t * TransferRequest)
+globus_i_gfs_hpss_module_gridftp_launch_read(globus_gfs_operation_t   Operation,
+                                             gridftp_request_t      * GridFTPRequest)
 {
-	int                 retval         = 0;
-	int                 ops_needed     = 0;
-	char              * buffer         = NULL;
-	globus_bool_t       eof            = GLOBUS_FALSE;
-	globus_bool_t       error_occurred = GLOBUS_FALSE;
-	globus_result_t     result         = GLOBUS_SUCCESS;
-	gridftp_request_t   gridftp_request;
+	char            * buffer     = NULL;
+	int               ops_needed = 0;
+	globus_result_t   result     = GLOBUS_SUCCESS;
 
-	GlobusGFSName(globus_i_gfs_hpss_module_gridftp_read);
+	GlobusGFSName(globus_i_gfs_hpss_module_gridftp_launch_read);
 	GlobusGFSHpssDebugEnter();
 
-	/* Initialize our request structure. */
-	result = globus_i_gfs_hpss_module_gridftp_init_request(&gridftp_request, TransferRequest);
-	if (result != GLOBUS_SUCCESS)
-		goto cleanup;
-
-	while (result == GLOBUS_SUCCESS && retval == 0 && eof == GLOBUS_FALSE)
+	globus_mutex_lock(&GridFTPRequest->TransferState->Lock);
 	{
 		/* Check if an error has occurred. */
-		globus_mutex_lock(&TransferRequest->Lock);
+		if (GridFTPRequest->TransferState->Result != GLOBUS_SUCCESS)
+			goto cleanup;
+
+		/* Check if we have received EOF. */
+		if (GridFTPRequest->TransferState->Eof == GLOBUS_TRUE)
+			goto cleanup;
+
+		/* Set the optimal buffer count. */
+		globus_i_gfs_hpss_module_set_optimal_buffer_count(GridFTPRequest->BufferHandle, Operation);
+
+		/* Get the optimal OP count. */
+		globus_gridftp_server_get_optimal_concurrency(Operation, &ops_needed);
+
+		/* Subtract the number of current operations. */
+		ops_needed -= GridFTPRequest->OpCount;
+
+		/* Submit the buffers. */
+		for (; ops_needed > 0; ops_needed--)
 		{
-			error_occurred = (TransferRequest->Result != GLOBUS_SUCCESS);
+			/* Get an empty. */
+			globus_i_gfs_hpss_module_get_empty_buffer(GridFTPRequest->BufferHandle, 
+			                                          &buffer);
+			/* If we didn't receive a buffer... */
+			if (buffer == NULL)
+				break;
+
+			/* Now register the read operation. */
+			result = globus_gridftp_server_register_read(
+			             Operation,
+			             (globus_byte_t *)buffer,
+			             GridFTPRequest->BufferHandle->BufferLength,
+			             globus_i_gfs_hpss_module_gridftp_read_callback,
+			             GridFTPRequest);
+	
+			if (result != GLOBUS_SUCCESS)
+				goto cleanup;
+
+			/* Release our buffer handle. */
+			buffer = NULL;
+
+			/* Increment OpCount. */
+			GridFTPRequest->OpCount++;
 		}
-		globus_mutex_unlock(&TransferRequest->Lock);
-
-		if (error_occurred == GLOBUS_TRUE)
-			break;
-
-		globus_mutex_lock(&gridftp_request.Lock);
+cleanup:
+		/* If we received an error... */
+		if (result != GLOBUS_SUCCESS)
 		{
-			/* Record whether we have received EOF. */
-			eof = gridftp_request.Eof;
-
-			if (eof == GLOBUS_FALSE)
+			/* If no error has been recorded... */
+			if (GridFTPRequest->TransferState->Result == GLOBUS_SUCCESS)
 			{
-				do
-				{
-					/*
-					 * Calculate the number of read operations to submit.
-					 */
+				/* Record our error. */
+				GridFTPRequest->TransferState->Result =  result;
 
-					/* Start with the optimal number. */
-					globus_gridftp_server_get_optimal_concurrency(TransferRequest->Operation, &ops_needed);
-
-					/* Subtract the number of current operations. */
-					ops_needed -= gridftp_request.OpCount;
-
-/* XXX need throttle control on buffer allocations. */
-					/* Submit the buffers. */
-					for (; ops_needed > 0; ops_needed--)
-					{
-						retval = globus_i_gfs_hpss_module_get_emtpy_buffer(TransferRequest, &buffer);
-						if (retval != 0)
-							break;
-
-						/* Now register the read operation. */
-						result = globus_gridftp_server_register_read(
-						             TransferRequest->Operation,
-						             (globus_byte_t *)buffer,
-						             TransferRequest->Buffers.BufferLength,
-						             globus_i_gfs_hpss_module_gridftp_read_callback,
-						             &gridftp_request);
-						if (result != GLOBUS_SUCCESS)
-							break;
-
-						/* Release our buffer handle. */
-						buffer = NULL;
-
-						/* Increment OpCount. */
-						gridftp_request.OpCount++;
-					}
-
-					/* If no errors occurred... */
-					if (retval == 0 && result == GLOBUS_SUCCESS)
-					{
-						/* Wait for one of the callbacks to wake us. */
-						globus_cond_wait(&gridftp_request.Cond, &gridftp_request.Lock);
-					}
-				} while (0);
+				/* Wake everyone. */
+				globus_cond_broadcast(&GridFTPRequest->TransferState->Cond);
 			}
 		}
-		globus_mutex_unlock(&gridftp_request.Lock);
+
+		/* Release our buffer. */
+		if (buffer != NULL)
+			globus_i_gfs_hpss_module_release_empty_buffer(GridFTPRequest->BufferHandle, buffer);
 	}
+	globus_mutex_unlock(&GridFTPRequest->TransferState->Lock);
 
-	globus_mutex_lock(&gridftp_request.Lock);
-	{
-		/* Wait for all operations to complete. */
-		while (gridftp_request.OpCount != 0)
-		{
-			globus_cond_wait(&gridftp_request.Cond, &gridftp_request.Lock);
-		}
-	}
-	globus_mutex_unlock(&gridftp_request.Lock);
-
-	/* Clean up the request memory. */
-	globus_i_gfs_hpss_module_gridftp_destroy_request(&gridftp_request);
-
-cleanup:
-	/* If we still holding a buffer... */
-	if (buffer != NULL)
-		globus_i_gfs_hpss_module_deallocate_buffer(buffer);
 
 	if (result != GLOBUS_SUCCESS)
-	{
-		/* Post the error so others know to shutdown. */
-		globus_mutex_lock(&TransferRequest->Lock);
-		{
-			if (TransferRequest->Result == GLOBUS_SUCCESS)
-				TransferRequest->Result = result;
-		}
-		globus_mutex_unlock(&TransferRequest->Lock);
-	}
-
-	if (result != GLOBUS_SUCCESS || retval != 0)
 	{
 		GlobusGFSHpssDebugExitWithError();
 		return;
@@ -1520,10 +1567,9 @@ globus_i_gfs_hpss_module_gridftp_write_callback(
     globus_size_t            Length,
     void                   * UserArg)
 {
-	int                 retval          = 0;
 	gridftp_request_t * gridftp_request = NULL;
 
-	GlobusGFSName(globus_i_gfs_hpss_module_gridftp_read_callback);
+	GlobusGFSName(globus_i_gfs_hpss_module_gridftp_write_callback);
 	GlobusGFSHpssDebugEnter();
 
 	/* Make sure we recieved our UserArg. */
@@ -1532,41 +1578,46 @@ globus_i_gfs_hpss_module_gridftp_write_callback(
 	/* Cast it to our gridftp request. */
 	gridftp_request = (gridftp_request_t *) UserArg;
 
-	/* If an error did not occur on this read... */
-	if (Result == GLOBUS_SUCCESS)
+	globus_mutex_lock(&gridftp_request->TransferState->Lock);
 	{
-		retval = globus_i_gfs_hpss_module_release_empty_buffer(
-		                                  gridftp_request->TransferRequest,
-	                                      Buffer);
-	}
+		/* Release the buffer. */
+		globus_i_gfs_hpss_module_release_empty_buffer(gridftp_request->BufferHandle, Buffer);
 
-	/* On error, deallocate the buffer */
-	if (Result != GLOBUS_SUCCESS || retval != 0)
-		globus_i_gfs_hpss_module_deallocate_buffer(Buffer);
+		/* Wake anyone waiting on an empty buffer. */
+		globus_cond_broadcast(&gridftp_request->TransferState->Cond);
 
-	globus_mutex_lock(&gridftp_request->TransferRequest->Lock);
-	{
-		if (Result != GLOBUS_SUCCESS)
-		{
-			/* Record the error */
-			if (gridftp_request->TransferRequest->Result == GLOBUS_SUCCESS)
-				gridftp_request->TransferRequest->Result = Result;
-		}
-	}
-	globus_mutex_unlock(&gridftp_request->TransferRequest->Lock);
+		/* Remove our reference to the buffer. */
+		Buffer = NULL;
 
-	globus_mutex_lock(&gridftp_request->Lock);
-	{
-		/* Decrement the op count. */
+		/* Decrease the op count. */
 		gridftp_request->OpCount--;
 
-		/* Wake anyone that may be waiting. */
-		if (gridftp_request->OpCount == 0)
-			globus_cond_signal(&gridftp_request->Cond);
-	}
-	globus_mutex_unlock(&gridftp_request->Lock);
+		/* Wake anyone waiting on the op count. */
+		globus_cond_broadcast(&gridftp_request->TransferState->Cond);
 
-	if (Result != GLOBUS_SUCCESS || retval != 0)
+		/* If we received an error... */
+		if (Result != GLOBUS_SUCCESS)
+		{
+			/* If no error has occurred... */
+			if (gridftp_request->TransferState->Result == GLOBUS_SUCCESS)
+			{
+				/* Record the error. */
+				gridftp_request->TransferState->Result = Result;
+
+				/* Wake anyone waiting on anything. */
+				globus_cond_broadcast(&gridftp_request->TransferState->Cond);
+
+				goto cleanup;
+			}
+		}
+	}
+cleanup:
+	globus_mutex_unlock(&gridftp_request->TransferState->Lock);
+
+	/* Launch more reads. */
+	globus_i_gfs_hpss_module_gridftp_launch_write(Operation, gridftp_request);
+
+	if (Result != GLOBUS_SUCCESS)
 	{
 		GlobusGFSHpssDebugExitWithError();
 		return;
@@ -1574,139 +1625,92 @@ globus_i_gfs_hpss_module_gridftp_write_callback(
 
 	GlobusGFSHpssDebugExit();
 }
-static void
-globus_i_gfs_hpss_module_gridftp_write(transfer_request_t * TransferRequest)
-{
-	int                 retval          = 0;
-	int                 ops_needed      = 0;
-	char              * buffer          = NULL;
-	globus_bool_t       eof             = GLOBUS_FALSE;
-	globus_bool_t       error_occurred  = GLOBUS_FALSE;
-	globus_result_t     result          = GLOBUS_SUCCESS;
-	gridftp_request_t   gridftp_request;
-	globus_off_t        transfer_offset = 0;
-	globus_size_t       buffer_length   = 0;
 
-	GlobusGFSName(globus_i_gfs_hpss_module_gridftp_write);
+static void
+globus_i_gfs_hpss_module_gridftp_launch_write(globus_gfs_operation_t   Operation,
+                                              gridftp_request_t      * GridFTPRequest)
+
+{
+	char            * buffer        = NULL;
+	int               ops_needed    = 0;
+	globus_size_t     buffer_length = 0;
+	globus_result_t   result        = GLOBUS_SUCCESS;
+
+	GlobusGFSName(globus_i_gfs_hpss_module_gridftp_launch_write);
 	GlobusGFSHpssDebugEnter();
 
-	/* Initialize our request structure. */
-	result = globus_i_gfs_hpss_module_gridftp_init_request(&gridftp_request, TransferRequest);
-	if (result != GLOBUS_SUCCESS)
-		goto cleanup;
-
-	while (result == GLOBUS_SUCCESS && retval == 0 && eof == GLOBUS_FALSE)
+	globus_mutex_lock(&GridFTPRequest->TransferState->Lock);
 	{
 		/* Check if an error has occurred. */
-		globus_mutex_lock(&TransferRequest->Lock);
+		if (GridFTPRequest->TransferState->Result != GLOBUS_SUCCESS)
+			goto cleanup;
+
+		/* Set the optimal buffer count. */
+		globus_i_gfs_hpss_module_set_optimal_buffer_count(GridFTPRequest->BufferHandle, Operation);
+
+		/* Get the optimal OP count. */
+		globus_gridftp_server_get_optimal_concurrency(Operation, &ops_needed);
+
+		/* Subtract the number of current operations. */
+		ops_needed -= GridFTPRequest->OpCount;
+
+		/* Submit the buffers. */
+		for (; ops_needed > 0; ops_needed--)
 		{
-			error_occurred = (TransferRequest->Result != GLOBUS_SUCCESS);
+			/* Get the buffer at the current offset. */
+			globus_i_gfs_hpss_module_get_full_buffer(GridFTPRequest->BufferHandle, 
+			                                         GridFTPRequest->TransferOffset,
+			                                         (void **)&buffer,
+			                                         &buffer_length);
+			/* If we didn't receive a buffer... */
+			if (buffer == NULL)
+				break;
+
+			/* Now register the write operation. */
+			result = globus_gridftp_server_register_write(
+			                   Operation,
+			                   (globus_byte_t *)buffer,
+			                   buffer_length,
+			                   GridFTPRequest->TransferOffset,
+			                   0,
+			                   globus_i_gfs_hpss_module_gridftp_write_callback,
+			                   GridFTPRequest);
+	
+			if (result != GLOBUS_SUCCESS)
+				goto cleanup;
+
+			/* Release our buffer handle. */
+			buffer = NULL;
+
+			/* Increment OpCount. */
+			GridFTPRequest->OpCount++;
+
+			/* Increase the transfer offset. */
+			GridFTPRequest->TransferOffset += buffer_length;
 		}
-		globus_mutex_unlock(&TransferRequest->Lock);
-
-		if (error_occurred == GLOBUS_TRUE)
-			break;
-
-		globus_mutex_lock(&gridftp_request.Lock);
-		{
-			do
-			{
-				/*
-				 * Calculate the max number of write operations to submit.
-				 */
-
-				/* Start with the optimal number. */
-				globus_gridftp_server_get_optimal_concurrency(TransferRequest->Operation, &ops_needed);
-
-				/* Subtract the number of current operations. */
-				ops_needed -= gridftp_request.OpCount;
-
-/* XXX need throttle control on buffer allocations. */
-				/* Submit the buffers. */
-				for (; ops_needed > 0; ops_needed--)
-				{
-					/* Get the buffer at the current offset. */
-					retval = globus_i_gfs_hpss_module_get_full_buffer(TransferRequest, 
-					                                                  transfer_offset,
-					                                                  (void **)&buffer,
-					                                                  &buffer_length);
-					if (retval != 0)
-						break;
-
-					/* Now register the write operation. */
-					result = globus_gridftp_server_register_write(
-					             TransferRequest->Operation,
-					             (globus_byte_t *)buffer,
-					             buffer_length,
-					             transfer_offset,
-					             0,
-					             globus_i_gfs_hpss_module_gridftp_write_callback,
-					             &gridftp_request);
-
-					if (result != GLOBUS_SUCCESS)
-						break;
-
-					/* Release our buffer handle. */
-					buffer = NULL;
-
-					/* Increment OpCount. */
-					gridftp_request.OpCount++;
-
-					/* Increment the transfer offset. */
-					transfer_offset += buffer_length;
-
-					/* Check if the transfer is done. */
-					if (transfer_offset == TransferRequest->TransferLength)
-					{
-						eof = GLOBUS_TRUE;
-						break;
-					}
-				}
-
-				if (eof == GLOBUS_TRUE)
-					break;
-
-				/* If no errors occurred... */
-				if (retval == 0 && result == GLOBUS_SUCCESS)
-				{
-					/* Wait for one of the callbacks to wake us. */
-					globus_cond_wait(&gridftp_request.Cond, &gridftp_request.Lock);
-				}
-			} while (0);
-		}
-		globus_mutex_unlock(&gridftp_request.Lock);
-	}
-
-	globus_mutex_lock(&gridftp_request.Lock);
-	{
-		/* Wait for all operations to complete. */
-		while (gridftp_request.OpCount != 0)
-		{
-			globus_cond_wait(&gridftp_request.Cond, &gridftp_request.Lock);
-		}
-	}
-	globus_mutex_unlock(&gridftp_request.Lock);
-
-	/* Clean up the request memory. */
-	globus_i_gfs_hpss_module_gridftp_destroy_request(&gridftp_request);
-
 cleanup:
-	/* If we still holding a buffer... */
-	if (buffer != NULL)
-		globus_i_gfs_hpss_module_deallocate_buffer(buffer);
+		/* If we received an error... */
+		if (result != GLOBUS_SUCCESS)
+		{
+			/* If no error has been recorded... */
+			if (GridFTPRequest->TransferState->Result == GLOBUS_SUCCESS)
+			{
+				/* Record our error. */
+				GridFTPRequest->TransferState->Result =  result;
+
+				/* Wake everyone. */
+				globus_cond_broadcast(&GridFTPRequest->TransferState->Cond);
+			}
+		}
+
+		/* Release our buffer. */
+		if (buffer != NULL)
+			globus_i_gfs_hpss_module_release_empty_buffer(GridFTPRequest->BufferHandle, buffer);
+	}
+	globus_mutex_unlock(&GridFTPRequest->TransferState->Lock);
+
 
 	if (result != GLOBUS_SUCCESS)
-	{
-		/* Post the error so others know to shutdown. */
-		globus_mutex_lock(&TransferRequest->Lock);
-		{
-			if (TransferRequest->Result == GLOBUS_SUCCESS)
-				TransferRequest->Result = result;
-		}
-		globus_mutex_unlock(&TransferRequest->Lock);
-	}
-
-	if (result != GLOBUS_SUCCESS || retval != 0)
 	{
 		GlobusGFSHpssDebugExitWithError();
 		return;
@@ -1716,8 +1720,247 @@ cleanup:
 	return;
 }
 
+static void
+globus_i_gfs_hpss_module_gridftp_end(gridftp_request_t * GridFTPRequest)
+{
+	GlobusGFSName(globus_i_gfs_hpss_module_gridftp_end);
+	GlobusGFSHpssDebugEnter();
+
+	/* Wait for the transfer to complete. */
+	globus_mutex_lock(&GridFTPRequest->TransferState->Lock);
+	{
+		while (GridFTPRequest->OpCount != 0)
+		{
+			globus_cond_wait(&GridFTPRequest->TransferState->Cond, 
+			                 &GridFTPRequest->TransferState->Lock);
+		}
+	}
+	globus_mutex_unlock(&GridFTPRequest->TransferState->Lock);
+
+	GlobusGFSHpssDebugExit();
+}
+
 /*
- * RETR
+ * Right now we handle list_type "LIST:", MSLD is list_type "TMSPUOIGDQLN". 
+ * There may be others, like NLST?
+ */
+static void
+globus_l_gfs_hpss_module_list(
+    globus_gfs_operation_t       Operation,
+    globus_gfs_transfer_info_t * TransferInfo,
+    void                       * UserArg)
+{
+	int                 dirfd           = -1;
+	int                 retval          = 0;
+	char              * buffer          = NULL;
+	char              * fullpath        = NULL;
+	int                 buffer_length   = 0;
+	globus_off_t        transfer_offset = 0;
+	globus_result_t     result          = GLOBUS_SUCCESS;
+	gridftp_request_t   gridftp_request;
+	buffer_handle_t     buffer_handle;
+	transfer_state_t    transfer_state;
+	hpss_dirent_t       dirent;
+	hpss_stat_t         hpss_stat_buf;
+
+	GlobusGFSName(globus_l_gfs_hpss_module_list);
+	GlobusGFSHpssDebugEnter();
+
+    /* Inform the server that we are starting. */
+	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
+
+	/* Initialize the free & empty buffer chains. */
+	globus_i_gfs_hpss_module_init_buffer_handle(Operation, &buffer_handle);
+
+	/* Initialize the transfer state. */
+	globus_i_gfs_hpss_module_init_transfer_state(&transfer_state);
+
+	/* Initialize our gridftp request. */
+	globus_i_gfs_hpss_module_init_gridftp_request(&gridftp_request, 
+	                                              &transfer_state, 
+	                                              &buffer_handle);
+
+	/* Stat the given path. */
+	retval = hpss_Lstat(TransferInfo->pathname, &hpss_stat_buf);
+	if (retval != 0)
+	{
+		result = GlobusGFSErrorSystemError("hpss_Lstat", -retval);
+		goto cleanup;
+	}
+
+	/*
+	 * Handle non directories.
+	 */
+	if (!S_ISDIR(hpss_stat_buf.st_mode))
+	{
+		/* Get a free buffer. */
+		result = globus_i_gfs_hpss_module_get_empty_buffer(&buffer_handle, &buffer);
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+
+		/* Translate the stat info to a listing. */
+		globus_l_gfs_hpss_module_list_single_line(&hpss_stat_buf,
+		                                          TransferInfo->pathname,
+		                                          buffer,
+		                                          buffer_handle.BufferLength);
+
+
+		/* Release the full buffer. */
+		result = globus_i_gfs_hpss_module_release_full_buffer(&buffer_handle,
+		                                                       buffer,
+		                                                       transfer_offset,
+		                                                       strlen(buffer));
+
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+
+		/* Release our reference to the buffer. */
+		buffer = NULL;
+
+		/*
+		 * Order is important here; gridftp_write_start requires a full buffer
+		 * before it is called. It will not return until it has it.
+		 */
+
+		/* Fire off the GridFTP write callbacks. */
+		globus_i_gfs_hpss_module_gridftp_launch_write(Operation, &gridftp_request);
+		goto cleanup;
+	}
+
+	/*
+	 * Handle directories.
+	 */
+	dirfd = hpss_Opendir(TransferInfo->pathname);
+	if (dirfd < 0)
+	{
+		result = GlobusGFSErrorSystemError("hpss_Opendir", -dirfd);
+		goto cleanup;
+	}
+
+	while (GLOBUS_TRUE)
+	{
+		retval = hpss_Readdir(dirfd, &dirent);
+		if (retval != 0)
+		{
+			result = GlobusGFSErrorSystemError("hpss_Readdir", -retval);
+			goto cleanup;
+		}
+
+		if (dirent.d_namelen == 0)
+			break;
+
+		/* Construct the full path. */
+		fullpath = (char *) globus_malloc(strlen(TransferInfo->pathname) + strlen(dirent.d_name) + 2);
+		if (fullpath == NULL)
+		{
+			result = GlobusGFSErrorMemory("fullpath");
+			goto cleanup;
+		}
+
+		if (TransferInfo->pathname[strlen(TransferInfo->pathname) - 1] == '/')
+			sprintf(fullpath, "%s%s", TransferInfo->pathname, dirent.d_name);
+		else
+			sprintf(fullpath, "%s/%s", TransferInfo->pathname, dirent.d_name);
+
+		retval = hpss_Lstat(fullpath, &hpss_stat_buf);
+		if (retval != 0)
+		{
+			if (retval == -ENOENT)
+				continue;
+
+			result = GlobusGFSErrorSystemError("hpss_Lstat", -retval);
+			goto cleanup;
+		}
+
+		globus_mutex_lock(&transfer_state.Lock);
+		{
+			while (buffer == NULL)
+			{
+				/* Break out on error. */
+				if ((result = transfer_state.Result) != GLOBUS_SUCCESS)
+					break;
+
+				/* Get a free buffer. */
+				result = globus_i_gfs_hpss_module_get_empty_buffer(&buffer_handle, &buffer);
+				if (result != GLOBUS_SUCCESS)
+					break;
+
+				/* Wait until a buffer is ready. */
+				if (buffer == NULL)
+					globus_cond_wait(&transfer_state.Cond, &transfer_state.Lock);
+			}
+		}
+		globus_mutex_unlock(&transfer_state.Lock);
+
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+
+		/* Translate the stat info to a listing. */
+		globus_l_gfs_hpss_module_list_single_line(&hpss_stat_buf,
+		                                          fullpath,
+		                                          buffer,
+		                                          buffer_handle.BufferLength);
+
+		globus_free(fullpath);
+
+		/* Release our reference. */
+		fullpath = NULL;
+
+		/* Record the length of the buffer. */
+		buffer_length = strlen(buffer);
+
+		/* Release the full buffer. */
+		result = globus_i_gfs_hpss_module_release_full_buffer(&buffer_handle,
+		                                                       buffer,
+		                                                       transfer_offset,
+		                                                       buffer_length);
+
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+
+		/* Release our reference to the buffer. */
+		buffer = NULL;
+
+		/* Increment the transfer offset. */
+		transfer_offset += buffer_length;
+
+		/* Fire off the GridFTP write callbacks. */
+		globus_i_gfs_hpss_module_gridftp_launch_write(Operation, &gridftp_request);
+	}
+
+cleanup:
+	if (dirfd >= 0)
+		hpss_Closedir(dirfd);
+
+	if (fullpath != NULL)
+		globus_free(fullpath);
+
+	if (buffer != NULL)
+		globus_i_gfs_hpss_module_release_empty_buffer(gridftp_request.BufferHandle, buffer);
+
+	/* Wait for the gridftp write callbacks to finish. */
+	globus_i_gfs_hpss_module_gridftp_end(&gridftp_request);
+
+	/* Destroy the transfer state. */
+	globus_i_gfs_hpss_module_destroy_transfer_state(&transfer_state);
+
+	/* Destroy the buffer handle. */
+	globus_i_gfs_hpss_module_destroy_buffer_handle(&buffer_handle);
+
+	/* Let the server know we are finished. */
+	globus_gridftp_server_finished_transfer(Operation, result);
+
+	if (result != GLOBUS_SUCCESS)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return;
+	}
+
+	GlobusGFSHpssDebugExit();
+}
+
+/*
+ * RETR Operation
  */
 static void
 globus_l_gfs_hpss_module_send(
@@ -1725,9 +1968,20 @@ globus_l_gfs_hpss_module_send(
     globus_gfs_transfer_info_t * TransferInfo,
     void                       * UserArg)
 {
-	globus_result_t    result      = GLOBUS_SUCCESS;
-	pio_request_t      pio_request;
-	transfer_request_t transfer_request;
+	int                     hpss_file_fd   = -1;
+	globus_result_t         result         = GLOBUS_SUCCESS;
+	globus_bool_t           eof            = GLOBUS_FALSE;
+	globus_off_t            file_offset    = 0;
+	globus_off_t            file_length    = 0;
+	globus_gfs_stat_t     * gfs_stat_array = NULL;
+	int                     gfs_stat_count = 0;
+	pio_request_t           pio_request;
+	gridftp_request_t       gridftp_request;
+	transfer_state_t        transfer_state;
+	buffer_handle_t         buffer_handle;
+	hpss_cos_hints_t        hints_in;
+	hpss_cos_hints_t        hints_out;
+	hpss_cos_priorities_t   priorities;
 
 	GlobusGFSName(globus_l_gfs_hpss_module_send);
 	GlobusGFSHpssDebugEnter();
@@ -1735,34 +1989,124 @@ globus_l_gfs_hpss_module_send(
     /* Inform the server that we are starting. */
 	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
-	/* Initialize our transfer request structure. */
-	result = globus_i_gfs_hpss_module_init_transfer_request(READ_REQUEST,
-	                                                        Operation, 
-	                                                        TransferInfo,
-	                                                        &transfer_request);
-	if (result != GLOBUS_SUCCESS)
-		goto finish_transfer;
+	/* Initialize the free & empty buffer chains. */
+	globus_i_gfs_hpss_module_init_buffer_handle(Operation, &buffer_handle);
 
-	/* Launch the PIO transfer. */
-	result = globus_i_gfs_hpss_module_pio_begin(&pio_request, &transfer_request);
-	if (result != GLOBUS_SUCCESS)
-		goto destroy_transfer_request;
+	/* Initialize the transfer state. */
+	globus_i_gfs_hpss_module_init_transfer_state(&transfer_state);
 
-	/* Fire off the GridFTP write callbacks. */
-	globus_i_gfs_hpss_module_gridftp_write(&transfer_request);
+	/* Initialize our gridftp request. */
+	globus_i_gfs_hpss_module_init_gridftp_request(&gridftp_request, 
+	                                              &transfer_state,
+	                                              &buffer_handle);
+
+	/* Initialize the hints in. */
+	memset(&hints_in, 0, sizeof(hpss_cos_hints_t));
+
+	if (TransferInfo->partial_offset != -1)
+		file_offset = TransferInfo->partial_offset;
+	file_length = TransferInfo->partial_length;
+
+	/* If the length wasn't given... */
+	if (file_length == -1)
+	{
+		/* Stat the file. */
+		result = globus_l_gfs_hpss_common_gfs_stat(TransferInfo->pathname,
+		                                           GLOBUS_TRUE,  /* FileOnly        */
+		                                           GLOBUS_FALSE, /* UseSymlinkInfo  */
+		                                           GLOBUS_TRUE,  /* IncludePathStat */
+		                                           &gfs_stat_array,
+		                                           &gfs_stat_count);
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+
+		file_length = gfs_stat_array[0].size;
+
+		/* Adjust for partial offset transfers. */
+		file_length -= file_offset;
+
+		globus_l_gfs_hpss_common_destroy_gfs_stat_array(gfs_stat_array, gfs_stat_count);
+	}
+
+	/* Initialize the hints out. */
+	memset(&hints_out, 0, sizeof(hpss_cos_hints_t));
+
+	/* Initialize the priorities. */
+	memset(&priorities, 0, sizeof(hpss_cos_priorities_t));
+
+	/* Open the HPSS file. */
+	hpss_file_fd = hpss_Open(TransferInfo->pathname,
+	                         O_RDONLY, /* No append, yet */
+	                         0,
+	                         &hints_in,    /* Hints In      */
+	                         &priorities,  /* Priorities In */
+	                         &hints_out);  /* Hints Out     */
+	if (hpss_file_fd < 0)
+	{
+        result = GlobusGFSErrorSystemError("hpss_Open", -hpss_file_fd);
+		goto cleanup;
+	}
+
+	/* Fire off the PIO side of the transfer. */
+	result = globus_i_gfs_hpss_module_pio_begin(&pio_request,
+	                                            hpss_file_fd,
+	                                            HPSS_PIO_READ,
+	                                            file_offset,
+	                                            file_length,
+	                                            buffer_handle.BufferLength,
+	                                            hints_out.StripeWidth,
+	                                            &transfer_state,
+	                                            &buffer_handle);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	/*
+	 * Order is important here; gridftp_write_start requires a full buffer
+	 * before it is called. It will not return until it has it.
+	 */
+
+	/*
+	 * Our job is to:
+	 * 	(1) wait until EOF or error and initiate cleanup
+	 * 	(2) make sure we do not run out of gridftp write requests
+	 */
+	while (result == GLOBUS_SUCCESS && eof == GLOBUS_FALSE)
+	{
+		globus_mutex_lock(&transfer_state.Lock);
+		{
+			while ((result = transfer_state.Result) == GLOBUS_SUCCESS &&
+			       (eof    = transfer_state.Eof)    == GLOBUS_FALSE   &&
+			       gridftp_request.OpCount > 0)
+			{
+				globus_cond_wait(&transfer_state.Cond, &transfer_state.Lock);
+			}
+		}
+		globus_mutex_unlock(&transfer_state.Lock);
+
+		/* Fire off the GridFTP read callbacks. */
+		globus_i_gfs_hpss_module_gridftp_launch_write(Operation, &gridftp_request);
+	}
+
+	/* End the GridFTP request. */
+	globus_i_gfs_hpss_module_gridftp_end(&gridftp_request);
 
 	/* End the PIO request. */
 	globus_i_gfs_hpss_module_pio_end(&pio_request);
 
-destroy_transfer_request:
+cleanup:
+	if (hpss_file_fd >= 0)
+		hpss_Close(hpss_file_fd);
 
+	/* Record the exit status. */
 	if (result == GLOBUS_SUCCESS)
-		result = transfer_request.Result;
+		result = transfer_state.Result;
 
-	/* Destroy our request. */
-	globus_i_gfs_hpss_module_destroy_transfer_request(&transfer_request);
+	/* Destroy the transfer state. */
+	globus_i_gfs_hpss_module_destroy_transfer_state(&transfer_state);
 
-finish_transfer:
+	/* Destroy the buffer handle. */
+	globus_i_gfs_hpss_module_destroy_buffer_handle(&buffer_handle);
+
 	/* Let the server know we are finished. */
 	globus_gridftp_server_finished_transfer(Operation, result);
 
@@ -1784,9 +2128,18 @@ globus_l_gfs_hpss_module_recv(
     globus_gfs_transfer_info_t * TransferInfo,
     void                       * UserArg)
 {
-	globus_result_t    result      = GLOBUS_SUCCESS;
-	pio_request_t      pio_request;
-	transfer_request_t transfer_request;
+	int                   hpss_file_fd   = -1;
+	globus_result_t       result         = GLOBUS_SUCCESS;
+	globus_bool_t         eof            = GLOBUS_FALSE;
+	globus_off_t          file_offset    = 0;
+	globus_off_t          file_length    = 0;
+	pio_request_t         pio_request;
+	gridftp_request_t     gridftp_request;
+	transfer_state_t      transfer_state;
+	buffer_handle_t       buffer_handle;
+	hpss_cos_hints_t      hints_in;
+	hpss_cos_hints_t      hints_out;
+	hpss_cos_priorities_t priorities;
 
 	GlobusGFSName(globus_l_gfs_hpss_module_recv);
 	GlobusGFSHpssDebugEnter();
@@ -1794,34 +2147,117 @@ globus_l_gfs_hpss_module_recv(
     /* Inform the server that we are starting. */
 	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
-	/* Initialize our transfer request structure. */
-	result = globus_i_gfs_hpss_module_init_transfer_request(WRITE_REQUEST,
-	                                                        Operation, 
-	                                                        TransferInfo,
-	                                                        &transfer_request);
-	if (result != GLOBUS_SUCCESS)
-		goto finish_transfer;
+	/* Initialize the free & empty buffer chains. */
+	globus_i_gfs_hpss_module_init_buffer_handle(Operation, &buffer_handle);
 
-	/* Launch the PIO transfer. */
-	result = globus_i_gfs_hpss_module_pio_begin(&pio_request, &transfer_request);
-	if (result != GLOBUS_SUCCESS)
-		goto destroy_transfer_request;
+	/* Initialize the transfer state. */
+	globus_i_gfs_hpss_module_init_transfer_state(&transfer_state);
 
-	/* Fire off the GridFTP read callbacks. */
-	globus_i_gfs_hpss_module_gridftp_read(&transfer_request);
+	/* Initialize our gridftp request. */
+	globus_i_gfs_hpss_module_init_gridftp_request(&gridftp_request,
+	                                              &transfer_state,
+	                                              &buffer_handle);
+
+	/* Make sure we know how much data we are receiving. */
+	if (TransferInfo->alloc_size == 0)
+	{
+		result = GlobusGFSErrorGeneric("Client must specify ALLO");
+		goto cleanup;
+	}
+
+	/* We only handle truncation at this point. */
+	if (TransferInfo->truncate == GLOBUS_FALSE)
+	{
+		result = GlobusGFSErrorGeneric("Appending is not currently allowed");
+		goto cleanup;
+	}
+
+	file_offset = 0;
+	file_length = TransferInfo->alloc_size;
+
+	/* Initialize the hints in. */
+	memset(&hints_in, 0, sizeof(hpss_cos_hints_t));
+
+	CONVERT_LONGLONG_TO_U64(file_length, hints_in.MinFileSize);
+	CONVERT_LONGLONG_TO_U64(file_length, hints_in.MaxFileSize);
+
+	/* Initialize the hints out. */
+	memset(&hints_out, 0, sizeof(hpss_cos_hints_t));
+
+	/* Initialize the priorities. */
+	memset(&priorities, 0, sizeof(hpss_cos_priorities_t));
+
+	priorities.MinFileSizePriority = LOWEST_PRIORITY;
+	priorities.MaxFileSizePriority = LOWEST_PRIORITY;
+
+	/* Open the HPSS file. */
+	hpss_file_fd = hpss_Open(TransferInfo->pathname,
+	                         O_WRONLY|O_CREAT|O_TRUNC, /* No append, yet */
+	                         S_IRUSR|S_IWUSR,
+	                         &hints_in,    /* Hints In      */
+	                         &priorities,  /* Priorities In */
+	                         &hints_out);  /* Hints Out     */
+	if (hpss_file_fd < 0)
+	{
+        result = GlobusGFSErrorSystemError("hpss_Open", -hpss_file_fd);
+		goto cleanup;
+	}
+
+	/* Fire off the PIO side of the transfer. */
+	result = globus_i_gfs_hpss_module_pio_begin(&pio_request,
+	                                            hpss_file_fd,
+	                                            HPSS_PIO_WRITE,
+	                                            file_offset,
+	                                            file_length,
+	                                            buffer_handle.BufferLength,
+	                                            hints_out.StripeWidth,
+	                                            &transfer_state,
+	                                            &buffer_handle);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	/*
+	 * Our job is to:
+	 * 	(1) wait until EOF or error and initiate cleanup
+	 * 	(2) make sure we do not run out of gridftp read requests
+	 */
+	while (result == GLOBUS_SUCCESS && eof == GLOBUS_FALSE)
+	{
+		globus_mutex_lock(&transfer_state.Lock);
+		{
+			while ((result = transfer_state.Result) == GLOBUS_SUCCESS &&
+			       (eof    = transfer_state.Eof)    == GLOBUS_FALSE   &&
+			       gridftp_request.OpCount > 0)
+			{
+				globus_cond_wait(&transfer_state.Cond, &transfer_state.Lock);
+			}
+		}
+		globus_mutex_unlock(&transfer_state.Lock);
+
+		/* Fire off the GridFTP read callbacks. */
+		globus_i_gfs_hpss_module_gridftp_launch_read(Operation, &gridftp_request);
+	}
+
+	/* End the GridFTP request. */
+	globus_i_gfs_hpss_module_gridftp_end(&gridftp_request);
 
 	/* End the PIO request. */
 	globus_i_gfs_hpss_module_pio_end(&pio_request);
 
-destroy_transfer_request:
+cleanup:
+	if (hpss_file_fd >= 0)
+		hpss_Close(hpss_file_fd);
 
+	/* Record the exit status. */
 	if (result == GLOBUS_SUCCESS)
-		result = transfer_request.Result;
+		result = transfer_state.Result;
 
-	/* Destroy our request. */
-	globus_i_gfs_hpss_module_destroy_transfer_request(&transfer_request);
+	/* Destroy the transfer state. */
+	globus_i_gfs_hpss_module_destroy_transfer_state(&transfer_state);
 
-finish_transfer:
+	/* Destroy the buffer handle. */
+	globus_i_gfs_hpss_module_destroy_buffer_handle(&buffer_handle);
+
 	/* Let the server know we are finished. */
 	globus_gridftp_server_finished_transfer(Operation, result);
 
@@ -1841,19 +2277,19 @@ globus_l_gfs_hpss_module_chgrp(char * Pathname,
 	int                 retval = 0;
 	gid_t               gid    = 0;
 	globus_result_t     result = GLOBUS_SUCCESS;
-    globus_gfs_stat_t * stat_buf_array = NULL;
-	int                 stat_buf_count = 0;
+    globus_gfs_stat_t * gfs_stat_array = NULL;
+	int                 gfs_stat_count = 0;
 
 	GlobusGFSName(globus_l_gfs_hpss_module_chgrp);
 	GlobusGFSHpssDebugEnter();
 
 	/* Stat it, make sure it exists. */
-	result = globus_l_gfs_hpss_common_stat(Pathname,
-	                                       GLOBUS_TRUE,  /* FileOnly        */
-	                                       GLOBUS_FALSE, /* UseSymlinkInfo  */
-	                                       GLOBUS_TRUE,  /* IncludePathStat */
-	                                       &stat_buf_array,
-	                                       &stat_buf_count);
+	result = globus_l_gfs_hpss_common_gfs_stat(Pathname,
+	                                           GLOBUS_TRUE,  /* FileOnly        */
+	                                           GLOBUS_FALSE, /* UseSymlinkInfo  */
+	                                           GLOBUS_TRUE,  /* IncludePathStat */
+	                                           &gfs_stat_array,
+	                                           &gfs_stat_count);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
@@ -1872,7 +2308,7 @@ globus_l_gfs_hpss_module_chgrp(char * Pathname,
 	}
 
 	/* Now change the group. */
-	retval = hpss_Chown(Pathname, stat_buf_array[0].uid, gid);
+	retval = hpss_Chown(Pathname, gfs_stat_array[0].uid, gid);
 	if (retval != 0)
 	{
        	result = GlobusGFSErrorSystemError("hpss_Chgrp", -retval);
@@ -1881,7 +2317,7 @@ globus_l_gfs_hpss_module_chgrp(char * Pathname,
 
 cleanup:
 	/* clean up the statbuf. */
-	globus_l_gfs_hpss_common_destroy_stat_array(stat_buf_array, stat_buf_count);
+	globus_l_gfs_hpss_common_destroy_gfs_stat_array(gfs_stat_array, gfs_stat_count);
 
 	if (result != GLOBUS_SUCCESS)
 	{
@@ -1985,9 +2421,9 @@ globus_l_gfs_hpss_module_stat(globus_gfs_operation_t   Operation,
                               globus_gfs_stat_info_t * StatInfo,
                               void                   * Arg)
 {
-	globus_result_t     result        = GLOBUS_SUCCESS;
-	globus_gfs_stat_t * statbuf_array = NULL;
-	int                 statbuf_count = 0;
+	globus_result_t     result         = GLOBUS_SUCCESS;
+	globus_gfs_stat_t * gfs_stat_array = NULL;
+	int                 gfs_stat_count = 0;
 
 	GlobusGFSName(globus_i_gfs_hpss_module_stat);
 	GlobusGFSHpssDebugEnter();
@@ -1996,23 +2432,23 @@ globus_l_gfs_hpss_module_stat(globus_gfs_operation_t   Operation,
 	/* globus_assert(Arg != NULL); */
 
 
-	result = globus_l_gfs_hpss_common_stat(StatInfo->pathname,
-	                                       StatInfo->file_only,
-	                                       StatInfo->use_symlink_info,
-	                                       StatInfo->include_path_stat,
-	                                       &statbuf_array,
-	                                       &statbuf_count);
+	result = globus_l_gfs_hpss_common_gfs_stat(StatInfo->pathname,
+	                                           StatInfo->file_only,
+	                                           StatInfo->use_symlink_info,
+	                                           StatInfo->include_path_stat,
+	                                           &gfs_stat_array,
+	                                           &gfs_stat_count);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
 	/* Inform the server that we are done. */
 	globus_gridftp_server_finished_stat(Operation, 
 	                                    result, 
-	                                    statbuf_array, 
-	                                    statbuf_count);
+	                                    gfs_stat_array, 
+	                                    gfs_stat_count);
 
-	/* Destroy the statbuf_array. */
-	globus_l_gfs_hpss_common_destroy_stat_array(statbuf_array, statbuf_count);
+	/* Destroy the gfs_stat_array. */
+	globus_l_gfs_hpss_common_destroy_gfs_stat_array(gfs_stat_array, gfs_stat_count);
 
 	GlobusGFSHpssDebugExit();
 	return;
@@ -2033,7 +2469,7 @@ static globus_gfs_storage_iface_t globus_l_gfs_hpss_dsi_iface =
 	0,
 	globus_l_gfs_hpss_module_session_start,
 	globus_l_gfs_hpss_module_session_end,
-	NULL, /* globus_l_gfs_hpss_module_list, */
+	globus_l_gfs_hpss_module_list,
 	globus_l_gfs_hpss_module_send,
 	globus_l_gfs_hpss_module_recv,
 	NULL, /* globus_l_gfs_hpss_module_trev, */
