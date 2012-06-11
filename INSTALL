@@ -3,7 +3,6 @@ For the latest build instructions, see https://github.com/JasonAlt/GridFTP-DSI-f
 BUILD GRIDFTP
 =============
 
-=======
 You'll need to download and build Globus Toolkit 5.2.x. Follow the instructions in the INSTALL file to build gridftp. Since HPSS is 32bit (until the 7.4 release), be sure to build the toolkit 32bit:
 
 globus$ ./configure --prefix=/usr/local/globus-5.2.x --with-flavor=gcc32dbg
@@ -22,7 +21,6 @@ Build and Install the DSI
 Build the HPSS DSI with the following options. Note that kerberos authentication is not yet supported.
 
 ./configure --with-globus=/usr/local/globus-5.2.x --with-globus-flavor=gcc32dbg --with-hpssdir=/opt/hpss --with-unixauth
-
 Install the DSI into the Globus Toolkit installation directory:
 
 make install
