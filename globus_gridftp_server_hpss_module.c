@@ -46,6 +46,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <utime.h>
 #include <time.h>
 
 /*
@@ -383,7 +384,8 @@ globus_l_gfs_hpss_module_list_single_line(
     hpss_stat_t * HpssStat,
 	char        * FullPath,
     char        * Buffer,
-    int           BufferLength)
+    int           BufferLength,
+    char        * LinkTarget)
 {
 	globus_result_t   result = GLOBUS_SUCCESS;
 	char              archive[3];
@@ -522,7 +524,7 @@ globus_l_gfs_hpss_module_list_single_line(
 
 	snprintf(Buffer, 
 	         BufferLength,
-	         "%s %3d %s %s %s %12"GLOBUS_OFF_T_FORMAT" %s %2d %02d:%02d %s\n",
+	         "%s %3d %s %s %s %12"GLOBUS_OFF_T_FORMAT" %s %2d %02d:%02d %s%s%s%s\n",
 	         perms,
 	         HpssStat->st_nlink,
 	         user,
@@ -533,7 +535,10 @@ globus_l_gfs_hpss_module_list_single_line(
 	         tm->tm_mday,
 	         tm->tm_hour,
 	         tm->tm_min,
-	         name);
+	         name,
+	         S_ISLNK(HpssStat->st_mode) ? " ->" : "",
+	         LinkTarget != NULL ? " " : "",
+	         LinkTarget != NULL ? LinkTarget : "");
 
 	if (username != NULL)
 		globus_free(username);
@@ -1762,6 +1767,7 @@ globus_l_gfs_hpss_module_list(
 	transfer_state_t    transfer_state;
 	hpss_dirent_t       dirent;
 	hpss_stat_t         hpss_stat_buf;
+	char                link_target[1024];
 
 	GlobusGFSName(globus_l_gfs_hpss_module_list);
 	GlobusGFSHpssDebugEnter();
@@ -1798,11 +1804,23 @@ globus_l_gfs_hpss_module_list(
 		if (result != GLOBUS_SUCCESS)
 			goto cleanup;
 
+		/* If it is a symlink... */
+		if (S_ISLNK(hpss_stat_buf.st_mode))
+		{
+			/* Read its target. */
+			retval = hpss_Readlink(TransferInfo->pathname,
+			                       link_target,
+			                       sizeof(link_target));
+		}
+
 		/* Translate the stat info to a listing. */
 		globus_l_gfs_hpss_module_list_single_line(&hpss_stat_buf,
 		                                          TransferInfo->pathname,
 		                                          buffer,
-		                                          buffer_handle.BufferLength);
+		                                          buffer_handle.BufferLength,
+		                                          S_ISLNK(hpss_stat_buf.st_mode) && retval > 0 ?
+		                                            link_target:
+		                                            NULL);
 
 
 		/* Release the full buffer. */
@@ -1895,11 +1913,23 @@ globus_l_gfs_hpss_module_list(
 		if (result != GLOBUS_SUCCESS)
 			goto cleanup;
 
+		/* If it is a symlink... */
+		if (S_ISLNK(hpss_stat_buf.st_mode))
+		{
+			/* Read its target. */
+			retval = hpss_Readlink(fullpath,
+			                       link_target,
+			                       sizeof(link_target));
+		}
+
 		/* Translate the stat info to a listing. */
 		globus_l_gfs_hpss_module_list_single_line(&hpss_stat_buf,
 		                                          fullpath,
 		                                          buffer,
-		                                          buffer_handle.BufferLength);
+		                                          buffer_handle.BufferLength,
+		                                          S_ISLNK(hpss_stat_buf.st_mode) && retval > 0 ?
+		                                            link_target:
+		                                            NULL);
 
 		globus_free(fullpath);
 
@@ -2338,15 +2368,10 @@ globus_l_gfs_hpss_module_command(
 	int                retval         = 0;
 	char             * command_output = NULL;
 	globus_result_t    result         = GLOBUS_SUCCESS;
-/*	session_handle_t * session_handle = NULL; */
+	struct utimbuf     times;
 
 	GlobusGFSName(globus_l_gfs_hpss_module_command);
 	GlobusGFSHpssDebugEnter();
-
-	/* Make sure our arg was passed in. */
-/*	globus_assert(UserArg != NULL); */
-	/* Cast it to our session handle. */
-/*	session_handle = (session_handle_t *) UserArg; */
 
 	switch (CommandInfo->command)
 	{
@@ -2395,6 +2420,21 @@ globus_l_gfs_hpss_module_command(
 		                                        CommandInfo->chgrp_group);
 		break;
 
+	case GLOBUS_GFS_CMD_SITE_UTIME:
+		times.actime  = CommandInfo->utime_time;
+		times.modtime = CommandInfo->utime_time;
+
+		retval = hpss_Utime(CommandInfo->pathname, &times);
+		if (retval != 0)
+        	result = GlobusGFSErrorSystemError("hpss_Utime", -retval);
+		break;
+
+	case GLOBUS_GFS_CMD_SITE_SYMLINK:
+		retval = hpss_Symlink(CommandInfo->from_pathname, CommandInfo->pathname);
+		if (retval != 0)
+        	result = GlobusGFSErrorSystemError("hpss_Symlink", -retval);
+		break;
+
 	case GLOBUS_GFS_CMD_CKSM:
 	case GLOBUS_GFS_CMD_SITE_DSI:
 	case GLOBUS_GFS_CMD_SITE_SETNETSTACK:
@@ -2427,10 +2467,6 @@ globus_l_gfs_hpss_module_stat(globus_gfs_operation_t   Operation,
 
 	GlobusGFSName(globus_i_gfs_hpss_module_stat);
 	GlobusGFSHpssDebugEnter();
-
-	/* Make sure Arg was provided. */
-	/* globus_assert(Arg != NULL); */
-
 
 	result = globus_l_gfs_hpss_common_gfs_stat(StatInfo->pathname,
 	                                           StatInfo->file_only,

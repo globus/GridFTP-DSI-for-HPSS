@@ -1,5 +1,8 @@
 Version 0.3 Alpha
 	- Remove libtool from the distribution
+	- Added support for MFMT and SITE UTIME
+	- Added support for SITE SYMLINKFROM/SYMLINKTO
+	- Added symlink targets to list output
 
 Version 0.2 Alpha
 	- Tested against HPSS 7.4.1B
