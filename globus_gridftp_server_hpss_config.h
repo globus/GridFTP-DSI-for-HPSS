@@ -52,6 +52,10 @@
 typedef struct {
 	char * LoginName;
 	char * KeytabFile;
+	char * ProjectFile;
+	char * FamilyFile;
+	char * CosFile;
+	char * AdminList;
 } config_t;
 
 globus_result_t
@@ -66,4 +70,36 @@ globus_l_gfs_hpss_config_get_login_name();
 char *
 globus_l_gfs_hpss_config_get_keytab();
 
+/*
+ *  Family can be an integer or the name.
+ */
+globus_bool_t
+globus_l_gfs_hpss_config_can_user_use_family(char * UserName,
+                                             char * Family);
+
+int
+globus_l_gfs_hpss_config_get_family_id(char * Family);
+
+char *
+globus_l_gfs_hpss_config_get_family_name(char * Family);
+
+char *
+globus_l_gfs_hpss_config_get_my_families(char * UserName);
+
+
+/*
+ * Cos can be an integer or the name.
+ */
+globus_bool_t
+globus_l_gfs_hpss_config_can_user_use_cos(char * UserName,
+                                          char * Cos);
+
+int
+globus_l_gfs_hpss_config_get_cos_id(char * Cos);
+
+globus_bool_t
+globus_l_gfs_hpss_config_is_user_admin(char * UserName);
+
+char *
+globus_l_gfs_hpss_config_get_my_cos(char * UserName);
 #endif /* GLOBUS_GRIDFTP_SERVER_HPSS_CONFIG_H */
