@@ -6,6 +6,7 @@ Version 0.3 Alpha
 	- Added restart and performance markers in extended block mode
 	- Added SETCOS,LSCOS (class of service), SETFAM,LSFAM (tape families)
 	- Added project, family, cos and admin settings to the config file
+	- Now requires Globus Toolkit 5.2.2rc2 or newer
 
 Version 0.2 Alpha
 	- Tested against HPSS 7.4.1B
