@@ -96,11 +96,12 @@ typedef struct {
 } transfer_state_t;
 
 typedef struct pio_request {
-	transfer_state_t     * TransferState;
-	buffer_handle_t      * BufferHandle;
-	hpss_pio_operation_t   PioOperation;
-	globus_off_t           FileLength;
-	globus_off_t           FileOffset;
+	transfer_state_t       * TransferState;
+	buffer_handle_t        * BufferHandle;
+	globus_gfs_operation_t   GridFTPOperation;
+	hpss_pio_operation_t     PioOperation;
+	globus_off_t             FileLength;
+	globus_off_t             FileOffset;
 
 	struct {
 		int            FileFD;
@@ -110,7 +111,14 @@ typedef struct pio_request {
 		hpss_pio_grp_t StripeGroup;
 	} Participant;
 
-	/* Access controlled via Transfer State lock */
+	/*
+	 * Access to items below controlled via Transfer State lock
+	 */
+
+	/* Amount of current/previous pio write operation. */
+	globus_off_t   UncommittedOffset;
+	globus_off_t   UncommittedLength;
+
 	globus_bool_t  CoordHasExitted;
 	globus_bool_t  ParticHasExitted;
 } pio_request_t;
@@ -123,6 +131,19 @@ typedef struct gridftp_request {
 	globus_off_t       TransferOffset; /* For RETR operations. */
 	int                OpCount; /* Number of outstanding read/writes */
 } gridftp_request_t;
+
+typedef struct {
+	char * UserName;
+	int    CosID;
+	int    FamilyID;
+} session_handle_t;
+
+enum {
+	GLOBUS_GFS_HPSS_CMD_SITE_SETCOS = GLOBUS_GFS_MIN_CUSTOM_CMD,
+	GLOBUS_GFS_HPSS_CMD_SITE_LSCOS,
+	GLOBUS_GFS_HPSS_CMD_SITE_SETFAM,
+	GLOBUS_GFS_HPSS_CMD_SITE_LSFAM,
+};
 
 static void
 globus_i_gfs_hpss_module_gridftp_launch_write(globus_gfs_operation_t   Operation,
@@ -275,6 +296,7 @@ globus_l_gfs_hpss_module_session_start(
     globus_result_t     result         = GLOBUS_SUCCESS;
     globus_gfs_stat_t * gfs_stat_array = NULL;
 	int                 gfs_stat_count = 0;
+	session_handle_t  * session_handle = NULL;
 
     GlobusGFSName(globus_l_gfs_hpss_module_session_start);
     GlobusGFSHpssDebugEnter();
@@ -329,6 +351,77 @@ globus_l_gfs_hpss_module_session_start(
 	/* It exists, that's good enough for us. */
 	globus_l_gfs_hpss_common_destroy_gfs_stat_array(gfs_stat_array, gfs_stat_count);
 
+	/* Allocate our session handle. */
+	session_handle = (session_handle_t *) globus_malloc(sizeof(session_handle_t));
+	if (session_handle == NULL)
+	{
+		result = GlobusGFSErrorMemory("session handle");
+		goto cleanup;
+	}
+
+	session_handle->UserName = globus_libc_strdup(SessionInfo->username);
+	session_handle->CosID    = -1;
+	session_handle->FamilyID = -1;
+
+	/*
+	 * Add our local commands.
+	 */
+
+	result = globus_gridftp_server_add_command(Operation,
+	                                           "SITE SETCOS",
+	                                           GLOBUS_GFS_HPSS_CMD_SITE_SETCOS,
+	                                           3,
+	                                           3,
+	                                           "SITE SETCOS <sp> cos: Set the HPSS class of service ('default' to reset)",
+	                                           GLOBUS_FALSE,
+	                                           0);
+	if (result != GLOBUS_SUCCESS)
+	{
+		result = GlobusGFSErrorWrapFailed("Failed to add custom 'SITE SETCOS' command", result);
+		goto cleanup;
+	}
+
+	result = globus_gridftp_server_add_command(Operation,
+	                                           "SITE LSCOS",
+	                                           GLOBUS_GFS_HPSS_CMD_SITE_LSCOS,
+	                                           2,
+	                                           2,
+	                                           "SITE LSCOS: List the allowed HPSS class of services.",
+	                                           GLOBUS_FALSE,
+	                                           0);
+	if (result != GLOBUS_SUCCESS)
+	{
+		result = GlobusGFSErrorWrapFailed("Failed to add custom 'SITE LSCOS' command", result);
+		goto cleanup;
+	}
+
+	result = globus_gridftp_server_add_command(Operation,
+	                                           "SITE SETFAM",
+	                                           GLOBUS_GFS_HPSS_CMD_SITE_SETFAM,
+	                                           3,
+	                                           3,
+	                                           "SITE SETFAM <sp> family: Set the HPSS tape family ('default' to reset)",
+	                                           GLOBUS_FALSE,
+	                                           0);
+	if (result != GLOBUS_SUCCESS)
+	{
+		result = GlobusGFSErrorWrapFailed("Failed to add custom 'SITE SETFAM' command", result);
+		goto cleanup;
+	}
+
+	result = globus_gridftp_server_add_command(Operation,
+	                                           "SITE LSFAM",
+	                                           GLOBUS_GFS_HPSS_CMD_SITE_LSFAM,
+	                                           2,
+	                                           2,
+	                                           "SITE LSFAM: List the allowed HPSS families.",
+	                                           GLOBUS_FALSE,
+	                                           0);
+	if (result != GLOBUS_SUCCESS)
+	{
+		result = GlobusGFSErrorWrapFailed("Failed to add custom 'SITE LSFAM' command", result);
+		goto cleanup;
+	}
 	/*
 	 * Inform the server that we are done. If we do not pass in a username, the
 	 * server will use the name we mapped to with GSI. If we do not pass in a
@@ -340,7 +433,7 @@ globus_l_gfs_hpss_module_session_start(
 	 */
 	globus_gridftp_server_finished_session_start(Operation,
 	                                             result,
-	                                             NULL, /* session_handle, */
+	                                             session_handle,
 	                                             NULL,
 	                                             home_directory);
 
@@ -348,6 +441,14 @@ globus_l_gfs_hpss_module_session_start(
 	return;
 
 cleanup:
+
+	/* Cleanup the session handle. */
+	if (session_handle != NULL)
+	{
+		if (session_handle->UserName != NULL)
+			globus_free(session_handle->UserName);
+		globus_free(session_handle);
+	}
 
 	/* Inform the server that we have completed with an error. */
 	globus_gridftp_server_finished_session_start(Operation,
@@ -363,16 +464,17 @@ cleanup:
 static void
 globus_l_gfs_hpss_module_session_end(void * Arg)
 {
+	session_handle_t * session_handle = (session_handle_t *)Arg;
+
 	GlobusGFSName(globus_l_gfs_hpss_module_session_end);
 	GlobusGFSHpssDebugEnter();
 
-	/*
-	 * Make sure something is passed back. If an error occurs soon enough in
-	 * the connection (like authentication), session end may be called
-	 * even though session start wasn't called.
-	 */
-	if (Arg == NULL)
-		return;
+	if (session_handle != NULL)
+	{
+		if (session_handle->UserName != NULL)
+			globus_free(session_handle->UserName);
+		globus_free(session_handle);
+	}
 
 	GlobusGFSHpssDebugExit();
 }
@@ -1021,6 +1123,22 @@ globus_i_gfs_hpss_module_pio_register_write_callback(
 		/* Wake anyone waiting on a free buffer. */
 		globus_cond_broadcast(&pio_request->TransferState->Cond);
 
+		/* If we just committed a buffer... */
+		if (pio_request->UncommittedLength != 0)
+		{
+			/*
+			 * Inform the server that it has been committed. This enables
+			 * restart/perf markers.
+			 */
+			globus_gridftp_server_update_bytes_written(pio_request->GridFTPOperation, 
+			                                           pio_request->UncommittedOffset,
+			                                           pio_request->UncommittedLength);
+
+			/* Reset these values. */
+			pio_request->UncommittedOffset = 0;
+			pio_request->UncommittedLength = 0;
+		}
+
 		while (TRUE)
 		{
 			/* Check for an error condition first. */
@@ -1043,6 +1161,13 @@ globus_i_gfs_hpss_module_pio_register_write_callback(
 
 /* XXX How to handle an early EOF? */
 
+		/* If we have a buffer... */
+		if (Buffer != NULL)
+		{
+			/* Record the uncommitted write. */
+			pio_request->UncommittedOffset  = transfer_offset;
+			pio_request->UncommittedLength  = buffer_length;
+		}
 	}
 cleanup:
 	globus_mutex_unlock(&pio_request->TransferState->Lock);
@@ -1220,15 +1345,16 @@ globus_i_gfs_hpss_module_pio_execute(void * Arg)
 }
 
 static globus_result_t
-globus_i_gfs_hpss_module_pio_begin(pio_request_t        * PioRequest,
-                                   int                    HpssFileFD,
-                                   hpss_pio_operation_t   PioOperation,
-                                   globus_off_t           FileOffset,
-                                   globus_off_t           FileLength,
-                                   unsigned32             BlockSize,
-                                   unsigned32             FileStripeWidth,
-                                   transfer_state_t     * TransferState,
-                                   buffer_handle_t      * BufferHandle)
+globus_i_gfs_hpss_module_pio_begin(pio_request_t          * PioRequest,
+                                   globus_gfs_operation_t   GridFTPOperation,
+                                   int                      HpssFileFD,
+                                   hpss_pio_operation_t     PioOperation,
+                                   globus_off_t             FileOffset,
+                                   globus_off_t             FileLength,
+                                   unsigned32               BlockSize,
+                                   unsigned32               FileStripeWidth,
+                                   transfer_state_t       * TransferState,
+                                   buffer_handle_t        * BufferHandle)
 {
 	int                 retval = 0;
 	void              * buffer = NULL;
@@ -1242,8 +1368,9 @@ globus_i_gfs_hpss_module_pio_begin(pio_request_t        * PioRequest,
 
 	/* Initialize the pio request structure. */
 	memset(PioRequest, 0, sizeof(pio_request_t));
-	PioRequest->TransferState    = TransferState;
+	PioRequest->TransferState      = TransferState;
 	PioRequest->BufferHandle       = BufferHandle;
+	PioRequest->GridFTPOperation   = GridFTPOperation;
 	PioRequest->PioOperation       = PioOperation;
 	PioRequest->FileLength         = FileLength;
 	PioRequest->FileOffset         = FileOffset;
@@ -2079,6 +2206,7 @@ globus_l_gfs_hpss_module_send(
 
 	/* Fire off the PIO side of the transfer. */
 	result = globus_i_gfs_hpss_module_pio_begin(&pio_request,
+	                                            Operation,
 	                                            hpss_file_fd,
 	                                            HPSS_PIO_READ,
 	                                            file_offset,
@@ -2169,10 +2297,17 @@ globus_l_gfs_hpss_module_recv(
 	buffer_handle_t       buffer_handle;
 	hpss_cos_hints_t      hints_in;
 	hpss_cos_hints_t      hints_out;
+	session_handle_t    * session_handle = NULL;
 	hpss_cos_priorities_t priorities;
 
 	GlobusGFSName(globus_l_gfs_hpss_module_recv);
 	GlobusGFSHpssDebugEnter();
+
+	/* Make sure we got our UserArg. */
+	globus_assert(UserArg != NULL);
+
+	/* Cast to our session handle. */
+	session_handle = (session_handle_t *)UserArg;
 
     /* Inform the server that we are starting. */
 	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
@@ -2208,15 +2343,29 @@ globus_l_gfs_hpss_module_recv(
 	/* Initialize the hints in. */
 	memset(&hints_in, 0, sizeof(hpss_cos_hints_t));
 
-	CONVERT_LONGLONG_TO_U64(file_length, hints_in.MinFileSize);
-	CONVERT_LONGLONG_TO_U64(file_length, hints_in.MaxFileSize);
-
 	/* Initialize the hints out. */
 	memset(&hints_out, 0, sizeof(hpss_cos_hints_t));
 
 	/* Initialize the priorities. */
 	memset(&priorities, 0, sizeof(hpss_cos_priorities_t));
 
+	/* Try to set the class of service id. */
+	if (session_handle->CosID != -1)
+	{
+		hints_in.COSId   = session_handle->CosID;
+		priorities.COSIdPriority = REQUIRED_PRIORITY;
+	}
+
+	/* Try to set the tape family id. */
+	if (session_handle->FamilyID != -1)
+	{
+		hints_in.FamilyId           = session_handle->FamilyID;
+		priorities.FamilyIdPriority = REQUIRED_PRIORITY;
+	}
+
+	/* Set the file size hints & priorities. */
+	CONVERT_LONGLONG_TO_U64(file_length, hints_in.MinFileSize);
+	CONVERT_LONGLONG_TO_U64(file_length, hints_in.MaxFileSize);
 	priorities.MinFileSizePriority = LOWEST_PRIORITY;
 	priorities.MaxFileSizePriority = LOWEST_PRIORITY;
 
@@ -2235,6 +2384,7 @@ globus_l_gfs_hpss_module_recv(
 
 	/* Fire off the PIO side of the transfer. */
 	result = globus_i_gfs_hpss_module_pio_begin(&pio_request,
+	                                            Operation,
 	                                            hpss_file_fd,
 	                                            HPSS_PIO_WRITE,
 	                                            file_offset,
@@ -2365,13 +2515,26 @@ globus_l_gfs_hpss_module_command(
     globus_gfs_command_info_t * CommandInfo,
     void                      * UserArg)
 {
-	int                retval         = 0;
-	char             * command_output = NULL;
-	globus_result_t    result         = GLOBUS_SUCCESS;
+	int                retval          = 0;
+	char             * cos_list        = NULL;
+	char             * family_list     = NULL;
+	char             * command_output  = NULL;
+	globus_result_t    result          = GLOBUS_SUCCESS;
 	struct utimbuf     times;
+	session_handle_t * session_handle  = NULL;
+	globus_bool_t      free_cmd_output = GLOBUS_FALSE;
+	globus_bool_t      can_use_cos     = GLOBUS_FALSE;
+	globus_bool_t      can_use_family  = GLOBUS_FALSE;
+	globus_bool_t      user_is_admin   = GLOBUS_FALSE;
 
 	GlobusGFSName(globus_l_gfs_hpss_module_command);
 	GlobusGFSHpssDebugEnter();
+
+	/* Make sure we got our UserArg. */
+	globus_assert(UserArg != NULL);
+
+	/* Cast to our session handle. */
+	session_handle = (session_handle_t *)UserArg;
 
 	switch (CommandInfo->command)
 	{
@@ -2435,6 +2598,89 @@ globus_l_gfs_hpss_module_command(
         	result = GlobusGFSErrorSystemError("hpss_Symlink", -retval);
 		break;
 
+	case GLOBUS_GFS_HPSS_CMD_SITE_SETCOS:
+		/* Check for the 'default' cos. */
+		if (strcasecmp(CommandInfo->pathname, "default") == 0)
+		{
+			session_handle->CosID = -1;
+			command_output = "250 Success\r\n";
+			break;
+		}
+
+		/* Check if the user is allowed to use this COS. */
+		can_use_cos = globus_l_gfs_hpss_config_can_user_use_cos(session_handle->UserName, CommandInfo->pathname);
+
+		if (can_use_cos == GLOBUS_FALSE)
+		{
+			/* Check if the user is in the admin list. */
+			user_is_admin = globus_l_gfs_hpss_config_is_user_admin(session_handle->UserName);
+
+			if (user_is_admin == GLOBUS_FALSE)
+			{
+				command_output = "550 Not permitted to use this class of service\r\n";
+				break;
+			}
+		}
+
+		/* Save the class of service id. */
+		session_handle->CosID = globus_l_gfs_hpss_config_get_cos_id(CommandInfo->pathname);
+
+		command_output = "250 Success\r\n";
+	
+		break;
+
+	case GLOBUS_GFS_HPSS_CMD_SITE_LSCOS:
+		cos_list = globus_l_gfs_hpss_config_get_my_cos(session_handle->UserName);
+
+		command_output = globus_malloc(strlen("250 Allowed COS: \r\n") + (cos_list ? strlen(cos_list) : 0));
+		sprintf(command_output, "250 Allowed COS: %s\r\n", cos_list ? cos_list : "");
+		free_cmd_output = GLOBUS_TRUE;
+
+		if (cos_list != NULL)
+			globus_free(cos_list);
+		break;
+
+	case GLOBUS_GFS_HPSS_CMD_SITE_SETFAM:
+		/* Check for the 'default' family. */
+		if (strcasecmp(CommandInfo->pathname, "default") == 0)
+		{
+			session_handle->FamilyID = -1;
+			command_output = "250 Success\r\n";
+			break;
+		}
+
+		/* Check if the user is allowed to use this family. */
+		can_use_family = globus_l_gfs_hpss_config_can_user_use_family(session_handle->UserName,
+		                                                              CommandInfo->pathname);
+
+		if (can_use_family == GLOBUS_FALSE)
+		{
+			/* Check if the user is in the admin list. */
+			user_is_admin = globus_l_gfs_hpss_config_is_user_admin(session_handle->UserName);
+
+			if (user_is_admin == GLOBUS_FALSE)
+			{
+				command_output = "550 Not permitted to use this family\r\n";
+				break;
+			}
+		}
+
+		/* Save the family id. */
+		session_handle->FamilyID = globus_l_gfs_hpss_config_get_family_id(CommandInfo->pathname);
+		command_output = "250 Success\r\n";
+		break;
+
+	case GLOBUS_GFS_HPSS_CMD_SITE_LSFAM:
+		family_list = globus_l_gfs_hpss_config_get_my_families(session_handle->UserName);
+
+		command_output = globus_malloc(strlen("250 Allowed families: \r\n") + (family_list ? strlen(family_list) : 0) + 1);
+		sprintf(command_output, "250 Allowed families: %s\r\n", family_list ? family_list : "");
+		free_cmd_output = GLOBUS_TRUE;
+
+		if (family_list != NULL)
+			globus_free(family_list);
+		break;
+
 	case GLOBUS_GFS_CMD_CKSM:
 	case GLOBUS_GFS_CMD_SITE_DSI:
 	case GLOBUS_GFS_CMD_SITE_SETNETSTACK:
@@ -2448,8 +2694,9 @@ globus_l_gfs_hpss_module_command(
 
 	globus_gridftp_server_finished_command(Operation, result, command_output);
 
-	if (command_output != NULL)
+	if (free_cmd_output == GLOBUS_TRUE)
 		globus_free(command_output);
+
 	GlobusGFSHpssDebugExit();
 }
 
