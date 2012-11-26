@@ -15,6 +15,7 @@ BUILD AND INSTALL HPSS
 This is beyond the scope of this article but you should have a working HPSS installation. This version of the DSI was built against HPSS 7.3.3p4.
 
 Build and Install the DSI
+=========================
 
 Build the HPSS DSI with the following options. If your HPSS installation uses Kerberos, replace '--with-unixauth'
 with '--with_krb5auth' below.
@@ -86,7 +87,8 @@ The globus gridftp server does not need to run as a privileged user. You should 
 Add an entry to /etc/services for the default gsiftp port:
 
 gsiftp 2811/tcp # GSI FTP
-Here's an example xinetd entry (/etc/xinetd.d/gridftp). Note the specific changes for 5.2.0 vs later 5.2.x versions.
+
+Here's an example xinetd entry (/etc/xinetd.d/gridftp). Note that the DSI requires that the server run with threads so you must use -threads with a value of 2 or greater.
 
 service gsiftp
 
