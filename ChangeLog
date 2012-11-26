@@ -1,4 +1,8 @@
-Version 0.3 Alpha
+Version 1.0 RC1
+	- Now requires Globus Toolkit 5.2.3rc1 or newer. See 
+	  http://jira.globus.org/browse/GT-299
+	- Added support for ESTO, ERET, REST (APPE, SCKS not supported yet)
+	- Tested against HPSS 7.3.3P7
 	- Remove libtool from the distribution
 	- Added support for MFMT and SITE UTIME
 	- Added support for SITE SYMLINKFROM/SYMLINKTO
@@ -6,7 +10,18 @@ Version 0.3 Alpha
 	- Added restart and performance markers in extended block mode
 	- Added SETCOS,LSCOS (class of service), SETFAM,LSFAM (tape families)
 	- Added project, family, cos and admin settings to the config file
-	- Now requires Globus Toolkit 5.2.2rc2 or newer
+	- Changed '250 Success' messages to '250 OK' to match server.
+	- Added 'SITE HARDLINKFROM' and 'SITE HARDLINKTO'
+	- Added 'SITE STAGE'. Files that can not be staged because they are on a
+	  tape-only class of service will give a special warning.
+	- Changed calculation for what is and is not archived. A file must be 
+	  completely on a disk SC to be considered not archived.
+	- Changed "AR" status in list output to "TP". This should better reflect
+	  that some COS are tape only.
+	- The list function has been removed until a fully functional version
+	  including MLSD and NLST can be implemented.
+	- Removed project file configs until those are better understood.
+	- Split the DSI into local and control/data components
 
 Version 0.2 Alpha
 	- Tested against HPSS 7.4.1B

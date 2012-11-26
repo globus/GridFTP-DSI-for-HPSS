@@ -1,7 +1,7 @@
 dnl
 
 AC_REVISION($Revision: 1.8 $)
-AC_INIT([GridFTP HPSS DSI], [0.2 alpha])
+AC_INIT([GridFTP HPSS DSI], [1.0 rc1])
 
 AC_PROG_LIBTOOL
 
@@ -138,13 +138,21 @@ hpssauthlibs=''
 #    [Link against libhpsskrb5auth and libhpssunixauth.]),
 #    [hpssauthlibs="$hpssauthlibs -lhpsskrb5auth -lhpssunixauth"], [])
 
-AC_ARG_WITH(unixauth, AC_HELP_STRING([--with-unixauth],\
-    [Link against libhpssunixauth.]),
-    [hpssauthlibs="$hpssauthlibs -lhpssunixauth"], [])
+AC_ARG_WITH(unixauth, 
+    AC_HELP_STRING([--with-unixauth], [Link against libhpssunixauth.]),
+    [
+        hpssauthlibs="$hpssauthlibs -lhpssunixauth"
+        AC_DEFINE(HPSS_UNIX_AUTH, 1, [Using Unix authentication])
+    ], 
+    [])
 
-AC_ARG_WITH(krb5auth, AC_HELP_STRING([--with-krb5auth],\
-    [Link against libhpsskrb5auth.]),
-    [hpssauthlibs="$hpssauthlibs -lhpsskrb5auth"], [])
+AC_ARG_WITH(krb5auth, 
+    AC_HELP_STRING([--with-krb5auth], [Link against libhpsskrb5auth.]),
+    [
+        hpssauthlibs="$hpssauthlibs -lhpsskrb5auth"
+        AC_DEFINE(HPSS_KRB5_AUTH, 1, [Using Unix authentication])
+    ],
+    [])
 
 if test "${hpssauthlibs+set}" != set; then
 	echo "Must specifiy one of --with-unixauth or --with-krb5auth"
@@ -160,6 +168,8 @@ dnl These values are hardcoded for now, until I can get the packaging stuff work
 dnl
 DIRT_TIMESTAMP=`perl -e 'print time'`
 DIRT_BRANCH_ID=99999
+
+AC_CONFIG_HEADERS([config.h])
 
 AC_SUBST(GPT_MAJOR_VERSION, 0)
 AC_SUBST(GPT_MINOR_VERSION, 2)

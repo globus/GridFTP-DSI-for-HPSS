@@ -9,6 +9,7 @@ LoginName gridftp
 # (required) Keytab file containing the user's credentials
 KeytabFile keytab
 
+# CURRENTLY NOT SUPPORTED
 # (optional) Path to file that defines which projects each user belongs to.
 # Project file format is:
 #   username:project1,project2
