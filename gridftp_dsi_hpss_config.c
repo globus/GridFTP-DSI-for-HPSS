@@ -42,12 +42,14 @@
 /*
  * System includes.
  */
-#include <ctype.h>
-#include <stdio.h>
-#include <errno.h>
+#include <sys/types.h>
+#include <strings.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <ctype.h>
+#include <stdio.h>
+#include <errno.h>
 #include <grp.h>
 #include <pwd.h>
 
@@ -61,376 +63,321 @@
 /*
  * Local includes.
  */
-#include "globus_gridftp_server_hpss_config.h"
-#include "globus_gridftp_server_hpss_common.h"
+#include "gridftp_dsi_hpss_config.h"
+#include "gridftp_dsi_hpss_misc.h"
 
+#ifdef DMALLOC
 /*
- * Yeah, it's global. Sue me. I'm getting tired of passing it around everywhere.
+ * Dmalloc
  */
-static config_t * _Config = NULL;
+#include <dmalloc.h>
+#endif /* DMALLOC */
+
+typedef enum {
+	ACL_TYPE_USER,
+	ACL_TYPE_GROUP,
+} acl_type_t;
+
+typedef struct acl_list {
+	acl_type_t        Type;
+	char            * Name;
+	struct acl_list * Next;
+} acl_list_t;
+
+typedef struct TranslationFile {
+	struct translation {
+		int                  ID;
+		char               * Name;
+		acl_list_t         * ACLList;
+		struct translation * Next;
+	} * Translations;
+} TranslationFile_t;
+
+struct config_handle {
+	char   * ConfigFile;
+
+	struct {
+		char       * LoginName;
+		char       * KeytabFile;
+		char       * FamilyFile;
+		char       * CosFile;
+		acl_list_t * AdminList;
+	} Config;
+
+	/* Family file entries. */
+	TranslationFile_t Family;
+	TranslationFile_t Cos;
+};
 
 static void
-globus_i_gfs_hpss_find_next_word(char *  Buffer,
-                                 char ** Word,
-                                 int  *  Length)
+config_destroy_acl_list(acl_list_t * ACLList)
 {
-    GlobusGFSName(globus_i_gfs_hpss_find_next_word);
-    GlobusGFSHpssDebugEnter();
+	acl_list_t * acl_save = NULL;
 
-    *Word   = NULL;
-    *Length = 0;
+	GlobusGFSName(config_destroy_acl_list);
+	GlobusGFSHpssDebugEnter();
+
+	while (ACLList != NULL)
+	{
+		/* Save off this ACL */
+		acl_save = ACLList;
+		/* Move the list forward. */
+		ACLList = ACLList->Next;
+
+		if (acl_save->Name != NULL)
+			free(acl_save->Name);
+		free(acl_save);
+	}
+
+    GlobusGFSHpssDebugExit();
+}
+
+static void
+config_destroy_translations(struct translation * Translations)
+{
+	struct translation * trans_save = NULL;
+
+	GlobusGFSName(config_destroy_translations);
+	GlobusGFSHpssDebugEnter();
+
+	if (Translations != NULL)
+	{
+		/* Save off this entry. */
+		trans_save = Translations;
+		/* Move the list forward. */
+		Translations = Translations->Next;
+
+		if (trans_save->Name != NULL)
+			globus_free(trans_save->Name);
+
+		config_destroy_acl_list(trans_save->ACLList);
+		globus_free(trans_save);
+	}
+
+    GlobusGFSHpssDebugExit();
+}
+
+/*
+ * Helper that removes leading whitespace, newlines, comments, etc.
+ */
+static void
+config_find_next_word(char *  Buffer,
+                      char ** Word,
+                      int  *  Length)
+{
+	GlobusGFSName(config_find_next_word);
+	GlobusGFSHpssDebugEnter();
+
+	*Word   = NULL;
+	*Length = 0;
 
 	if (Buffer == NULL)
 		goto cleanup;
 
-    /* Skip spacing. */
-    while (isspace(*Buffer)) Buffer++;
+	/* Skip spacing. */
+	while (isspace(*Buffer)) Buffer++;
 
-    /* Skip EOL */
-    if (*Buffer == '\0' || *Buffer == '\n')
-        goto cleanup;
+	/* Skip EOL */
+	if (*Buffer == '\0' || *Buffer == '\n')
+		goto cleanup;
 
-    /* Skip comments. */
-    if (*Buffer == '#')
-        goto cleanup;
+	/* Skip comments. */
+	if (*Buffer == '#')
+		goto cleanup;
 
-    /* Return the start of the found keep word */
-    *Word = Buffer;
+	/* Return the start of the found keep word */
+	*Word = Buffer;
 
-    /* Find the length of the word. */
-    while (!isspace(*Buffer) && *Buffer != '\0' && *Buffer != '\n')
+	/* Find the length of the word. */
+	while (!isspace(*Buffer) && *Buffer != '\0' && *Buffer != '\n')
 	{
 		(*Length)++;
 		Buffer++;
 	}
 
 cleanup:
+	GlobusGFSHpssDebugExit();
+}
+
+/*
+ * String will be trashed.
+ */
+static globus_result_t
+config_create_acl_list(char       *  String,
+                       acl_list_t ** ACLList)
+{
+	int               length  = 0;
+	char            * tmp     = String;
+	char            * word    = NULL;
+	char            * entry   = NULL;
+	char            * saveptr = NULL;
+	acl_list_t      * acl     = NULL;
+	globus_result_t   result  = GLOBUS_SUCCESS;
+
+	GlobusGFSName(config_create_acl_list);
+	GlobusGFSHpssDebugEnter();
+
+	if (String == NULL)
+		goto cleanup;
+
+	while ((entry = strtok_r(tmp, ",", &saveptr)) != NULL)
+	{
+		tmp = NULL;
+
+		/* This will remove any garbage. */
+		config_find_next_word(entry, &word, &length);
+
+		/* Skip if there was nothing there. */
+		if (length == 0)
+			continue;
+
+		/* Allocate the new ACL. */
+		acl = (acl_list_t *) globus_calloc(1, sizeof(acl_list_t));
+		if (acl == NULL)
+		{
+			result = GlobusGFSErrorMemory("config_handle_t");
+			goto cleanup;
+		}
+
+		/* Set the default. */
+		acl->Type = ACL_TYPE_USER;
+
+		if (strncmp(word, "u:", 2) == 0)
+		{
+			acl->Type = ACL_TYPE_USER;
+			word   += 2;
+			length -= 2;
+		} else if (strncmp(word, "g:", 2) == 0)
+		{
+			acl->Type = ACL_TYPE_GROUP;
+			word   += 2;
+			length -= 2;
+		}
+
+		acl->Name = misc_strndup(word, length);
+
+		/* Now put it on the list. */
+		acl->Next = *ACLList;
+		*ACLList = acl;
+	}
+
+cleanup:
+	if (result != GLOBUS_SUCCESS)
+	{
+		/* Destroy the ACL list. */
+		config_destroy_acl_list(*ACLList);
+		/* Release our handle to it. */
+		*ACLList = NULL;
+
+		GlobusGFSHpssDebugExitWithError();
+		return result;
+	}
+
     GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
 }
 
 static globus_result_t
-globus_i_gfs_hpss_parse_config_file(char * ConfigFile)
+config_create_translation(char               *  IDStr,
+                          char               *  Name,
+                          char               *  ACLList,
+                          struct translation ** Translation)
 {
-    int                index        = 0;
-    int                tmp_length   = 0;
-    int                key_length   = 0;
-    int                value_length = 0;
-    int                retval       = 0;
-    FILE            *  config_f     = NULL;
-    char            *  tmp          = NULL;
-    char            *  key          = NULL;
-    char            *  value        = NULL;
-    char               buffer[1024];
-    globus_result_t    result       = GLOBUS_SUCCESS;
+	int             retval = 0;
+	globus_result_t result = GLOBUS_SUCCESS;
 
-    GlobusGFSName(globus_i_gfs_hpss_parse_config_file);
+    GlobusGFSName(config_create_translation);
     GlobusGFSHpssDebugEnter();
 
-    /* If no config file was given... */
-    if (ConfigFile == NULL)
-    {
-        /* Check if the default exists. */
-        retval = access(DEFAULT_CONFIG_FILE, R_OK);
+	/* Allocate the translation. */
+	*Translation = (struct translation *) globus_calloc(1, sizeof(struct translation));
+	if (*Translation == NULL)
+	{
+		result = GlobusGFSErrorMemory("struct translation");
+		goto cleanup;
+	}
 
-        /* If we can not access the file for reading... */
-        if (retval != 0)
-        {
-            /* Construct the error */
-            result = GlobusGFSErrorSystemError("Can not access config file", errno);
-            goto cleanup;
-        }
+	/* Convert the id. */
+	retval = sscanf(IDStr, "%d", &(*Translation)->ID);
+	if (retval != 1)
+	{
+		result = GlobusGFSErrorWrapFailed("Not an integer value", GlobusGFSErrorGeneric(IDStr));
+		goto cleanup;
+	}
 
-        /* Use the default config file. */
-        ConfigFile = DEFAULT_CONFIG_FILE;
-    }
+	/* Copy in the name. */
+	(*Translation)->Name = globus_libc_strdup(Name);
 
-    /*
-     * Open the config file.
-     */
-    config_f = fopen(ConfigFile, "r");
-    if (config_f == NULL)
-    {
-        result = GlobusGFSErrorSystemError("Failed to open config file", errno);
-        goto cleanup;
-    }
-
-    while (fgets(buffer, sizeof(buffer), config_f) != NULL)
-    {
-        /* Reset index. */
-        index = 0;
-
-        /* Locate the keyword */
-        globus_i_gfs_hpss_find_next_word(buffer, &key, &key_length);
-        if (key == NULL)
-            continue;
-
-        /* Locate the value */
-        globus_i_gfs_hpss_find_next_word(key+key_length, &value, &value_length);
-        if (key == NULL)
-        {
-            result = GlobusGFSErrorWrapFailed("Unknown configuration option",
-                                              GlobusGFSErrorGeneric(buffer));
-            goto cleanup;
-        }
-
-        /* Make sure the value was the last word. */
-        /* Locate the value */
-        globus_i_gfs_hpss_find_next_word(value+value_length, &tmp, &tmp_length);
-        if (tmp != NULL)
-        {
-            result = GlobusGFSErrorWrapFailed("Unknown configuration option",
-                                              GlobusGFSErrorGeneric(buffer));
-            goto cleanup;
-        }
-
-        /* Now match the directive. */
-        if (key_length == strlen("LoginName") && 
-		    strncasecmp(key, "LoginName", key_length) == 0)
-        {
-            _Config->LoginName = globus_l_gfs_hpss_common_strndup(value, value_length);
-        } else if (key_length == strlen("KeytabFile") && 
-		           strncasecmp(key, "KeytabFile", key_length) == 0)
-        {
-            _Config->KeytabFile = globus_l_gfs_hpss_common_strndup(value, value_length);
-        } else if (key_length == strlen("ProjectFile") &&
-                   strncasecmp(key, "ProjectFile", key_length) == 0)
-        {
-            _Config->ProjectFile = globus_l_gfs_hpss_common_strndup(value, value_length);
-        } else if (key_length == strlen("FamilyFile") &&
-                   strncasecmp(key, "FamilyFile", key_length) == 0)
-        {
-            _Config->FamilyFile = globus_l_gfs_hpss_common_strndup(value, value_length);
-        } else if (key_length == strlen("CosFile") &&
-                   strncasecmp(key, "CosFile", key_length) == 0)
-        {
-            _Config->CosFile = globus_l_gfs_hpss_common_strndup(value, value_length);
-        } else if (key_length == strlen("Admin") &&
-                   strncasecmp(key, "Admin", key_length) == 0)
-        {
-            _Config->AdminList = globus_l_gfs_hpss_common_strndup(value, value_length);
-        } else
-        {
-            result = GlobusGFSErrorWrapFailed("Unknown configuration option",
-                                              GlobusGFSErrorGeneric(buffer));
-            goto cleanup;
-        }
-    }
+	/* Create the ACL list. */
+	result = config_create_acl_list(ACLList, &(*Translation)->ACLList);
 
 cleanup:
-    if (config_f != NULL)
-        fclose(config_f);
-
-    if (result != GLOBUS_SUCCESS)
-    {
-        GlobusGFSHpssDebugExitWithError();
-        return result;
-    }
-
-    GlobusGFSHpssDebugExit();
-    return GLOBUS_SUCCESS;
-}
-
-globus_result_t
-globus_l_gfs_hpss_config_init(char * ConfigFile)
-{
-    globus_result_t result = GLOBUS_SUCCESS;
-
-    GlobusGFSName(globus_l_gfs_hpss_config_init);
-    GlobusGFSHpssDebugEnter();
-
-	if (_Config == NULL)
+	if (result != GLOBUS_SUCCESS)
 	{
-		_Config = (config_t *) globus_calloc(1, sizeof(config_t));
-		if (_Config == NULL)
-		{
-			result = GlobusGFSErrorMemory("session_handle");
-			goto cleanup;
-		}
-	}
+		/* Destroy the translations. */
+		config_destroy_translations(*Translation);
+		/* Release our handle. */
+		*Translation = NULL;
 
-    /* Initialize the config for sane cleanup. */
-    memset(_Config, 0, sizeof(config_t));
-
-    /* Parse the config file. */
-    result = globus_i_gfs_hpss_parse_config_file(ConfigFile);
-    if (result != GLOBUS_SUCCESS)
-        goto cleanup;
-
-	/* Make sure these values are defined. */
-	if (_Config->LoginName == NULL)
-	{
-		result = GlobusGFSErrorGeneric("Missing LoginName in configuration file!\n");
-		goto cleanup;
-	}
-
-	if (_Config->KeytabFile == NULL)
-	{
-		result = GlobusGFSErrorGeneric("Missing KeytabFile in configuration file!\n");
-		goto cleanup;
-	}
-
-cleanup:
-    if (result != GLOBUS_SUCCESS)
-    {
-        GlobusGFSHpssDebugExitWithError();
-        return result;
-    }
-    GlobusGFSHpssDebugExit();
-    return GLOBUS_SUCCESS;
-}
-
-void
-globus_l_gfs_hpss_config_destroy()
-{
-    GlobusGFSName(globus_l_gfs_hpss_config_destroy);
-    GlobusGFSHpssDebugEnter();
-
-	if (_Config != NULL)
-	{
-		if (_Config->LoginName != NULL)
-			globus_free(_Config->LoginName);
-		if (_Config->KeytabFile != NULL)
-			globus_free(_Config->KeytabFile);
-		if (_Config->ProjectFile != NULL)
-			globus_free(_Config->ProjectFile);
-		if (_Config->FamilyFile != NULL)
-			globus_free(_Config->FamilyFile);
-		if (_Config->CosFile != NULL)
-			globus_free(_Config->CosFile);
-		if (_Config->AdminList != NULL)
-			globus_free(_Config->AdminList);
-
-		_Config->LoginName   = NULL;
-		_Config->KeytabFile  = NULL;
-		_Config->ProjectFile = NULL;
-		_Config->FamilyFile  = NULL;
-		_Config->CosFile     = NULL;
-		_Config->AdminList   = NULL;
+		GlobusGFSHpssDebugExitWithError();
+		return result;
 	}
 
     GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
 }
 
-char *
-globus_l_gfs_hpss_config_get_login_name()
+/*
+ * Translation file all have the same format.
+ *
+ *  id:name:acl_list
+ *
+ *  where id is an integer
+ *        name is a character string
+ *        acl_list is [[u:]user[,g:group]]
+ *
+ *  The special keyword 'all' in the acl_list enables that
+ *  entry for all users.
+ *  
+ *  No spaces (leading, following or in between).
+ *  Lines starting with # are comments.
+ *
+ */
+static globus_result_t
+config_parse_translation_file(TranslationFile_t * TranslationFile,
+                              char              * FileName)
 {
-	char * login_name = NULL;
+	FILE               *  file_f           = NULL;
+	char               *  name             = NULL;
+	char               *  id_str           = NULL;
+	char               *  acl_list         = NULL;
+	char               *  saveptr          = NULL;
+	char               *  newline          = NULL;
+	struct translation *  translation      = NULL;
+	struct translation ** translation_tail = NULL;
+	char                  buffer[1024];
+	globus_result_t       result           = GLOBUS_SUCCESS;
 
-	globus_assert(_Config != NULL);
-	globus_assert(_Config->LoginName != NULL);
-
-	login_name = strdup(_Config->LoginName);
-	globus_assert(login_name != NULL);
-	return login_name;
-}
-
-char *
-globus_l_gfs_hpss_config_get_keytab()
-{
-	char * keytab_file = NULL;
-
-	globus_assert(_Config != NULL);
-	globus_assert(_Config->KeytabFile != NULL);
-
-	keytab_file = strdup(_Config->KeytabFile);
-	globus_assert(keytab_file != NULL);
-	return keytab_file;
-}
-
-static globus_bool_t
-globus_l_gfs_hpss_config_is_user_in_group(char * UserName,
-                                          char * GroupName)
-{
-	globus_bool_t   result = GLOBUS_FALSE;
-    struct group  * group  = NULL;
-    struct group    group_buf;
-	struct passwd * passwd = NULL;
-	struct passwd   passwd_buf;
-    char            buffer[1024];
-	gid_t           gid    = 0;
-    int             retval = 0;
-	int             index  = 0;
-
-    GlobusGFSName(globus_l_gfs_hpss_config_is_user_in_group);
+    GlobusGFSName(config_parse_translation_file);
     GlobusGFSHpssDebugEnter();
 
-    /* Find the group entry. */
-    retval = getgrnam_r(GroupName,
-                        &group_buf,
-                        buffer,
-                        sizeof(buffer),
-                        &group);
-    if (retval != 0)
-        goto cleanup;
+	/* Initialize the return value. */
+	TranslationFile->Translations = NULL;
 
-	if (group == NULL)
-		goto cleanup;
+	/* Save a pointer to the tail. */
+	translation_tail = &TranslationFile->Translations;
 
-	while (group->gr_mem[index] != NULL)
+	/* Open the translation file. */
+	file_f = fopen(FileName, "r");
+	if (file_f == NULL)
 	{
-		if (strcmp(group->gr_mem[index], UserName) == 0)
-		{
-			result = GLOBUS_TRUE;
-			break;
-		}
-
-		index++;
+		result = GlobusGFSErrorWrapFailed("Failed to open file", 
+		                                  GlobusGFSErrorSystemError(FileName, errno));
+		goto cleanup;
 	}
 
-	/* Save the group's gid. */
-	gid = group->gr_gid;
-
-	/* Find the user's passwd entry. */
-	retval = getpwnam_r(UserName, 
-	                    &passwd_buf,
-	                    buffer,
-	                    sizeof(buffer),
-	                    &passwd);
-    if (retval != 0)
-        goto cleanup;
-
-	if (passwd == NULL)
-		goto cleanup;
-
-	if (passwd->pw_gid == gid)
-		result = GLOBUS_TRUE;
-
-cleanup:
-
-    if (result == GLOBUS_FALSE)
-    {
-        GlobusGFSHpssDebugExitWithError();
-        return GLOBUS_FALSE;
-    }
-
-    GlobusGFSHpssDebugExit();
-    return GLOBUS_TRUE;
-}
-
-static globus_bool_t
-globus_l_gfs_hpss_config_is_user_in_project(char * UserName,
-                                            char * ProjectName)
-{
-	FILE          * project_f = NULL;
-	char          * user      = NULL;
-	char          * project   = NULL;
-	char          * newline   = NULL;
-	char          * saveptr   = NULL;
-	char            buffer[1024];
-	globus_bool_t   result    = GLOBUS_FALSE;
-
-    GlobusGFSName(globus_l_gfs_hpss_config_is_user_in_project);
-    GlobusGFSHpssDebugEnter();
-
-	/* Check for a project file */
-	if (_Config->ProjectFile == NULL)
-		goto cleanup;
-
-	project_f = fopen(_Config->ProjectFile, "r");
-	if (project_f == NULL)
-		goto cleanup;
-
-	while (fgets(buffer, sizeof(buffer), project_f) != NULL)
+	/* For each line... */
+	while (fgets(buffer, sizeof(buffer), file_f) != NULL)
 	{
 		/* Remove the newline. */
 		newline = strchr(buffer, '\n');
@@ -444,44 +391,58 @@ globus_l_gfs_hpss_config_is_user_in_project(char * UserName,
 		/* Reset saveptr */
 		saveptr = NULL;
 
-		/* Get the user */
-		user = strtok_r(buffer, ":", &saveptr);
-
-		if (user == NULL || strcmp(user, UserName) != 0)
+		/* Get the id */
+		id_str = strtok_r(buffer, ":", &saveptr);
+		if (id_str == NULL)
 			continue;
 
-		/* Get the projects */
-		while ((project = strtok_r(NULL, ",", &saveptr)) != NULL)
-		{
-			if (strcmp(project, ProjectName) == 0)
-			{
-				result = GLOBUS_TRUE;
-				goto cleanup;
-			}
-		}
+		/* Get the name*/
+		name = strtok_r(NULL, ":", &saveptr);
+		if (name == NULL)
+			continue;
+
+		/* Get the acl list. This can be empty. */
+		acl_list = strtok_r(NULL, ":", &saveptr);
+
+		/* Create the translation. */
+		result = config_create_translation(id_str, name, acl_list, &translation);
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+
+		/* Put this translation on the end of the list. */
+		*translation_tail = translation;
+
+		/* Move the tail forward. */
+		translation_tail = &translation->Next;
+
+		/* Release our handle. */
+		translation = NULL;
 	}
-
 cleanup:
+	if (file_f != NULL)
+		fclose(file_f);
 
-	if (project_f != NULL)
-		fclose(project_f);
-
-    if (result == GLOBUS_FALSE)
+    if (result != GLOBUS_SUCCESS)
     {
+		/* Destroy the tranlsations. */
+		config_destroy_translations(TranslationFile->Translations);
+		/* Release our handle. */
+		TranslationFile->Translations = NULL;
+
         GlobusGFSHpssDebugExitWithError();
-        return GLOBUS_FALSE;
+        return result;
     }
 
     GlobusGFSHpssDebugExit();
-    return GLOBUS_TRUE;
+    return GLOBUS_SUCCESS;
 }
 
 /*
  * Family file format is:
- *  family_name:family_id:acl_list
+ *  family_id:family_name:acl_list
  *
- *  where family_name is a character string (max length 15)
- *        family_id is an integer
+ *  where family_id is an integer
+ *        family_name is a character string (max length 15)
  *        acl_list is [[u:]user[,p:project][,g:group]]
  *
  *  The special keyword 'all' in the acl_list enables that
@@ -492,336 +453,39 @@ cleanup:
  *
  * Family can be the name or the id
  */
-globus_bool_t
-globus_l_gfs_hpss_config_can_user_use_family(char * UserName,
-                                             char * Family)
+globus_result_t
+config_parse_family_file(config_handle_t   * ConfigHandle,
+                         TranslationFile_t * Family)
 {
-	FILE          * family_f      = NULL;
-	char          * family_name   = NULL;
-	char          * family_id_str = NULL;
-	char          * entry         = NULL;
-	char          * saveptr       = NULL;
-	char          * newline       = NULL;
-	char            buffer[1024];
-	globus_bool_t   result = GLOBUS_FALSE;
+	globus_result_t result = GLOBUS_SUCCESS;
 
-    GlobusGFSName(globus_l_gfs_hpss_config_can_user_use_family);
+    GlobusGFSName(config_parse_family_file);
     GlobusGFSHpssDebugEnter();
 
+	/* Initialize the return value. */
+	Family->Translations = NULL;
+
 	/* Check for a family file */
-	if (_Config->FamilyFile == NULL)
+	if (ConfigHandle->Config.FamilyFile == NULL)
 		goto cleanup;
 
-	family_f = fopen(_Config->FamilyFile, "r");
-	if (family_f == NULL)
-		goto cleanup;
-
-	while (fgets(buffer, sizeof(buffer), family_f) != NULL)
+	result = config_parse_translation_file(Family, ConfigHandle->Config.FamilyFile);
+	if (result != GLOBUS_SUCCESS)
 	{
-		/* Remove the newline. */
-		newline = strchr(buffer, '\n');
-		if (newline != NULL)
-			*newline = '\0';
-
-		/* Skip comments. */
-		if (buffer[0] == '#')
-			continue;
-
-		/* Reset saveptr */
-		saveptr = NULL;
-
-		/* Get the family name*/
-		family_name = strtok_r(buffer, ":", &saveptr);
-		if (family_name == NULL)
-			continue;
-
-		/* Get the family id */
-		family_id_str = strtok_r(NULL, ":", &saveptr);
-		if (family_id_str == NULL)
-			continue;
-
-		/* Check that Family matches the name or the id. */
-		if (strcmp(family_name,   Family) != 0 &&
-		    strcmp(family_id_str, Family) != 0)
-		{
-			continue;
-		}
-
-		/* Get the entries in the list */
-		while ((entry = strtok_r(NULL, ",", &saveptr)) != NULL)
-		{
-			if (strncmp(entry, "g:", 2) == 0)
-			{
-				result = globus_l_gfs_hpss_config_is_user_in_group(UserName, entry+2);
-			} else if (strncmp(entry, "p:", 2) == 0)
-			{
-				result = globus_l_gfs_hpss_config_is_user_in_project(UserName, entry+2);
-			} else if (strncmp(entry, "u:", 2) == 0)
-			{
-				if (strcmp(entry+2, UserName) == 0)
-					result = GLOBUS_TRUE;
-			} else if (strcmp(entry, UserName) == 0)
-			{
-					result = GLOBUS_TRUE;
-			} else if (strcasecmp(entry, "all") == 0)
-			{
-				result = GLOBUS_TRUE;
-			}
-
-			if (result == GLOBUS_TRUE)
-				break;
-		}
+		result = GlobusGFSErrorWrapFailed("Failed to parse family file", result);
+		goto cleanup;
 	}
-cleanup:
-	if (family_f != NULL)
-		fclose(family_f);
 
-    if (result == GLOBUS_FALSE)
+cleanup:
+
+    if (result != GLOBUS_SUCCESS)
     {
         GlobusGFSHpssDebugExitWithError();
-        return GLOBUS_FALSE;
+        return result;
     }
 
     GlobusGFSHpssDebugExit();
-    return GLOBUS_TRUE;
-}
-
-char *
-globus_l_gfs_hpss_config_get_my_families(char * UserName)
-{
-	FILE          * family_f      = NULL;
-	char          * family_list   = NULL;
-	char          * family_name   = NULL;
-	char          * family_id     = NULL;
-	char          * entry         = NULL;
-	char          * saveptr       = NULL;
-	char          * newline       = NULL;
-	char            buffer[1024];
-	globus_bool_t   can_use_family = GLOBUS_FALSE;
-	globus_bool_t   user_is_admin  = GLOBUS_FALSE;
-
-    GlobusGFSName(globus_l_gfs_hpss_config_get_my_families);
-    GlobusGFSHpssDebugEnter();
-
-	/* Check if the user is an admin. */
-	user_is_admin = globus_l_gfs_hpss_config_is_user_admin(UserName);
-
-	/* Check for a family file */
-	if (_Config->FamilyFile == NULL)
-		goto cleanup;
-
-	family_f = fopen(_Config->FamilyFile, "r");
-	if (family_f == NULL)
-		goto cleanup;
-
-	while (fgets(buffer, sizeof(buffer), family_f) != NULL)
-	{
-		/* Remove the newline. */
-		newline = strchr(buffer, '\n');
-		if (newline != NULL)
-			*newline = '\0';
-
-		/* Skip comments. */
-		if (buffer[0] == '#')
-			continue;
-
-		/* Reset saveptr */
-		saveptr = NULL;
-
-		/* Get the family name*/
-		family_name = strtok_r(buffer, ":", &saveptr);
-		if (family_name == NULL)
-			continue;
-
-		/* Get the family id */
-		family_id = strtok_r(NULL, ":", &saveptr);
-		if (family_id == NULL)
-			continue;
-
-		can_use_family = GLOBUS_FALSE;
-
-		/* Get the entries in the list */
-		while ((entry = strtok_r(NULL, ",", &saveptr)) != NULL)
-		{
-			if (strncmp(entry, "g:", 2) == 0)
-			{
-				can_use_family = globus_l_gfs_hpss_config_is_user_in_group(UserName, entry+2);
-			} else if (strncmp(entry, "p:", 2) == 0)
-			{
-				can_use_family = globus_l_gfs_hpss_config_is_user_in_project(UserName, entry+2);
-			} else if (strncmp(entry, "u:", 2) == 0)
-			{
-				if (strcmp(entry+2, UserName) == 0)
-					can_use_family = GLOBUS_TRUE;
-			} else if (strcmp(entry, UserName) == 0)
-			{
-					can_use_family = GLOBUS_TRUE;
-			} else if (strcasecmp(entry, "all") == 0)
-			{
-				can_use_family = GLOBUS_TRUE;
-			}
-
-			if (can_use_family)
-				break;
-		}
-
-		if (user_is_admin == GLOBUS_TRUE)
-			can_use_family = GLOBUS_TRUE;
-
-		if (can_use_family == GLOBUS_TRUE)
-		{
-			/* Add this family to the list. */
-			if (family_list == NULL)
-			{
-				family_list = (char *) globus_malloc(strlen(family_id) + strlen(family_name) + 2);
-				sprintf(family_list, "%s:%s", family_id, family_name);
-			} else
-			{
-				family_list = (char *) globus_realloc(family_list, strlen(family_list) + 
-				                                                   strlen(family_id)   +
-				                                                   strlen(family_name) + 3);
-
-				strcat(family_list, ",");
-				strcat(family_list, family_id);
-				strcat(family_list, ":");
-				strcat(family_list, family_name);
-			}
-		}
-	}
-cleanup:
-	if (family_f != NULL)
-		fclose(family_f);
-
-    GlobusGFSHpssDebugExit();
-    return family_list;
-}
-int
-globus_l_gfs_hpss_config_get_family_id(char * Family)
-{
-	int    family_id     = -1;
-	FILE * family_f      = NULL;
-	char * family_name   = NULL;
-	char * family_id_str = NULL;
-	char * saveptr       = NULL;
-	char * newline       = NULL;
-	char   buffer[1024];
-
-    GlobusGFSName(globus_l_gfs_hpss_config_get_family_id);
-    GlobusGFSHpssDebugEnter();
-
-	/* Check for a family file */
-	if (_Config->FamilyFile == NULL)
-		goto cleanup;
-
-	family_f = fopen(_Config->FamilyFile, "r");
-	if (family_f == NULL)
-		goto cleanup;
-
-	while (fgets(buffer, sizeof(buffer), family_f) != NULL)
-	{
-		/* Remove the newline. */
-		newline = strchr(buffer, '\n');
-		if (newline != NULL)
-			*newline = '\0';
-
-		/* Skip comments. */
-		if (buffer[0] == '#')
-			continue;
-
-		/* Reset saveptr */
-		saveptr = NULL;
-
-		/* Get the family name*/
-		family_name = strtok_r(buffer, ":", &saveptr);
-		if (family_name == NULL)
-			continue;
-
-		/* Get the family id */
-		family_id_str = strtok_r(NULL, ":", &saveptr);
-		if (family_id_str == NULL)
-			continue;
-
-		/* Check that Family matches the name or the id. */
-		if (strcasecmp(family_name,   Family) == 0 ||
-		    strcasecmp(family_id_str, Family) == 0)
-		{
-			family_id = atoi(family_id_str);
-			break;
-		}
-	}
-cleanup:
-	if (family_f != NULL)
-		fclose(family_f);
-
-    GlobusGFSHpssDebugExit();
-    return family_id;
-}
-
-char *
-globus_l_gfs_hpss_config_get_family_name(char * Family)
-{
-	FILE * family_f      = NULL;
-	char * family_name   = NULL;
-	char * family_id_str = NULL;
-	char * saveptr       = NULL;
-	char * newline       = NULL;
-	char   buffer[1024];
-
-    GlobusGFSName(globus_l_gfs_hpss_config_get_family_name);
-    GlobusGFSHpssDebugEnter();
-
-	/* Check for a family file */
-	if (_Config->FamilyFile == NULL)
-		goto cleanup;
-
-	family_f = fopen(_Config->FamilyFile, "r");
-	if (family_f == NULL)
-		goto cleanup;
-
-	while (fgets(buffer, sizeof(buffer), family_f) != NULL)
-	{
-		/* Remove the newline. */
-		newline = strchr(buffer, '\n');
-		if (newline != NULL)
-			*newline = '\0';
-
-		/* Skip comments. */
-		if (buffer[0] == '#')
-			continue;
-
-		/* Reset saveptr */
-		saveptr = NULL;
-
-		/* Get the family name*/
-		family_name = strtok_r(buffer, ":", &saveptr);
-		if (family_name == NULL)
-			continue;
-
-		/* Get the family id */
-		family_id_str = strtok_r(NULL, ":", &saveptr);
-		if (family_id_str == NULL)
-			continue;
-
-		/* Check that Family matches the name or the id. */
-		if (strcasecmp(family_name,   Family) == 0 ||
-		    strcasecmp(family_id_str, Family) == 0)
-		{
-			break;
-		}
-
-		/* Reset family_name */
-		family_name = NULL;
-	}
-cleanup:
-	if (family_f != NULL)
-		fclose(family_f);
-
-    GlobusGFSHpssDebugExit();
-
-	if (family_name != NULL)
-		return strdup(family_name);
-
-    return NULL;
+    return GLOBUS_SUCCESS;
 }
 
 /*
@@ -840,313 +504,695 @@ cleanup:
  *
  * Cos can be the name or the id
  */
-globus_bool_t
-globus_l_gfs_hpss_config_can_user_use_cos(char * UserName,
-                                          char * Cos)
+globus_result_t
+config_parse_cos_file(config_handle_t   * ConfigHandle,
+                      TranslationFile_t * Cos)
 {
-	FILE          * cos_f    = NULL;
-	char          * cos_id   = NULL;
-	char          * cos_name = NULL;
-	char          * entry    = NULL;
-	char          * saveptr  = NULL;
-	char          * newline  = NULL;
-	char            buffer[1024];
-	globus_bool_t   result = GLOBUS_FALSE;
+	globus_result_t result = GLOBUS_SUCCESS;
 
-    GlobusGFSName(globus_l_gfs_hpss_config_can_user_use_cos);
+    GlobusGFSName(config_parse_cos_file);
     GlobusGFSHpssDebugEnter();
 
-	/* Check for a COS file */
-	if (_Config->CosFile == NULL)
+	/* Initialize the return value. */
+	Cos->Translations = NULL;
+
+	/* Check for a cos file */
+	if (ConfigHandle->Config.CosFile == NULL)
 		goto cleanup;
 
-	cos_f = fopen(_Config->CosFile, "r");
-	if (cos_f == NULL)
-		goto cleanup;
-
-	while (fgets(buffer, sizeof(buffer), cos_f) != NULL)
+	result = config_parse_translation_file(Cos, ConfigHandle->Config.CosFile);
+	if (result != GLOBUS_SUCCESS)
 	{
-		/* Remove the newline. */
-		newline = strchr(buffer, '\n');
-		if (newline != NULL)
-			*newline = '\0';
-
-		/* Skip comments. */
-		if (buffer[0] == '#')
-			continue;
-
-		/* Reset saveptr */
-		saveptr = NULL;
-
-		/* Get the cos id. */
-		cos_id = strtok_r(buffer, ":", &saveptr);
-		if (cos_id == NULL)
-			continue;
-
-		/* Get the cos name*/
-		cos_name = strtok_r(NULL, ":", &saveptr);
-		if (cos_name == NULL)
-			continue;
-
-		if (strcasecmp(cos_name, Cos) != 0 && strcasecmp(cos_id, Cos) != 0)
-			continue;
-
-		/* Get the entries in the list */
-		while ((entry = strtok_r(NULL, ",", &saveptr)) != NULL)
-		{
-			if (strncmp(entry, "g:", 2) == 0)
-			{
-				result = globus_l_gfs_hpss_config_is_user_in_group(UserName, entry+2);
-			} else if (strncmp(entry, "p:", 2) == 0)
-			{
-				result = globus_l_gfs_hpss_config_is_user_in_project(UserName, entry+2);
-			} else if (strncmp(entry, "u:", 2) == 0)
-			{
-				if (strcmp(entry+2, UserName) == 0)
-					result = GLOBUS_TRUE;
-			} else if (strcmp(entry, UserName) == 0)
-			{
-					result = GLOBUS_TRUE;
-			} else if (strcasecmp(entry, "all") == 0)
-			{
-					result = GLOBUS_TRUE;
-			}
-
-			if (result == GLOBUS_TRUE)
-				break;
-		}
+		result = GlobusGFSErrorWrapFailed("Failed to parse cos file", result);
+		goto cleanup;
 	}
-cleanup:
-	if (cos_f != NULL)
-		fclose(cos_f);
 
-    if (result == GLOBUS_FALSE)
+cleanup:
+
+    if (result != GLOBUS_SUCCESS)
     {
         GlobusGFSHpssDebugExitWithError();
-        return GLOBUS_FALSE;
+        return result;
     }
 
     GlobusGFSHpssDebugExit();
-    return GLOBUS_TRUE;
+    return GLOBUS_SUCCESS;
+}
+
+static globus_result_t
+config_parse_config_file(config_handle_t * ConfigHandle)
+{
+	int                index        = 0;
+	int                tmp_length   = 0;
+	int                key_length   = 0;
+	int                value_length = 0;
+	FILE            *  config_f     = NULL;
+	char            *  tmp          = NULL;
+	char            *  key          = NULL;
+	char            *  value        = NULL;
+	char               buffer[1024];
+	globus_result_t    result       = GLOBUS_SUCCESS;
+
+	GlobusGFSName(config_parse_config_file);
+	GlobusGFSHpssDebugEnter();
+
+	/*
+	 * Open the config file.
+	 */
+	config_f = fopen(ConfigHandle->ConfigFile, "r");
+	if (config_f == NULL)
+	{
+		result = GlobusGFSErrorSystemError("Failed to open config file", errno);
+		goto cleanup;
+	}
+
+	while (fgets(buffer, sizeof(buffer), config_f) != NULL)
+	{
+		/* Reset index. */
+		index = 0;
+
+		/* Locate the keyword */
+		config_find_next_word(buffer, &key, &key_length);
+		if (key == NULL)
+			continue;
+
+		/* Locate the value */
+		config_find_next_word(key+key_length, &value, &value_length);
+		if (key == NULL)
+		{
+			result = GlobusGFSErrorWrapFailed("Unknown configuration option",
+			                                  GlobusGFSErrorGeneric(buffer));
+			goto cleanup;
+		}
+
+		/* Make sure the value was the last word. */
+		/* Locate the value */
+		config_find_next_word(value+value_length, &tmp, &tmp_length);
+		if (tmp != NULL)
+		{
+			result = GlobusGFSErrorWrapFailed("Unknown configuration option",
+			                                  GlobusGFSErrorGeneric(buffer));
+			goto cleanup;
+		}
+
+		/* Now match the directive. */
+		if (key_length == strlen("LoginName") && strncasecmp(key, "LoginName", key_length) == 0)
+		{
+			ConfigHandle->Config.LoginName = misc_strndup(value, value_length);
+		} else if (key_length == strlen("KeytabFile") && strncasecmp(key, "KeytabFile", key_length) == 0)
+		{
+			ConfigHandle->Config.KeytabFile = misc_strndup(value, value_length);
+		} else if (key_length == strlen("FamilyFile") && strncasecmp(key, "FamilyFile", key_length) == 0)
+		{
+			ConfigHandle->Config.FamilyFile = misc_strndup(value, value_length);
+		} else if (key_length == strlen("CosFile") && strncasecmp(key, "CosFile", key_length) == 0)
+		{
+			ConfigHandle->Config.CosFile = misc_strndup(value, value_length);
+		} else if (key_length == strlen("Admin") && strncasecmp(key, "Admin", key_length) == 0)
+		{
+			/* Construct the admin acl list. */
+			result = config_create_acl_list(value, &ConfigHandle->Config.AdminList);
+			if (result != GLOBUS_SUCCESS)
+				goto cleanup;
+		} else
+		{
+			result = GlobusGFSErrorWrapFailed("Unknown configuration option",
+			                                  GlobusGFSErrorGeneric(buffer));
+			goto cleanup;
+		}
+	}
+
+cleanup:
+	if (config_f != NULL)
+		fclose(config_f);
+
+	if (result != GLOBUS_SUCCESS)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return result;
+	}
+
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+void
+config_destroy(config_handle_t * ConfigHandle)
+{
+	GlobusGFSName(config_destroy);
+	GlobusGFSHpssDebugEnter();
+
+	if (ConfigHandle != NULL)
+	{
+		if (ConfigHandle->Config.LoginName != NULL)
+			globus_free(ConfigHandle->Config.LoginName);
+		if (ConfigHandle->Config.KeytabFile != NULL)
+			globus_free(ConfigHandle->Config.KeytabFile);
+		if (ConfigHandle->Config.FamilyFile != NULL)
+			globus_free(ConfigHandle->Config.FamilyFile);
+		if (ConfigHandle->Config.CosFile != NULL)
+			globus_free(ConfigHandle->Config.CosFile);
+		config_destroy_acl_list(ConfigHandle->Config.AdminList);
+
+		config_destroy_translations(ConfigHandle->Family.Translations);
+		config_destroy_translations(ConfigHandle->Cos.Translations);
+	}
+
+	GlobusGFSHpssDebugExit();
+}
+
+globus_result_t
+config_init(char * ConfigFile, config_handle_t ** ConfigHandle)
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(config_init);
+	GlobusGFSHpssDebugEnter();
+
+	*ConfigHandle = (config_handle_t *) globus_calloc(1, sizeof(config_handle_t));
+	if (*ConfigHandle == NULL)
+	{
+		result = GlobusGFSErrorMemory("config_handle_t");
+		goto cleanup;
+	}
+
+	/* Save the config file. */
+	if (ConfigFile != NULL)
+		(*ConfigHandle)->ConfigFile = globus_libc_strdup(ConfigFile);
+	else
+		(*ConfigHandle)->ConfigFile = globus_libc_strdup("/var/hpss/etc/gridftp.conf");
+
+	/* Parse the config file. */
+	result = config_parse_config_file(*ConfigHandle);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	/* Parse the family translation file. */
+	result = config_parse_family_file(*ConfigHandle, &(*ConfigHandle)->Family);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	/* Parse the cos translation file. */
+	result = config_parse_cos_file(*ConfigHandle, &(*ConfigHandle)->Cos);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+cleanup:
+	if (result != GLOBUS_SUCCESS)
+	{
+		/* Destroy our config. */
+		config_destroy(*ConfigHandle);
+		/* Release our handle. */
+		*ConfigHandle = NULL;
+
+		GlobusGFSHpssDebugExitWithError();
+		return result;
+	}
+
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
 }
 
 char *
-globus_l_gfs_hpss_config_get_my_cos(char * UserName)
+config_get_login_name(config_handle_t * ConfigHandle)
 {
-	FILE          * cos_f    = NULL;
-	char          * cos_list = NULL;
-	char          * cos_id   = NULL;
-	char          * cos_name = NULL;
-	char          * entry    = NULL;
-	char          * saveptr  = NULL;
-	char          * newline  = NULL;
-	char            buffer[1024];
-	globus_bool_t   can_use_cos   = GLOBUS_FALSE;
-	globus_bool_t   user_is_admin = GLOBUS_FALSE;
-
-    GlobusGFSName(globus_l_gfs_hpss_config_get_my_cos);
-    GlobusGFSHpssDebugEnter();
-
-	/* Check if the user is an admin. */
-	user_is_admin = globus_l_gfs_hpss_config_is_user_admin(UserName);
-
-	/* Check for a COS file */
-	if (_Config->CosFile == NULL)
-		goto cleanup;
-
-	cos_f = fopen(_Config->CosFile, "r");
-	if (cos_f == NULL)
-		goto cleanup;
-
-	while (fgets(buffer, sizeof(buffer), cos_f) != NULL)
-	{
-		/* Remove the newline. */
-		newline = strchr(buffer, '\n');
-		if (newline != NULL)
-			*newline = '\0';
-
-		/* Skip comments. */
-		if (buffer[0] == '#')
-			continue;
-
-		/* Reset saveptr */
-		saveptr = NULL;
-
-		/* Get the cos id. */
-		cos_id = strtok_r(buffer, ":", &saveptr);
-		if (cos_id == NULL)
-			continue;
-
-		/* Get the cos name*/
-		cos_name = strtok_r(NULL, ":", &saveptr);
-		if (cos_name == NULL)
-			continue;
-
-		can_use_cos = GLOBUS_FALSE;
-
-		/* Get the entries in the list */
-		while ((entry = strtok_r(NULL, ",", &saveptr)) != NULL)
-		{
-			if (strncmp(entry, "g:", 2) == 0)
-			{
-				can_use_cos = globus_l_gfs_hpss_config_is_user_in_group(UserName, entry+2);
-			} else if (strncmp(entry, "p:", 2) == 0)
-			{
-				can_use_cos = globus_l_gfs_hpss_config_is_user_in_project(UserName, entry+2);
-			} else if (strncmp(entry, "u:", 2) == 0)
-			{
-				if (strcmp(entry+2, UserName) == 0)
-					can_use_cos = GLOBUS_TRUE;
-			} else if (strcmp(entry, UserName) == 0)
-			{
-					can_use_cos = GLOBUS_TRUE;
-			} else if (strcasecmp(entry, "all") == 0)
-			{
-					can_use_cos = GLOBUS_TRUE;
-			}
-
-			if (can_use_cos == GLOBUS_TRUE)
-				break;
-		}
-
-		if (user_is_admin == GLOBUS_TRUE)
-			can_use_cos = GLOBUS_TRUE;
-
-		if (can_use_cos == GLOBUS_TRUE)
-		{
-			/* Add this cos to the list. */
-			if (cos_list == NULL)
-			{
-				cos_list = (char *) globus_malloc(strlen(cos_id) + strlen(cos_name) + 2);
-				sprintf(cos_list, "%s:%s", cos_id, cos_name);
-			} else
-			{
-				cos_list = (char *) globus_realloc(cos_list, strlen(cos_list) + 
-				                                             strlen(cos_id)   +
-				                                             strlen(cos_name) + 3);
-
-				strcat(cos_list, ",");
-				strcat(cos_list, cos_id);
-				strcat(cos_list, ":");
-				strcat(cos_list, cos_name);
-			}
-		}
-	}
-cleanup:
-	if (cos_f != NULL)
-		fclose(cos_f);
-
-    GlobusGFSHpssDebugExit();
-    return cos_list;
+	GlobusGFSName(config_get_login_name);
+	GlobusGFSHpssDebugEnter();
+	GlobusGFSHpssDebugExit();
+	return ConfigHandle->Config.LoginName;
 }
-int
-globus_l_gfs_hpss_config_get_cos_id(char * Cos)
+
+char *
+config_get_keytab_file(config_handle_t * ConfigHandle)
 {
-	int    cos_id     = -1;
-	FILE * cos_f      = NULL;
-	char * cos_id_str = NULL;
-	char * cos_name   = NULL;
-	char * saveptr    = NULL;
-	char * newline    = NULL;
-	char   buffer[1024];
+	GlobusGFSName(config_get_login_name);
+	GlobusGFSHpssDebugEnter();
+	GlobusGFSHpssDebugExit();
+	return ConfigHandle->Config.KeytabFile;
+}
 
-    GlobusGFSName(globus_l_gfs_hpss_config_get_cos_id);
-    GlobusGFSHpssDebugEnter();
+/*
+ *  Cos is the name.
+ */
+int
+config_get_cos_id(config_handle_t * ConfigHandle, char * Cos)
+{
+	int                  cos_id      = CONFIG_NO_COS_ID;
+	struct translation * translation = NULL;
 
-	/* Check for a COS file */
-	if (_Config->CosFile == NULL)
-		goto cleanup;
+	GlobusGFSName(config_get_cos_id);
+	GlobusGFSHpssDebugEnter();
 
-	cos_f = fopen(_Config->CosFile, "r");
-	if (cos_f == NULL)
-		goto cleanup;
-
-	while (fgets(buffer, sizeof(buffer), cos_f) != NULL)
+	for (translation  = ConfigHandle->Cos.Translations; 
+	     translation != NULL; 
+	     translation = translation->Next)
 	{
-		/* Remove the newline. */
-		newline = strchr(buffer, '\n');
-		if (newline != NULL)
-			*newline = '\0';
-
-		/* Skip comments. */
-		if (buffer[0] == '#')
-			continue;
-
-		/* Reset saveptr */
-		saveptr = NULL;
-
-		/* Get the id. */
-		cos_id_str = strtok_r(buffer, ":", &saveptr);
-		if (cos_id_str == NULL)
-			continue;
-
-		/* Get the cos name */
-		cos_name = strtok_r(NULL, ":", &saveptr);
-		if (cos_name == NULL)
-			continue;
-
-		if (strcasecmp(cos_name, Cos) == 0 || strcasecmp(cos_id_str, Cos) == 0)
+		if (strcmp(translation->Name, Cos) == 0)
 		{
-			cos_id = atoi(cos_id_str);
+			cos_id = translation->ID;
 			break;
 		}
 	}
-cleanup:
-	if (cos_f != NULL)
-		fclose(cos_f);
 
-    GlobusGFSHpssDebugExit();
-    return cos_id;
+	GlobusGFSHpssDebugExit();
+
+	return cos_id;
+}
+
+/*
+ * The returned value is not dup'ed.
+ */
+char *
+config_get_cos_name(config_handle_t * ConfigHandle, int CosID)
+{
+	char               * cos_name    = NULL;
+	struct translation * translation = NULL;
+
+	GlobusGFSName(config_get_cos_name);
+	GlobusGFSHpssDebugEnter();
+
+	for (translation  = ConfigHandle->Cos.Translations; 
+	     translation != NULL; 
+	     translation = translation->Next)
+	{
+		if (translation->ID == CosID)
+		{
+			cos_name = translation->Name;
+			break;
+		}
+	}
+
+	GlobusGFSHpssDebugExit();
+
+	return cos_name;
 }
 
 globus_bool_t
-globus_l_gfs_hpss_config_is_user_admin(char * UserName)
+config_user_use_cos(config_handle_t * ConfigHandle,
+                    char            * UserName,
+                    int               CosID)
 {
-	char          * admin_list = NULL;
-	char          * tmp        = NULL;
-	char          * saveptr    = NULL;
-	char          * entry      = NULL;
-	globus_bool_t   result     = GLOBUS_FALSE;
+	globus_bool_t        result      = GLOBUS_FALSE;
+	acl_list_t         * acl_list    = NULL;
+	struct translation * translation = NULL;
 
-    GlobusGFSName(globus_l_gfs_hpss_config_is_user_admin);
-    GlobusGFSHpssDebugEnter();
+	GlobusGFSName(config_user_use_cos);
+	GlobusGFSHpssDebugEnter();
 
-	/* If no list, no one is admin */
-	if (_Config->AdminList == NULL)
-		goto cleanup;
-
-	/* Duplicate the list. */
-	tmp = admin_list = globus_libc_strdup(_Config->AdminList);
-
-	while ((entry = strtok_r(tmp, ",", &saveptr)) != NULL)
+	/* Search for the right COS tranlation. */
+	for (translation  = ConfigHandle->Cos.Translations; 
+	     translation != NULL; 
+	     translation = translation->Next)
 	{
-		tmp = NULL;
+		if (translation->ID == CosID)
+		{
+			/* Search the ACL list. */
+			for (acl_list  = translation->ACLList;
+			     acl_list != NULL;
+			     acl_list  = acl_list->Next)
+			{
+				switch (acl_list->Type)
+				{
+				case ACL_TYPE_USER:
+					if (strcasecmp(acl_list->Name, UserName) == 0)
+					{
+						result = GLOBUS_TRUE;
+						goto cleanup;
+					}
+					break;
+				case ACL_TYPE_GROUP:
+					result = misc_is_user_in_group(UserName, acl_list->Name);
+					if (result == GLOBUS_TRUE)
+						goto cleanup;
+					break;
+				}
+			}
+		}
+	}
+cleanup:
+	GlobusGFSHpssDebugExit();
 
-		if (strncmp(entry, "g:", 2) == 0)
+	return result;
+}
+
+static globus_result_t
+config_add_string_to_list(char *** List,
+                          char *   String,
+                          int      Index)
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(config_add_string_to_list);
+	GlobusGFSHpssDebugEnter();
+
+	/* Initialize the list on the first pass. */
+	if (Index == 0)
+		*List = NULL;
+
+	/* Extend the array. */
+	*List = (char **) globus_realloc(*List, sizeof(char *) * (Index + 2));
+	if (*List == NULL)
+	{
+		result = GlobusGFSErrorMemory("cos list");
+		goto cleanup;
+	}
+
+	/* Copy the string. */
+	(*List)[Index] = globus_libc_strdup(String);
+
+	if ((*List)[Index] == NULL)
+	{
+		result = GlobusGFSErrorMemory("cos list");
+		goto cleanup;
+	}
+
+	/* NULL terminate the array. */
+	(*List)[Index + 1] = NULL;
+
+cleanup:
+	if (result != GLOBUS_SUCCESS)
+	{
+		if (*List != NULL)
 		{
-			result = globus_l_gfs_hpss_config_is_user_in_group(UserName, entry+2);
-		} else if (strncmp(entry, "u:", 2) == 0)
-		{
-			result = (strcmp(entry+2, UserName) == 0);
-		} else
-		{
-			result = (strcmp(entry, UserName) == 0);
+			/* Free the list. */
+			for (Index = 0; (*List)[Index] != NULL; Index++)
+			{
+				globus_free((*List)[Index]);
+			}
+			globus_free(*List);
 		}
 
-		if (result == GLOBUS_TRUE)
-			break;
+		GlobusGFSHpssDebugExitWithError();
+		return result;
+	}
+
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+globus_result_t
+config_get_user_cos_list(config_handle_t *   ConfigHandle,
+                         char            *   UserName,
+                         char            *** CosList)
+{
+	int                   index         = 0;
+	acl_list_t         *  acl_list      = NULL;
+	globus_result_t       result        = GLOBUS_SUCCESS;
+	globus_bool_t         user_in_group = GLOBUS_FALSE;
+	globus_bool_t         skip_acls     = GLOBUS_FALSE;
+	struct translation *  translation   = NULL;
+
+	GlobusGFSName(config_get_user_cos_list);
+	GlobusGFSHpssDebugEnter();
+
+	/* Initialize the return value. */
+	*CosList = NULL;
+
+	/* Search for the right COS tranlation. */
+	for (translation  = ConfigHandle->Cos.Translations; 
+	     translation != NULL; 
+	     translation  = translation->Next)
+	{
+		/* Admins can access all classes of service. */
+		if (config_user_is_admin(ConfigHandle, UserName) == GLOBUS_TRUE)
+		{
+			/* Add this cos to the list. */
+			result = config_add_string_to_list(CosList,
+			                                   translation->Name,
+			                                   index++);
+			if (result != GLOBUS_SUCCESS)
+				goto cleanup;
+
+			/* No need to parse the ACL list. */
+			continue;
+		}
+
+		/* Initialize this before the loop. */
+		skip_acls = GLOBUS_FALSE;
+
+		/* Search the ACL list. */
+		for (acl_list  = translation->ACLList;
+		     acl_list != NULL;
+		     acl_list  = acl_list->Next)
+		{
+			switch (acl_list->Type)
+			{
+			case ACL_TYPE_USER:
+				if (strcasecmp(acl_list->Name, UserName) == 0)
+				{
+					result = config_add_string_to_list(CosList,
+					                                   translation->Name,
+					                                   index++);
+					if (result != GLOBUS_SUCCESS)
+						goto cleanup;
+
+					/* We can skip the reset of the acls on this list. */
+					skip_acls = GLOBUS_TRUE;
+				}
+				break;
+			case ACL_TYPE_GROUP:
+				user_in_group = misc_is_user_in_group(UserName, acl_list->Name);
+				if (user_in_group == GLOBUS_TRUE)
+				{
+					result = config_add_string_to_list(CosList,
+					                                   translation->Name,
+					                                   index++);
+					if (result != GLOBUS_SUCCESS)
+						goto cleanup;
+
+					/* We can skip the reset of the acls on this list. */
+					skip_acls = GLOBUS_TRUE;
+				}
+				break;
+			}
+		}
 	}
 
 cleanup:
-	if (admin_list != NULL)
-		globus_free(admin_list);
+	GlobusGFSHpssDebugExit();
+	return result;
+}
 
-    if (result == GLOBUS_FALSE)
-    {
-        GlobusGFSHpssDebugExitWithError();
-        return GLOBUS_FALSE;
-    }
+/*
+ *  Family is the name.
+ */
+int
+config_get_family_id(config_handle_t * ConfigHandle, char * Family)
+{
+	int                  fam_id      = CONFIG_NO_FAMILY_ID;
+	struct translation * translation = NULL;
 
-    GlobusGFSHpssDebugExit();
-    return GLOBUS_TRUE;
+	GlobusGFSName(config_get_family_id);
+	GlobusGFSHpssDebugEnter();
+
+	for (translation  = ConfigHandle->Cos.Translations; 
+	     translation != NULL; 
+	     translation = translation->Next)
+	{
+		if (strcmp(translation->Name, Family) == 0)
+		{
+			fam_id = translation->ID;
+			break;
+		}
+	}
+
+	GlobusGFSHpssDebugExit();
+
+	return fam_id;
+}
+
+/*
+ * The returned value is not dup'ed.
+ */
+char *
+config_get_family_name(config_handle_t * ConfigHandle, int FamilyID)
+{
+	char               * family_name = NULL;
+	struct translation * translation = NULL;
+
+	GlobusGFSName(config_get_family_name);
+	GlobusGFSHpssDebugEnter();
+
+	for (translation  = ConfigHandle->Family.Translations; 
+	     translation != NULL; 
+	     translation = translation->Next)
+	{
+		if (translation->ID == FamilyID)
+		{
+			family_name = translation->Name;
+			break;
+		}
+	}
+
+	GlobusGFSHpssDebugExit();
+
+	return family_name;
+}
+
+globus_bool_t
+config_user_use_family(config_handle_t * ConfigHandle,
+                       char            * UserName,
+                       int               FamilyID)
+{
+	globus_bool_t        result      = GLOBUS_FALSE;
+	acl_list_t         * acl_list    = NULL;
+	struct translation * translation = NULL;
+
+	GlobusGFSName(config_user_use_family);
+	GlobusGFSHpssDebugEnter();
+
+	/* Search for the right COS tranlation. */
+	for (translation  = ConfigHandle->Family.Translations; 
+	     translation != NULL; 
+	     translation = translation->Next)
+	{
+		if (translation->ID == FamilyID)
+		{
+			/* Search the ACL list. */
+			for (acl_list  = translation->ACLList;
+			     acl_list != NULL;
+			     acl_list  = acl_list->Next)
+			{
+				switch (acl_list->Type)
+				{
+				case ACL_TYPE_USER:
+					if (strcasecmp(acl_list->Name, UserName) == 0)
+					{
+						result = GLOBUS_TRUE;
+						goto cleanup;
+					}
+					break;
+				case ACL_TYPE_GROUP:
+					result = misc_is_user_in_group(UserName, acl_list->Name);
+					if (result == GLOBUS_TRUE)
+						goto cleanup;
+					break;
+				}
+			}
+		}
+	}
+cleanup:
+	GlobusGFSHpssDebugExit();
+
+	return result;
+}
+
+globus_result_t
+config_get_user_family_list(config_handle_t *   ConfigHandle,
+                            char            *   UserName,
+                            char            *** FamilyList)
+{
+	int                   index         = 0;
+	acl_list_t         *  acl_list      = NULL;
+	globus_result_t       result        = GLOBUS_SUCCESS;
+	globus_bool_t         user_in_group = GLOBUS_FALSE;
+	globus_bool_t         skip_acls     = GLOBUS_FALSE;
+	struct translation *  translation   = NULL;
+
+	GlobusGFSName(config_get_user_family_list);
+	GlobusGFSHpssDebugEnter();
+
+	/* Initialize the return value. */
+	*FamilyList = NULL;
+
+	/* Search for the right COS tranlation. */
+	for (translation  = ConfigHandle->Family.Translations; 
+	     translation != NULL; 
+	     translation  = translation->Next)
+	{
+		/* Admins can access all families. */
+		if (config_user_is_admin(ConfigHandle, UserName) == GLOBUS_TRUE)
+		{
+			/* Add this family to the list. */
+			result = config_add_string_to_list(FamilyList,
+			                                   translation->Name,
+			                                   index++);
+			if (result != GLOBUS_SUCCESS)
+				goto cleanup;
+
+			/* No need to parse the ACL list. */
+			continue;
+		}
+
+		/* Initialize this before the loop. */
+		skip_acls = GLOBUS_FALSE;
+
+		/* Search the ACL list. */
+		for (acl_list  = translation->ACLList;
+		     acl_list != NULL;
+		     acl_list  = acl_list->Next)
+		{
+			switch (acl_list->Type)
+			{
+			case ACL_TYPE_USER:
+				if (strcasecmp(acl_list->Name, UserName) == 0)
+				{
+					result = config_add_string_to_list(FamilyList,
+					                                   translation->Name,
+					                                   index);
+					if (result != GLOBUS_SUCCESS)
+						goto cleanup;
+
+					/* We can skip the reset of the acls on this list. */
+					skip_acls = GLOBUS_TRUE;
+				}
+				break;
+			case ACL_TYPE_GROUP:
+				user_in_group = misc_is_user_in_group(UserName, acl_list->Name);
+				if (user_in_group == GLOBUS_TRUE)
+				{
+					result = config_add_string_to_list(FamilyList,
+					                                   translation->Name,
+					                                   index);
+					if (result != GLOBUS_SUCCESS)
+						goto cleanup;
+
+					/* We can skip the reset of the acls on this list. */
+					skip_acls = GLOBUS_TRUE;
+				}
+				break;
+			}
+		}
+	}
+
+cleanup:
+	GlobusGFSHpssDebugExit();
+	return result;
+}
+
+globus_bool_t
+config_user_is_admin(config_handle_t * ConfigHandle, char * UserName)
+{
+	globus_bool_t   result = GLOBUS_FALSE;
+	acl_list_t    * acl_list = NULL;
+
+	GlobusGFSName(config_user_is_admin);
+	GlobusGFSHpssDebugEnter();
+
+	/* Search the ACL list. */
+	for (acl_list  = ConfigHandle->Config.AdminList;
+	     acl_list != NULL;
+	     acl_list  = acl_list->Next)
+	{
+		switch (acl_list->Type)
+		{
+		case ACL_TYPE_USER:
+			if (strcasecmp(acl_list->Name, UserName) == 0)
+			{
+				result = GLOBUS_TRUE;
+				goto cleanup;
+			}
+			break;
+		case ACL_TYPE_GROUP:
+			result = misc_is_user_in_group(UserName, acl_list->Name);
+			if (result == GLOBUS_TRUE)
+				goto cleanup;
+			break;
+		}
+	}
+
+cleanup:
+	GlobusGFSHpssDebugExit();
+
+	return result;
 }
