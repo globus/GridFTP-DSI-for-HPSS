@@ -121,11 +121,11 @@ am__objects_1 = gridftp_dsi_hpss_transfer_control.lo \
 	gridftp_dsi_hpss_transfer_data.lo \
 	gridftp_dsi_hpss_data_ranges.lo \
 	gridftp_dsi_hpss_pio_control.lo gridftp_dsi_hpss_range_list.lo \
-	gridftp_dsi_hpss_checksum.lo gridftp_dsi_hpss_pio_data.lo \
-	gridftp_dsi_hpss_gridftp.lo gridftp_dsi_hpss_session.lo \
-	gridftp_dsi_hpss_buffer.lo gridftp_dsi_hpss_config.lo \
-	gridftp_dsi_hpss_misc.lo gridftp_dsi_hpss_list.lo \
-	gridftp_dsi_hpss_msg.lo
+	gridftp_dsi_hpss_commands.lo gridftp_dsi_hpss_checksum.lo \
+	gridftp_dsi_hpss_pio_data.lo gridftp_dsi_hpss_gridftp.lo \
+	gridftp_dsi_hpss_session.lo gridftp_dsi_hpss_buffer.lo \
+	gridftp_dsi_hpss_config.lo gridftp_dsi_hpss_misc.lo \
+	gridftp_dsi_hpss_list.lo gridftp_dsi_hpss_msg.lo
 am_libglobus_gridftp_server_hpss_local_la_OBJECTS = $(am__objects_1) \
 	gridftp_dsi_hpss_local.lo
 libglobus_gridftp_server_hpss_local_la_OBJECTS =  \
@@ -215,7 +215,6 @@ DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DIRT_BRANCH_ID = @DIRT_BRANCH_ID@
 DIRT_TIMESTAMP = @DIRT_TIMESTAMP@
-DLLTOOL = @DLLTOOL@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
@@ -252,7 +251,6 @@ LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
-MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
 NMEDIT = @NMEDIT@
@@ -265,7 +263,6 @@ PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
 PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
-PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 RANLIB = @RANLIB@
@@ -279,7 +276,6 @@ abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
-ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
@@ -312,6 +308,7 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
+lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
@@ -354,6 +351,7 @@ Common_Sources = gridftp_dsi_hpss_transfer_control.c \
 	             gridftp_dsi_hpss_pio_control.h      \
 	             gridftp_dsi_hpss_range_list.c       \
 	             gridftp_dsi_hpss_range_list.h       \
+	             gridftp_dsi_hpss_commands.c         \
 	             gridftp_dsi_hpss_commands.h         \
 	             gridftp_dsi_hpss_checksum.c         \
 	             gridftp_dsi_hpss_checksum.h         \
@@ -377,7 +375,6 @@ Common_Sources = gridftp_dsi_hpss_transfer_control.c \
 
 #	             gridftp_dsi_hpss_ipc_data.c         \
 #	             gridftp_dsi_hpss_ipc_data.h         \
-#	             gridftp_dsi_hpss_commands.c         \
 #	             gridftp_dsi_hpss_xio_server.c       \
 #	             gridftp_dsi_hpss_xio_server.h       \
 #	             gridftp_dsi_hpss_xio_client.c       \
@@ -497,6 +494,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_buffer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_checksum.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_commands.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_config.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_data_ranges.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_gridftp.Plo@am__quote@

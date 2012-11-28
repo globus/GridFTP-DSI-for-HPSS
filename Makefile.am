@@ -68,6 +68,7 @@ Common_Sources = gridftp_dsi_hpss_transfer_control.c \
 	             gridftp_dsi_hpss_pio_control.h      \
 	             gridftp_dsi_hpss_range_list.c       \
 	             gridftp_dsi_hpss_range_list.h       \
+	             gridftp_dsi_hpss_commands.c         \
 	             gridftp_dsi_hpss_commands.h         \
 	             gridftp_dsi_hpss_checksum.c         \
 	             gridftp_dsi_hpss_checksum.h         \
@@ -90,7 +91,6 @@ Common_Sources = gridftp_dsi_hpss_transfer_control.c \
 
 #	             gridftp_dsi_hpss_ipc_data.c         \
 #	             gridftp_dsi_hpss_ipc_data.h         \
-#	             gridftp_dsi_hpss_commands.c         \
 #	             gridftp_dsi_hpss_xio_server.c       \
 #	             gridftp_dsi_hpss_xio_server.h       \
 #	             gridftp_dsi_hpss_xio_client.c       \
