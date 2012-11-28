@@ -107,8 +107,10 @@ misc_get_file_size(char * Path, globus_off_t * FileSize);
 /*
  * Passwd file translations.
  */
+#ifdef DEPRECATED
 globus_result_t
 misc_username_to_home(char * UserName, char ** HomeDirectory);
+#endif /* DEPRECATED */
 
 globus_result_t
 misc_username_to_uid(char * UserName, int * Uid);

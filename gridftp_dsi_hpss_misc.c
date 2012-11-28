@@ -83,7 +83,7 @@ misc_copy_basename(char * Path, char ** BaseName)
 	char            * basename = NULL;
 	globus_result_t   result   = GLOBUS_SUCCESS;
 
-	GlobusGFSName(misc_copy_basename);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	basename = strrchr(Path, '/');
@@ -112,7 +112,7 @@ misc_translate_stat(char              * Name,
 	globus_result_t result = GLOBUS_SUCCESS;
 	char            symlink_target[HPSS_MAX_PATH_NAME];
 
-	GlobusGFSName(misc_translate_stat);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return variable. */
@@ -189,7 +189,7 @@ misc_gfs_stat(char              *  Path,
 	hpss_dirent_t     dirent;
 	hpss_stat_t       hpss_stat_buf;
 
-	GlobusGFSName(misc_stat);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the returned array information. */
@@ -384,7 +384,7 @@ misc_destroy_gfs_stat_array(globus_gfs_stat_t * GfsStatArray,
 {
 	int index = 0;
 
-	GlobusGFSName(misc_destroy_gfs_stat_array);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	if (GfsStatArray != NULL)
@@ -413,7 +413,7 @@ misc_file_archived(char          * Path,
 	globus_result_t  result        = GLOBUS_SUCCESS;
 	hpss_xfileattr_t xfileattr;
 
-	GlobusGFSName(misc_file_archived);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -512,6 +512,7 @@ cleanup:
 	return GLOBUS_SUCCESS;
 }
 
+#ifdef DEPRECATED
 globus_result_t
 misc_username_to_home(char *  UserName, 
                       char ** HomeDirectory)
@@ -522,7 +523,7 @@ misc_username_to_home(char *  UserName,
 	char            buffer[1024];
 	int             retval = 0;
 
-	GlobusGFSName(misc_username_to_home);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -564,6 +565,7 @@ cleanup:
 	GlobusGFSHpssDebugExit();
 	return GLOBUS_SUCCESS;
 }
+#endif /* DEPRECATED */
 
 globus_result_t
 misc_username_to_uid(char * UserName, 
@@ -575,7 +577,7 @@ misc_username_to_uid(char * UserName,
 	char            buffer[1024];
 	int             retval = 0;
 
-	GlobusGFSName(misc_username_to_uid);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -622,7 +624,7 @@ misc_uid_to_username(int Uid, char ** UserName)
 	char            buffer[1024];
 	int             retval = 0;
 
-	GlobusGFSName(misc_uid_to_username);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -675,7 +677,7 @@ misc_groupname_to_gid(char * GroupName, gid_t * Gid)
 	char              buffer[1024];
 	int               retval = 0;
 
-	GlobusGFSName(misc_groupname_to_gid);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -722,7 +724,7 @@ misc_gid_to_groupname(gid_t Gid, char  ** GroupName)
 	char              buffer[1024];
 	int               retval = 0;
 
-	GlobusGFSName(misc_gid_to_groupname);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -779,7 +781,7 @@ misc_is_user_in_group(char * UserName, char * GroupName)
 	int             retval = 0;
 	int             index  = 0;
 
-	GlobusGFSName(misc_is_user_in_group);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Find the group entry. */
