@@ -1,24 +1,24 @@
 For the latest build instructions, see https://github.com/JasonAlt/GridFTP-DSI-for-HPSS/wiki/Installation-of-Version-1.0
 
+BUILD AND INSTALL HPSS
+======================
+
+Building HPSS is beyond the scope of this guide but you should have a working HPSS installation. This version of the DSI was tested against HPSS 7.3.3p7. The DSI requires either a full HPSS build or a 'clnt' HPSS build. Note whether the HPSS build is 32bit or 64bit; you'll need to build GridFTP and the DSI that same way.
+
 BUILD GRIDFTP
 =============
 
-You'll need to download and build Globus Toolkit 5.2.3rc2 or later. Follow the instructions in the INSTALL file to build gridftp. Since HPSS is 32bit (until the 7.4 release), be sure to build the toolkit 32bit:
+You'll need to download and build Globus Toolkit 5.2.3rc1 or later. Follow the instructions in the Globus Toolkit INSTALL file to build gridftp. The following example assumes you are building against 32bit HPSS. If you are building against 64bit HPSS, replace 'gcc32dbg' with 'gcc64dbg'.
 
 globus$ ./configure --prefix=/usr/local/globus-5.2.x --with-flavor=gcc32dbg
 globus$ make gridftp
 globus$ make install
 
-BUILD AND INSTALL HPSS
-======================
-
-This is beyond the scope of this article but you should have a working HPSS installation. This version of the DSI was built against HPSS 7.3.3p4.
-
-Build and Install the DSI
+BUILD AND INSTALL THE DSI
 =========================
 
 Build the HPSS DSI with the following options. If your HPSS installation uses Kerberos, replace '--with-unixauth'
-with '--with_krb5auth' below.
+with '--with_krb5auth' below. If you are building against 64bit HPSS, change 'gcc32dbg' to 'gcc64dbg' and add '--libdir=/usr/local/globus-5.2.x/lib64' to the configure options.
 
 ./configure --with-globus=/usr/local/globus-5.2.x --with-globus-flavor=gcc32dbg --with-hpssdir=/opt/hpss --with-unixauth
 
@@ -109,3 +109,14 @@ service gsiftp
 	socket_type = stream
 	per_source  = 100
 }
+
+SETUP THE DSI CONFIG FILE
+=========================
+
+Review 'ConfigFile' in the source directory for any changes you may wish to make for your site. Then copy ConfigFile into place on the target system. The DSI will use the following search order for locating the configuration file:
+
+ 1) $HPSS_PATH_ETC/gridftp.conf
+ 2) /var/hpss/etc/gridftp.conf
+
+Make sure the configuration file's permissions allow for the GridFTP process to read it. For example, if you chose to run the GridFTP server as user 'gridftp', make sure the user 'gridftp' has read access to the configuration file.
+
