@@ -1,3 +1,15 @@
+Version 1.0 RC2
+	- Added fixes sent by Damian Hazen of LBL:
+		- Fixed user->home directory mapping to use HPSS LDAP
+		- Fixed KRB5 authentication issues
+		- Added $HPSS_PATH_ETC/gridftp.conf as new config file location
+		- Added gridftp_dsi_hpss_commands.c and header to Makefile.am
+	- The search order for the config file is now:
+		1) $HPSS_PATH_ETC/gridftp.conf
+		2) /var/hpss/etc/gridftp.conf
+	- Install directions now include config file setup
+	- Fixed config file's AdminList syntax
+
 Version 1.0 RC1
 	- Now requires Globus Toolkit 5.2.3rc1 or newer. See 
 	  http://jira.globus.org/browse/GT-299
