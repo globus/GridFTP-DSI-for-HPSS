@@ -66,6 +66,11 @@
 #include "gridftp_dsi_hpss_config.h"
 #include "gridftp_dsi_hpss_misc.h"
 
+/*
+ * HPSS includes.
+ */
+#include <hpss_Getenv.h>
+
 #ifdef DMALLOC
 /*
  * Dmalloc
@@ -114,7 +119,7 @@ config_destroy_acl_list(acl_list_t * ACLList)
 {
 	acl_list_t * acl_save = NULL;
 
-	GlobusGFSName(config_destroy_acl_list);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	while (ACLList != NULL)
@@ -137,7 +142,7 @@ config_destroy_translations(struct translation * Translations)
 {
 	struct translation * trans_save = NULL;
 
-	GlobusGFSName(config_destroy_translations);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	if (Translations != NULL)
@@ -165,7 +170,7 @@ config_find_next_word(char *  Buffer,
                       char ** Word,
                       int  *  Length)
 {
-	GlobusGFSName(config_find_next_word);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	*Word   = NULL;
@@ -214,7 +219,7 @@ config_create_acl_list(char       *  String,
 	acl_list_t      * acl     = NULL;
 	globus_result_t   result  = GLOBUS_SUCCESS;
 
-	GlobusGFSName(config_create_acl_list);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	if (String == NULL)
@@ -286,7 +291,7 @@ config_create_translation(char               *  IDStr,
 	int             retval = 0;
 	globus_result_t result = GLOBUS_SUCCESS;
 
-    GlobusGFSName(config_create_translation);
+    GlobusGFSName(__func__);
     GlobusGFSHpssDebugEnter();
 
 	/* Allocate the translation. */
@@ -358,7 +363,7 @@ config_parse_translation_file(TranslationFile_t * TranslationFile,
 	char                  buffer[1024];
 	globus_result_t       result           = GLOBUS_SUCCESS;
 
-    GlobusGFSName(config_parse_translation_file);
+    GlobusGFSName(__func__);
     GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -459,7 +464,7 @@ config_parse_family_file(config_handle_t   * ConfigHandle,
 {
 	globus_result_t result = GLOBUS_SUCCESS;
 
-    GlobusGFSName(config_parse_family_file);
+    GlobusGFSName(__func__);
     GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -510,7 +515,7 @@ config_parse_cos_file(config_handle_t   * ConfigHandle,
 {
 	globus_result_t result = GLOBUS_SUCCESS;
 
-    GlobusGFSName(config_parse_cos_file);
+    GlobusGFSName(__func__);
     GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -553,7 +558,7 @@ config_parse_config_file(config_handle_t * ConfigHandle)
 	char               buffer[1024];
 	globus_result_t    result       = GLOBUS_SUCCESS;
 
-	GlobusGFSName(config_parse_config_file);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/*
@@ -639,7 +644,7 @@ cleanup:
 void
 config_destroy(config_handle_t * ConfigHandle)
 {
-	GlobusGFSName(config_destroy);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	if (ConfigHandle != NULL)
@@ -661,12 +666,107 @@ config_destroy(config_handle_t * ConfigHandle)
 	GlobusGFSHpssDebugExit();
 }
 
+/*
+ * The config file search order is:
+ *   1) $HPSS_PATH_ETC/gridftp.conf
+ *   2) DEFAULT_CONFIG_FILE (/var/hpss/etc/gridftp.conf)
+ */
 globus_result_t
-config_init(char * ConfigFile, config_handle_t ** ConfigHandle)
+config_find_config_file(char ** ConfigFile)
 {
-	globus_result_t result = GLOBUS_SUCCESS;
+	globus_result_t   result        = GLOBUS_SUCCESS;
+	char            * hpss_path_etc = NULL;
+	int               retval        = 0;
 
-	GlobusGFSName(config_init);
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	/* Initialize the return value. */
+	*ConfigFile = NULL;
+
+	/* Check for HPSS_PATH_ETC in the environment. */
+	hpss_path_etc = hpss_Getenv("HPSS_PATH_ETC");
+
+	/* If it exists... */
+	if (hpss_path_etc != NULL)
+	{
+		/* Construct the full path. */
+		*ConfigFile = globus_common_create_string("%s/gridftp.conf", hpss_path_etc);
+		if (*ConfigFile == NULL)
+		{
+			result = GlobusGFSErrorMemory("config file path");
+			goto cleanup;
+		}
+
+		/* Check if it exists and if we have access. */
+		retval = access(*ConfigFile, R_OK);
+
+		/* If we have access, we are done. */
+		if (retval == 0)
+			goto cleanup;
+
+		/* Release the full path to the config file. */
+		globus_free(*ConfigFile);
+		*ConfigFile = NULL;
+
+		/* Otherwise, determine why we do not have access. */
+		switch (errno)
+		{
+		/*
+		 * For all cases in which the file does not exist...
+		 */
+		case ENOENT:
+		case ENOTDIR:
+			break;
+
+		/*
+		 * All other cases indicate failure at some level.
+		 */
+		default:
+			result = GlobusGFSErrorSystemError("Can not access config file", errno);
+			goto cleanup;
+		}
+	}
+
+	/*
+	 * No success from the environment, let's check the default.
+	 */
+
+	/* Check if it exists and if we have access. */
+	retval = access(DEFAULT_CONFIG_FILE, R_OK);
+
+	/* All failures are error conditions at this stage. */
+	if (retval != 0)
+	{
+		result = GlobusGFSErrorSystemError("Can not access config file", errno);
+		goto cleanup;
+	}
+
+	/* Copy out the config file. */
+	*ConfigFile = globus_libc_strdup(DEFAULT_CONFIG_FILE);
+	if (*ConfigFile == NULL)
+	{
+		result = GlobusGFSErrorMemory("config file path");
+		goto cleanup;
+	}
+
+cleanup:
+	if (result != GLOBUS_SUCCESS)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return result;
+	}
+
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+globus_result_t
+config_init(config_handle_t ** ConfigHandle)
+{
+	globus_result_t   result        = GLOBUS_SUCCESS;
+
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	*ConfigHandle = (config_handle_t *) globus_calloc(1, sizeof(config_handle_t));
@@ -676,11 +776,10 @@ config_init(char * ConfigFile, config_handle_t ** ConfigHandle)
 		goto cleanup;
 	}
 
-	/* Save the config file. */
-	if (ConfigFile != NULL)
-		(*ConfigHandle)->ConfigFile = globus_libc_strdup(ConfigFile);
-	else
-		(*ConfigHandle)->ConfigFile = globus_libc_strdup("/var/hpss/etc/gridftp.conf");
+	/* Find the config file. */
+	result = config_find_config_file(&(*ConfigHandle)->ConfigFile);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
 
 	/* Parse the config file. */
 	result = config_parse_config_file(*ConfigHandle);
@@ -716,7 +815,7 @@ cleanup:
 char *
 config_get_login_name(config_handle_t * ConfigHandle)
 {
-	GlobusGFSName(config_get_login_name);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 	GlobusGFSHpssDebugExit();
 	return ConfigHandle->Config.LoginName;
@@ -725,7 +824,7 @@ config_get_login_name(config_handle_t * ConfigHandle)
 char *
 config_get_keytab_file(config_handle_t * ConfigHandle)
 {
-	GlobusGFSName(config_get_login_name);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 	GlobusGFSHpssDebugExit();
 	return ConfigHandle->Config.KeytabFile;
@@ -740,7 +839,7 @@ config_get_cos_id(config_handle_t * ConfigHandle, char * Cos)
 	int                  cos_id      = CONFIG_NO_COS_ID;
 	struct translation * translation = NULL;
 
-	GlobusGFSName(config_get_cos_id);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	for (translation  = ConfigHandle->Cos.Translations; 
@@ -768,7 +867,7 @@ config_get_cos_name(config_handle_t * ConfigHandle, int CosID)
 	char               * cos_name    = NULL;
 	struct translation * translation = NULL;
 
-	GlobusGFSName(config_get_cos_name);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	for (translation  = ConfigHandle->Cos.Translations; 
@@ -796,7 +895,7 @@ config_user_use_cos(config_handle_t * ConfigHandle,
 	acl_list_t         * acl_list    = NULL;
 	struct translation * translation = NULL;
 
-	GlobusGFSName(config_user_use_cos);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Search for the right COS tranlation. */
@@ -842,7 +941,7 @@ config_add_string_to_list(char *** List,
 {
 	globus_result_t result = GLOBUS_SUCCESS;
 
-	GlobusGFSName(config_add_string_to_list);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the list on the first pass. */
@@ -902,7 +1001,7 @@ config_get_user_cos_list(config_handle_t *   ConfigHandle,
 	globus_bool_t         skip_acls     = GLOBUS_FALSE;
 	struct translation *  translation   = NULL;
 
-	GlobusGFSName(config_get_user_cos_list);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -982,7 +1081,7 @@ config_get_family_id(config_handle_t * ConfigHandle, char * Family)
 	int                  fam_id      = CONFIG_NO_FAMILY_ID;
 	struct translation * translation = NULL;
 
-	GlobusGFSName(config_get_family_id);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	for (translation  = ConfigHandle->Cos.Translations; 
@@ -1010,7 +1109,7 @@ config_get_family_name(config_handle_t * ConfigHandle, int FamilyID)
 	char               * family_name = NULL;
 	struct translation * translation = NULL;
 
-	GlobusGFSName(config_get_family_name);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	for (translation  = ConfigHandle->Family.Translations; 
@@ -1038,7 +1137,7 @@ config_user_use_family(config_handle_t * ConfigHandle,
 	acl_list_t         * acl_list    = NULL;
 	struct translation * translation = NULL;
 
-	GlobusGFSName(config_user_use_family);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Search for the right COS tranlation. */
@@ -1089,7 +1188,7 @@ config_get_user_family_list(config_handle_t *   ConfigHandle,
 	globus_bool_t         skip_acls     = GLOBUS_FALSE;
 	struct translation *  translation   = NULL;
 
-	GlobusGFSName(config_get_user_family_list);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -1166,7 +1265,7 @@ config_user_is_admin(config_handle_t * ConfigHandle, char * UserName)
 	globus_bool_t   result = GLOBUS_FALSE;
 	acl_list_t    * acl_list = NULL;
 
-	GlobusGFSName(config_user_is_admin);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Search the ACL list. */

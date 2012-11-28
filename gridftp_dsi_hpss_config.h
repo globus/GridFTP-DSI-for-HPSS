@@ -58,7 +58,7 @@ typedef struct config_handle config_handle_t;
  * ConfigFile is dup'ed.
  */
 globus_result_t
-config_init(char * ConfigFile, config_handle_t ** ConfigHandle);
+config_init(config_handle_t ** ConfigHandle);
 
 void
 config_destroy(config_handle_t * ConfigHandle);
