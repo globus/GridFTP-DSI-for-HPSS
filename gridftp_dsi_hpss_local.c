@@ -385,6 +385,7 @@ local_session_start(globus_gfs_operation_t      Operation,
 	globus_result_t    result         = GLOBUS_SUCCESS;
 	session_handle_t * session_handle = NULL;
 	msg_handle_t     * msg_handle     = NULL;
+	sec_cred_t         user_cred;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -417,9 +418,21 @@ local_session_start(globus_gfs_operation_t      Operation,
 	/* Get the username. */
 	username = session_get_username(session_handle);
 
-	result = misc_username_to_home(username, &home_directory);
+	/*
+	 * Pulling the HPSS directory from the user's credential will support
+	 * sites that use HPSS LDAP.
+	 */
+	result = hpss_GetThreadUcred(&user_cred);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
+
+	/* Copy out the user's home directory. */
+	home_directory = globus_libc_strdup(user_cred.Directory);
+	if (home_directory == NULL)
+	{
+		result = GlobusGFSErrorMemory("home_directory");
+		goto cleanup;
+	}
 
 cleanup:
 	if (result != GLOBUS_SUCCESS)
