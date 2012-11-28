@@ -893,7 +893,7 @@ commands_handler(globus_gfs_operation_t      Operation,
 	globus_bool_t       tape_only       = GLOBUS_FALSE;
 	globus_bool_t       free_cmd_output = GLOBUS_FALSE;
 
-	GlobusGFSName(commands_handler);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Make sure we got our UserArg. */
