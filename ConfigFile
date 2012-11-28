@@ -65,4 +65,4 @@ KeytabFile keytab
 # (optional) List of users, groups or projects that have admin rights. Admin rights
 # allow you to migrate and purge files and use any cos or family.
 # Format is "Admin [u:]user,g:group
-#Admin <path_to_project_filename>
+#Admin <user1,user2,group1>
