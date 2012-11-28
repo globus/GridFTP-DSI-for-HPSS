@@ -250,10 +250,10 @@ session_auth_to_hpss(session_handle_t * SessionHandle)
 
 	/* Indicate that we are doing unix authentication. */
 	api_config.Flags     =  API_USE_CONFIG;
-#ifdef HPSS_UNIX_AUTH
-	api_config.AuthnMech =  hpss_authn_mech_unix;
-#elif defined HPSS_KRB5_AUTH
+#ifdef HPSS_KRB5_AUTH
 	api_config.AuthnMech =  hpss_authn_mech_krb5;
+#elif defined HPSS_UNIX_AUTH
+	api_config.AuthnMech =  hpss_authn_mech_unix;
 #else
 #error MUST BE CONFIGURED TO USE KRB5 OR UNIX AUTHENTICATION
 #endif
@@ -268,7 +268,7 @@ session_auth_to_hpss(session_handle_t * SessionHandle)
 
 	/* Now log into HPSS using our configured 'super user' */
 	retval = hpss_SetLoginCred(login_name,
-	                           hpss_authn_mech_unix, /* XXX detect this */
+	                           api_config.AuthnMech,
 	                           hpss_rpc_cred_client,
 	                           hpss_rpc_auth_type_keytab,
 	                           keytab_file);
@@ -380,7 +380,7 @@ session_authenticate(session_handle_t * SessionHandle)
 		goto cleanup;
 
 	/* Parse the config files. */
-	result = config_init(NULL, &SessionHandle->ConfigHandle);
+	result = config_init(&SessionHandle->ConfigHandle);
 	if (result != GLOBUS_SUCCESS)
 	{
 		result = GlobusGFSErrorWrapFailed("config_init", result);
