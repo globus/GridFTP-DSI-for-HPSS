@@ -117,7 +117,9 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 		{
 			hints_in.COSId = CosID;
 			priorities.COSIdPriority = REQUIRED_PRIORITY;
-		} else if (AllocSize != 0)
+		} 
+
+		if (AllocSize != 0)
 		{
 			/*
 			 * Use the ALLO size.
@@ -125,8 +127,8 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 			file_length = AllocSize;
 			CONVERT_LONGLONG_TO_U64(file_length, hints_in.MinFileSize);
 			CONVERT_LONGLONG_TO_U64(file_length, hints_in.MaxFileSize);
-			priorities.MinFileSizePriority = LOWEST_PRIORITY;
-			priorities.MaxFileSizePriority = LOWEST_PRIORITY;
+			priorities.MinFileSizePriority = REQUIRED_PRIORITY;
+			priorities.MaxFileSizePriority = REQUIRED_PRIORITY;
 		}
 
 		/* Get our preferred family id. */
@@ -135,9 +137,6 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 			hints_in.FamilyId = FamilyID;
 			priorities.FamilyIdPriority = REQUIRED_PRIORITY;
 		}
-
-		/* Force maximum segment sizes. */
-		hints_in.Flags |= HINTS_FORCE_MAX_SSEG;
 	}
 
 	/* Determine the open flags. */
@@ -492,13 +491,23 @@ pio_control_execute_thread(void * Arg)
 	CONVERT_LONGLONG_TO_U64(pio_control->PioExecute.Offset, offset);
 	CONVERT_LONGLONG_TO_U64(pio_control->PioExecute.Length, length);
 
-	/* Call pio execute. */
-	retval = hpss_PIOExecute(pio_control->FileFD,
-	                         offset,
-	                         length,
-	                         pio_control->PioExecute.StripeGroup,
-	                         &gap_info,
-	                         &bytes_moved);
+	/* Initialize bytes_moved. */
+	bytes_moved = cast64(0);
+
+	do {
+		offset = add64m(offset, bytes_moved);
+		length = sub64m(length, bytes_moved);
+		bytes_moved = cast64(0);
+
+		/* Call pio execute. */
+		retval = hpss_PIOExecute(pio_control->FileFD,
+		                         offset,
+		                         length,
+		                         pio_control->PioExecute.StripeGroup,
+		                         &gap_info,
+		                         &bytes_moved);
+
+	} while (retval == 0 && !eq64(bytes_moved, length));
 
 	if (retval != 0)
 		result = GlobusGFSErrorSystemError("hpss_PIOExecute", -retval);
