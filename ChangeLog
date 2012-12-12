@@ -9,6 +9,8 @@ Version 1.0 RC2
 		2) /var/hpss/etc/gridftp.conf
 	- Install directions now include config file setup
 	- Fixed config file's AdminList syntax
+	- No longer force max segment size in hints
+	- Fix for RETR that end early, presumably due to a large segment count
 
 Version 1.0 RC1
 	- Now requires Globus Toolkit 5.2.3rc1 or newer. See 
