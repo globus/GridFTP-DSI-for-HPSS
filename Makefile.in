@@ -77,9 +77,10 @@ build_triplet = @build@
 host_triplet = @host@
 subdir = .
 DIST_COMMON = $(am__configure_deps) $(srcdir)/Makefile.am \
-	$(srcdir)/Makefile.in $(srcdir)/version.h.in \
-	$(top_srcdir)/configure ChangeLog INSTALL config.guess \
-	config.sub depcomp install-sh ltmain.sh missing
+	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
+	$(srcdir)/version.h.in $(top_srcdir)/configure ChangeLog \
+	INSTALL config.guess config.sub depcomp install-sh ltmain.sh \
+	missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -87,6 +88,7 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
+CONFIG_HEADER = config.h
 CONFIG_CLEAN_FILES = version.h
 CONFIG_CLEAN_VPATH_FILES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
@@ -113,14 +115,21 @@ am__base_list = \
 am__installdirs = "$(DESTDIR)$(libdir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-libglobus_gridftp_server_hpss_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
-am__objects_1 = globus_gridftp_server_hpss_module.lo \
-	globus_gridftp_server_hpss_common.lo \
-	globus_gridftp_server_hpss_config.lo
-am_libglobus_gridftp_server_hpss_la_OBJECTS = $(am__objects_1)
-libglobus_gridftp_server_hpss_la_OBJECTS =  \
-	$(am_libglobus_gridftp_server_hpss_la_OBJECTS)
+libglobus_gridftp_server_hpss_local_la_DEPENDENCIES =  \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+am__objects_1 = gridftp_dsi_hpss_transfer_control.lo \
+	gridftp_dsi_hpss_transfer_data.lo \
+	gridftp_dsi_hpss_data_ranges.lo \
+	gridftp_dsi_hpss_pio_control.lo gridftp_dsi_hpss_range_list.lo \
+	gridftp_dsi_hpss_commands.lo gridftp_dsi_hpss_checksum.lo \
+	gridftp_dsi_hpss_pio_data.lo gridftp_dsi_hpss_gridftp.lo \
+	gridftp_dsi_hpss_session.lo gridftp_dsi_hpss_buffer.lo \
+	gridftp_dsi_hpss_config.lo gridftp_dsi_hpss_misc.lo \
+	gridftp_dsi_hpss_list.lo gridftp_dsi_hpss_msg.lo
+am_libglobus_gridftp_server_hpss_local_la_OBJECTS = $(am__objects_1) \
+	gridftp_dsi_hpss_local.lo
+libglobus_gridftp_server_hpss_local_la_OBJECTS =  \
+	$(am_libglobus_gridftp_server_hpss_local_la_OBJECTS)
 DEFAULT_INCLUDES = -I.@am__isrc@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -134,8 +143,8 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(libglobus_gridftp_server_hpss_la_SOURCES)
-DIST_SOURCES = $(libglobus_gridftp_server_hpss_la_SOURCES)
+SOURCES = $(libglobus_gridftp_server_hpss_local_la_SOURCES)
+DIST_SOURCES = $(libglobus_gridftp_server_hpss_local_la_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-dvi-recursive install-exec-recursive \
@@ -196,7 +205,7 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
-CFLAGS = $(GLOBUS_CFLAGS) $(CC_BIT64_FLAGS) -D$(BUILD_PLATFORM)
+CFLAGS = $(DMALLOC_FLAGS) $(GLOBUS_CFLAGS) $(CC_BIT64_FLAGS) -D$(BUILD_PLATFORM)
 CPP = @CPP@
 # This hack is in until I can figure out why globus_makefile_header in
 # 5.2.0 does not return include/globus/<flavor>/
@@ -206,7 +215,6 @@ DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DIRT_BRANCH_ID = @DIRT_BRANCH_ID@
 DIRT_TIMESTAMP = @DIRT_TIMESTAMP@
-DLLTOOL = @DLLTOOL@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
@@ -232,7 +240,10 @@ INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LD = @LD@
-LDFLAGS = $(RPATHOPT) -L$(HPSS_DIR)/lib $(GLOBUS_LDFLAGS)
+#libglobus_gridftp_server_hpss_control_la_LIBADD = -lhpss $(HPSS_AUTH_LIBS) $(GLOBUS_LIBS) $(DMALLOC_LIBS)
+#libglobus_gridftp_server_hpss_data_la_LIBADD = -lhpss $(HPSS_AUTH_LIBS) $(GLOBUS_LIBS) $(DMALLOC_LIBS)
+# These primaries are common to both targets, hence no prefix
+LDFLAGS = $(RPATHOPT) -L$(HPSS_DIR)/lib $(GLOBUS_LDFLAGS) $(DMALLOC_LIBS)
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
@@ -240,7 +251,6 @@ LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
-MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
 NMEDIT = @NMEDIT@
@@ -253,7 +263,6 @@ PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
 PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
-PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 RANLIB = @RANLIB@
@@ -267,7 +276,6 @@ abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
-ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
@@ -300,6 +308,7 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
+lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
@@ -326,28 +335,67 @@ SUBDIRS =
 # and primary is what type of target it is:
 #   Ex. PROGRAMS, MANS, LTLIBRARIES, SCRIPTS, DATA, LIBRARIES, HEADERS
 # Note: LTLIBRARIES is a libtool library
-# Note: The names of these libraries are important, the gridftp serer appends
-# our dsi name (hpss_control or hpss_data) onto libglobus_gridftp_server_ when
-# loading our DSI.
-lib_LTLIBRARIES = libglobus_gridftp_server_hpss.la
-Sources = globus_gridftp_server_hpss_module.c \
-	      globus_gridftp_server_hpss_common.c \
-	      globus_gridftp_server_hpss_common.h \
-	      globus_gridftp_server_hpss_config.c \
-	      globus_gridftp_server_hpss_config.h
+# Note: The names of these libraries are important, the gridftp server appends
+# our dsi name (hpss_control or hpss_data) onto libglobus_gridftp_server_ when loading 
+# our DSI.
+lib_LTLIBRARIES = libglobus_gridftp_server_hpss_local.la
+#	              libglobus_gridftp_server_hpss_control.la \
+#	              libglobus_gridftp_server_hpss_data.la
+Common_Sources = gridftp_dsi_hpss_transfer_control.c \
+	             gridftp_dsi_hpss_transfer_control.h \
+	             gridftp_dsi_hpss_transfer_data.c    \
+	             gridftp_dsi_hpss_transfer_data.h    \
+	             gridftp_dsi_hpss_data_ranges.c      \
+	             gridftp_dsi_hpss_data_ranges.h      \
+	             gridftp_dsi_hpss_pio_control.c      \
+	             gridftp_dsi_hpss_pio_control.h      \
+	             gridftp_dsi_hpss_range_list.c       \
+	             gridftp_dsi_hpss_range_list.h       \
+	             gridftp_dsi_hpss_commands.c         \
+	             gridftp_dsi_hpss_commands.h         \
+	             gridftp_dsi_hpss_checksum.c         \
+	             gridftp_dsi_hpss_checksum.h         \
+	             gridftp_dsi_hpss_pio_data.c         \
+	             gridftp_dsi_hpss_pio_data.h         \
+	             gridftp_dsi_hpss_gridftp.c          \
+	             gridftp_dsi_hpss_gridftp.h          \
+	             gridftp_dsi_hpss_session.c          \
+	             gridftp_dsi_hpss_session.h          \
+	             gridftp_dsi_hpss_buffer.c           \
+	             gridftp_dsi_hpss_buffer.h           \
+	             gridftp_dsi_hpss_config.c           \
+	             gridftp_dsi_hpss_config.h           \
+	             gridftp_dsi_hpss_misc.c             \
+	             gridftp_dsi_hpss_misc.h             \
+	             gridftp_dsi_hpss_list.c             \
+	             gridftp_dsi_hpss_list.h             \
+	             gridftp_dsi_hpss_msg.c              \
+	             gridftp_dsi_hpss_msg.h
 
+
+#	             gridftp_dsi_hpss_ipc_data.c         \
+#	             gridftp_dsi_hpss_ipc_data.h         \
+#	             gridftp_dsi_hpss_xio_server.c       \
+#	             gridftp_dsi_hpss_xio_server.h       \
+#	             gridftp_dsi_hpss_xio_client.c       \
+#	             gridftp_dsi_hpss_xio_client.h       \
+#	             gridftp_dsi_hpss_ipc_control.c      \
+#	             gridftp_dsi_hpss_ipc_control.h
+
+#DMALLOC_FLAGS=-DDMALLOC -DDMALLOC_FUNC_CHECK -I/usr/local/dmalloc/include
+#DMALLOC_LIBS=/usr/local/dmalloc/lib/libdmallocth.a
 
 # For each build target, define the primaries. SOURCES lists the source files
 # included for 'make dist'. LDFLAGS are linker flags. CFLAGS are compiler flags.
 # LDADD are linker adds (libraries need to build programs) and LIBADD are
 # library adds (libraries need to build libraries).
 # 
-libglobus_gridftp_server_hpss_la_SOURCES = $(Sources)
-#install:
-
-# These primaries are common to both targets, hence no prefix
-libglobus_gridftp_server_hpss_la_LIBADD = -lhpss $(HPSS_AUTH_LIBS) $(GLOBUS_LIBS)
-all: all-recursive
+libglobus_gridftp_server_hpss_local_la_SOURCES = $(Common_Sources) gridftp_dsi_hpss_local.c
+#libglobus_gridftp_server_hpss_control_la_SOURCES = $(Common_Sources) gridftp_dsi_hpss_control.c
+#libglobus_gridftp_server_hpss_data_la_SOURCES = $(Common_Sources) gridftp_dsi_hpss_data.c
+libglobus_gridftp_server_hpss_local_la_LIBADD = -lhpss $(HPSS_AUTH_LIBS) $(GLOBUS_LIBS) $(DMALLOC_LIBS)
+all: config.h
+	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
 .SUFFIXES:
 .SUFFIXES: .c .lo .o .obj
@@ -385,6 +433,23 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	$(am__cd) $(srcdir) && $(ACLOCAL) $(ACLOCAL_AMFLAGS)
 $(am__aclocal_m4_deps):
+
+config.h: stamp-h1
+	@if test ! -f $@; then \
+	  rm -f stamp-h1; \
+	  $(MAKE) $(AM_MAKEFLAGS) stamp-h1; \
+	else :; fi
+
+stamp-h1: $(srcdir)/config.h.in $(top_builddir)/config.status
+	@rm -f stamp-h1
+	cd $(top_builddir) && $(SHELL) ./config.status config.h
+$(srcdir)/config.h.in:  $(am__configure_deps) 
+	($(am__cd) $(top_srcdir) && $(AUTOHEADER))
+	rm -f stamp-h1
+	touch $@
+
+distclean-hdr:
+	-rm -f config.h stamp-h1
 version.h: $(top_builddir)/config.status $(srcdir)/version.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 install-libLTLIBRARIES: $(lib_LTLIBRARIES)
@@ -418,8 +483,8 @@ clean-libLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
-libglobus_gridftp_server_hpss.la: $(libglobus_gridftp_server_hpss_la_OBJECTS) $(libglobus_gridftp_server_hpss_la_DEPENDENCIES) 
-	$(LINK) -rpath $(libdir) $(libglobus_gridftp_server_hpss_la_OBJECTS) $(libglobus_gridftp_server_hpss_la_LIBADD) $(LIBS)
+libglobus_gridftp_server_hpss_local.la: $(libglobus_gridftp_server_hpss_local_la_OBJECTS) $(libglobus_gridftp_server_hpss_local_la_DEPENDENCIES) 
+	$(LINK) -rpath $(libdir) $(libglobus_gridftp_server_hpss_local_la_OBJECTS) $(libglobus_gridftp_server_hpss_local_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -427,9 +492,22 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/globus_gridftp_server_hpss_common.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/globus_gridftp_server_hpss_config.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/globus_gridftp_server_hpss_module.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_buffer.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_checksum.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_commands.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_config.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_data_ranges.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_gridftp.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_list.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_local.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_misc.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_msg.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_pio_control.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_pio_data.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_range_list.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_session.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_transfer_control.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_transfer_data.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -541,7 +619,7 @@ ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	mkid -fID $$unique
 tags: TAGS
 
-TAGS: tags-recursive $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
+TAGS: tags-recursive $(HEADERS) $(SOURCES) config.h.in $(TAGS_DEPENDENCIES) \
 		$(TAGS_FILES) $(LISP)
 	set x; \
 	here=`pwd`; \
@@ -558,7 +636,7 @@ TAGS: tags-recursive $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
 	      set "$$@" "$$include_option=$$here/$$subdir/TAGS"; \
 	  fi; \
 	done; \
-	list='$(SOURCES) $(HEADERS)  $(LISP) $(TAGS_FILES)'; \
+	list='$(SOURCES) $(HEADERS) config.h.in $(LISP) $(TAGS_FILES)'; \
 	unique=`for i in $$list; do \
 	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
 	  done | \
@@ -576,9 +654,9 @@ TAGS: tags-recursive $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
 	  fi; \
 	fi
 ctags: CTAGS
-CTAGS: ctags-recursive $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
+CTAGS: ctags-recursive $(HEADERS) $(SOURCES) config.h.in $(TAGS_DEPENDENCIES) \
 		$(TAGS_FILES) $(LISP)
-	list='$(SOURCES) $(HEADERS)  $(LISP) $(TAGS_FILES)'; \
+	list='$(SOURCES) $(HEADERS) config.h.in $(LISP) $(TAGS_FILES)'; \
 	unique=`for i in $$list; do \
 	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
 	  done | \
@@ -773,7 +851,7 @@ distcleancheck: distclean
 	       exit 1; } >&2
 check-am: all-am
 check: check-recursive
-all-am: Makefile $(LTLIBRARIES)
+all-am: Makefile $(LTLIBRARIES) config.h
 installdirs: installdirs-recursive
 installdirs-am:
 	for dir in "$(DESTDIR)$(libdir)"; do \
@@ -814,7 +892,7 @@ distclean: distclean-recursive
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
-	distclean-libtool distclean-tags
+	distclean-hdr distclean-libtool distclean-tags
 
 dvi: dvi-recursive
 
@@ -878,25 +956,26 @@ ps-am:
 
 uninstall-am: uninstall-libLTLIBRARIES
 
-.MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) ctags-recursive \
-	install-am install-strip tags-recursive
+.MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) all \
+	ctags-recursive install-am install-strip tags-recursive
 
 .PHONY: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) CTAGS GTAGS \
 	all all-am am--refresh check check-am clean clean-generic \
 	clean-libLTLIBRARIES clean-libtool ctags ctags-recursive dist \
 	dist-all dist-bzip2 dist-gzip dist-lzma dist-shar dist-tarZ \
 	dist-xz dist-zip distcheck distclean distclean-compile \
-	distclean-generic distclean-libtool distclean-tags \
-	distcleancheck distdir distuninstallcheck dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-libLTLIBRARIES install-man install-pdf \
-	install-pdf-am install-ps install-ps-am install-strip \
-	installcheck installcheck-am installdirs installdirs-am \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags tags-recursive uninstall uninstall-am \
+	distclean-generic distclean-hdr distclean-libtool \
+	distclean-tags distcleancheck distdir distuninstallcheck dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-libLTLIBRARIES \
+	install-man install-pdf install-pdf-am install-ps \
+	install-ps-am install-strip installcheck installcheck-am \
+	installdirs installdirs-am maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-recursive uninstall uninstall-am \
 	uninstall-libLTLIBRARIES
 
 include $(HPSS_DIR)/Makefile.macros

@@ -67,16 +67,23 @@
 /*
  * Local includes.
  */
-#include "globus_gridftp_server_hpss_common.h"
-#include "globus_gridftp_server_hpss_config.h"
+#include "gridftp_dsi_hpss_config.h"
+#include "gridftp_dsi_hpss_misc.h"
+
+#ifdef DMALLOC
+/*
+ * Dmalloc
+ */
+#include <dmalloc.h>
+#endif /* DMALLOC */
 
 static globus_result_t
-globus_l_gfs_hpss_common_copy_basename(char * Path, char ** BaseName)
+misc_copy_basename(char * Path, char ** BaseName)
 {
 	char            * basename = NULL;
 	globus_result_t   result   = GLOBUS_SUCCESS;
 
-	GlobusGFSName(globus_l_gfs_hpss_common_copy_basename);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	basename = strrchr(Path, '/');
@@ -97,15 +104,15 @@ globus_l_gfs_hpss_common_copy_basename(char * Path, char ** BaseName)
 }
 
 static globus_result_t
-globus_i_gfs_hpss_common_translate_stat(char              * Name,
-                                        hpss_stat_t       * HpssStat,
-                                        globus_gfs_stat_t * GlobusStat)
+misc_translate_stat(char              * Name,
+                    hpss_stat_t       * HpssStat,
+                    globus_gfs_stat_t * GlobusStat)
 {
 	int             retval = 0;
 	globus_result_t result = GLOBUS_SUCCESS;
 	char            symlink_target[HPSS_MAX_PATH_NAME];
 
-	GlobusGFSName(globus_i_gfs_hpss_common_translate_stat);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return variable. */
@@ -145,7 +152,7 @@ globus_i_gfs_hpss_common_translate_stat(char              * Name,
 	}
 
 	/* Copy out the path name. We only want to use the basename.  */
-	result = globus_l_gfs_hpss_common_copy_basename(Name, &GlobusStat->name);
+	result = misc_copy_basename(Name, &GlobusStat->name);
 
 cleanup:
 	if (result != GLOBUS_SUCCESS)
@@ -167,12 +174,12 @@ cleanup:
 }
 
 globus_result_t
-globus_l_gfs_hpss_common_gfs_stat(char              *  Path,
-                                  globus_bool_t        FileOnly,
-                                  globus_bool_t        UseSymlinkInfo,
-                                  globus_bool_t        IncludePathStat,
-                                  globus_gfs_stat_t ** GfsStatArray,
-                                  int               *  GfsStatCount)
+misc_gfs_stat(char              *  Path,
+              globus_bool_t        FileOnly,
+              globus_bool_t        UseSymlinkInfo,
+              globus_bool_t        IncludePathStat,
+              globus_gfs_stat_t ** GfsStatArray,
+              int               *  GfsStatCount)
 {
 	int               dir_fd     = -1;
 	int               index      = 0;
@@ -182,7 +189,7 @@ globus_l_gfs_hpss_common_gfs_stat(char              *  Path,
 	hpss_dirent_t     dirent;
 	hpss_stat_t       hpss_stat_buf;
 
-	GlobusGFSName(globus_l_gfs_hpss_common_stat);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the returned array information. */
@@ -226,9 +233,7 @@ globus_l_gfs_hpss_common_gfs_stat(char              *  Path,
 		}
 
 		/* Translate from hpss stat to globus stat. */
-		result = globus_i_gfs_hpss_common_translate_stat(Path,
-		                                                 &hpss_stat_buf,
-		                                                 *GfsStatArray);
+		result = misc_translate_stat(Path, &hpss_stat_buf, *GfsStatArray);
 
 		goto cleanup;
 	}
@@ -287,9 +292,9 @@ globus_l_gfs_hpss_common_gfs_stat(char              *  Path,
 	if (IncludePathStat == GLOBUS_TRUE)
 	{
 		/* Translate from hpss stat to globus stat. */
-		result = globus_i_gfs_hpss_common_translate_stat(Path,
-		                                                 &hpss_stat_buf,
-		                                                 &((*GfsStatArray)[index++]));
+		result = misc_translate_stat(Path,
+		                               &hpss_stat_buf,
+		                               &((*GfsStatArray)[index++]));
 	}
 
 	/*
@@ -335,9 +340,9 @@ globus_l_gfs_hpss_common_gfs_stat(char              *  Path,
 		}
 
 		/* Translate from hpss stat to globus stat. */
-		result = globus_i_gfs_hpss_common_translate_stat(entry_path,
-		                                                 &hpss_stat_buf,
-		                                                 &((*GfsStatArray)[index]));
+		result = misc_translate_stat(entry_path,
+		                               &hpss_stat_buf,
+		                               &((*GfsStatArray)[index]));
 
 		if (result != GLOBUS_SUCCESS)
 			goto cleanup;
@@ -361,8 +366,7 @@ cleanup:
 	if (result != GLOBUS_SUCCESS)
 	{
 		/* Destroy the stat array. */
-		globus_l_gfs_hpss_common_destroy_gfs_stat_array(*GfsStatArray,
-		                                                *GfsStatCount);
+		misc_destroy_gfs_stat_array(*GfsStatArray, *GfsStatCount);
 		*GfsStatArray = NULL;
 
 		GlobusGFSHpssDebugExitWithError();
@@ -375,12 +379,12 @@ cleanup:
 
 
 void
-globus_l_gfs_hpss_common_destroy_gfs_stat_array(globus_gfs_stat_t * GfsStatArray,
-                                                int                 GfsStatCount)
+misc_destroy_gfs_stat_array(globus_gfs_stat_t * GfsStatArray,
+                            int                 GfsStatCount)
 {
 	int index = 0;
 
-	GlobusGFSName(globus_l_gfs_hpss_common_destroy_gfs_stat_array);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	if (GfsStatArray != NULL)
@@ -399,8 +403,9 @@ globus_l_gfs_hpss_common_destroy_gfs_stat_array(globus_gfs_stat_t * GfsStatArray
 }
 
 globus_result_t
-globus_l_gfs_hpss_common_file_archived(char          * Path,
-                                       globus_bool_t * Archived)
+misc_file_archived(char          * Path,
+                   globus_bool_t * Archived,
+                   globus_bool_t * TapeOnly)
 {
 	int              retval        = 0;
 	int              storage_level = 0;
@@ -408,11 +413,14 @@ globus_l_gfs_hpss_common_file_archived(char          * Path,
 	globus_result_t  result        = GLOBUS_SUCCESS;
 	hpss_xfileattr_t xfileattr;
 
-	GlobusGFSName(globus_l_gfs_hpss_common_file_archived);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
 	*Archived = GLOBUS_TRUE;
+	*TapeOnly = GLOBUS_FALSE;
+
+	memset(&xfileattr, 0, sizeof(hpss_xfileattr_t));
 
 	/*
 	 * Stat the object. Without API_GET_XATTRS_NO_BLOCK, this call would hang
@@ -428,12 +436,21 @@ globus_l_gfs_hpss_common_file_archived(char          * Path,
 		goto cleanup;
 	}
 
+	/* Check if the top level is tape. */
+	if (xfileattr.SCAttrib[0].Flags & BFS_BFATTRS_LEVEL_IS_TAPE)
+	{
+		*Archived = GLOBUS_TRUE;
+		*TapeOnly = GLOBUS_TRUE;
+		goto cleanup;
+	}
+
 	/* Determine the archive status. */
 	for (storage_level = 0; storage_level < HPSS_MAX_STORAGE_LEVELS; storage_level++)
 	{
 		if (xfileattr.SCAttrib[storage_level].Flags & BFS_BFATTRS_LEVEL_IS_DISK)
 		{
-			if (neqz64m(xfileattr.SCAttrib[storage_level].BytesAtLevel))
+			/* Check for the entire file on disk at this level. */
+			if (eq64m(xfileattr.SCAttrib[storage_level].BytesAtLevel, xfileattr.Attrs.DataLength))
 			{
 				*Archived = GLOBUS_FALSE;
 				break;
@@ -441,6 +458,7 @@ globus_l_gfs_hpss_common_file_archived(char          * Path,
 		}
 	}
 
+cleanup:
 	/* Free the extended information. */
 	for (storage_level = 0; storage_level < HPSS_MAX_STORAGE_LEVELS; storage_level++)
 	{
@@ -453,7 +471,6 @@ globus_l_gfs_hpss_common_file_archived(char          * Path,
 		}
 	}
 
-cleanup:
 	if (result != GLOBUS_SUCCESS)
 	{
 		GlobusGFSHpssDebugExitWithError();
@@ -464,8 +481,41 @@ cleanup:
 }
 
 globus_result_t
-globus_l_gfs_hpss_common_username_to_home(char *  UserName, 
-                                          char ** HomeDirectory)
+misc_get_file_size(char * Path, globus_off_t * FileSize)
+{
+	globus_result_t     result         = GLOBUS_SUCCESS;
+	globus_gfs_stat_t * gfs_stat_array = NULL;
+	int                 gfs_stat_count = 0;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	/* Stat the file. */
+	result = misc_gfs_stat(Path,
+	                       GLOBUS_TRUE,
+	                       GLOBUS_FALSE,
+	                       GLOBUS_TRUE,
+	                       &gfs_stat_array,
+	                       &gfs_stat_count);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	*FileSize = gfs_stat_array[0].size;
+
+cleanup:
+	if (result != GLOBUS_SUCCESS)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return result;
+	}
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+#ifdef DEPRECATED
+globus_result_t
+misc_username_to_home(char *  UserName, 
+                      char ** HomeDirectory)
 {
 	globus_result_t result = GLOBUS_SUCCESS;
 	struct passwd * passwd = NULL;
@@ -473,7 +523,7 @@ globus_l_gfs_hpss_common_username_to_home(char *  UserName,
 	char            buffer[1024];
 	int             retval = 0;
 
-	GlobusGFSName(globus_l_gfs_hpss_common_username_to_home);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -515,10 +565,11 @@ cleanup:
 	GlobusGFSHpssDebugExit();
 	return GLOBUS_SUCCESS;
 }
+#endif /* DEPRECATED */
 
 globus_result_t
-globus_l_gfs_hpss_common_username_to_uid(char * UserName, 
-                                         int  * Uid)
+misc_username_to_uid(char * UserName, 
+                     int  * Uid)
 {
 	globus_result_t result = GLOBUS_SUCCESS;
 	struct passwd * passwd = NULL;
@@ -526,7 +577,7 @@ globus_l_gfs_hpss_common_username_to_uid(char * UserName,
 	char            buffer[1024];
 	int             retval = 0;
 
-	GlobusGFSName(globus_l_gfs_hpss_common_username_to_uid);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -565,8 +616,7 @@ cleanup:
 }
 
 globus_result_t
-globus_l_gfs_hpss_common_uid_to_username(int     Uid,
-                                         char ** UserName)
+misc_uid_to_username(int Uid, char ** UserName)
 {
 	globus_result_t result = GLOBUS_SUCCESS;
 	struct passwd * passwd = NULL;
@@ -574,7 +624,7 @@ globus_l_gfs_hpss_common_uid_to_username(int     Uid,
 	char            buffer[1024];
 	int             retval = 0;
 
-	GlobusGFSName(globus_l_gfs_hpss_common_uid_to_username);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -619,8 +669,7 @@ cleanup:
 
 
 globus_result_t
-globus_l_gfs_hpss_common_groupname_to_gid(char  * GroupName,
-                                          gid_t * Gid)
+misc_groupname_to_gid(char * GroupName, gid_t * Gid)
 {
 	globus_result_t   result = GLOBUS_SUCCESS;
 	struct group    * group  = NULL;
@@ -628,7 +677,7 @@ globus_l_gfs_hpss_common_groupname_to_gid(char  * GroupName,
 	char              buffer[1024];
 	int               retval = 0;
 
-	GlobusGFSName(globus_l_gfs_hpss_common_groupname_to_gid);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -667,8 +716,7 @@ cleanup:
 }
 
 globus_result_t
-globus_l_gfs_hpss_common_gid_to_groupname(gid_t    Gid,
-                                          char  ** GroupName)
+misc_gid_to_groupname(gid_t Gid, char  ** GroupName)
 {
 	globus_result_t   result = GLOBUS_SUCCESS;
 	struct group    * group  = NULL;
@@ -676,7 +724,7 @@ globus_l_gfs_hpss_common_gid_to_groupname(gid_t    Gid,
 	char              buffer[1024];
 	int               retval = 0;
 
-	GlobusGFSName(globus_l_gfs_hpss_common_gid_to_groupname);
+	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -720,19 +768,90 @@ cleanup:
 	return GLOBUS_SUCCESS;
 }
 
+globus_bool_t
+misc_is_user_in_group(char * UserName, char * GroupName)
+{
+	globus_bool_t   result = GLOBUS_FALSE;
+	struct group  * group  = NULL;
+	struct group    group_buf;
+	struct passwd * passwd = NULL;
+	struct passwd   passwd_buf;
+	char            buffer[1024];
+	gid_t           gid    = 0;
+	int             retval = 0;
+	int             index  = 0;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	/* Find the group entry. */
+	retval = getgrnam_r(GroupName,
+	                    &group_buf,
+	                    buffer,
+	                    sizeof(buffer),
+	                    &group);
+	if (retval != 0)
+		goto cleanup;
+
+	if (group == NULL)
+		goto cleanup;
+
+	while (group->gr_mem[index] != NULL)
+	{
+		if (strcmp(group->gr_mem[index], UserName) == 0)
+		{
+			result = GLOBUS_TRUE;
+			break;
+		}
+
+		index++;
+	}
+
+	/* Save the group's gid. */
+	gid = group->gr_gid;
+
+	/* Find the user's passwd entry. */
+	retval = getpwnam_r(UserName,
+	                    &passwd_buf,
+	                    buffer,
+	                    sizeof(buffer),
+	                    &passwd);
+	if (retval != 0)
+		goto cleanup;
+
+	if (passwd == NULL)
+		goto cleanup;
+
+	if (passwd->pw_gid == gid)
+		result = GLOBUS_TRUE;
+
+cleanup:
+
+	if (result == GLOBUS_FALSE)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return GLOBUS_FALSE;
+	}
+
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_TRUE;
+}
+
 void
-globus_l_gfs_hpss_common_destroy_result(globus_result_t Result)
+misc_destroy_result(globus_result_t Result)
 {
 	if (Result != GLOBUS_SUCCESS)
 		globus_object_free(globus_error_get(Result));
 }
 
 char *
-globus_l_gfs_hpss_common_strndup(char * String, int Length)
+misc_strndup(char * String, int Length)
 {
 	char * new_string = NULL;
 
 	new_string = (char *) globus_malloc(Length + 1);
+
+	globus_assert(new_string != NULL);
 
 	snprintf(new_string, Length + 1, "%s", String);
 

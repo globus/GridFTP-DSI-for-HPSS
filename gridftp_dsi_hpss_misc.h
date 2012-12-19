@@ -39,8 +39,8 @@
  * DEALINGS WITH THE SOFTWARE.
  */
 
-#ifndef GLOBUS_GRIDFTP_SERVER_HPSS_COMMON_H
-#define GLOBUS_GRIDFTP_SERVER_HPSS_COMMON_H
+#ifndef GRIDFTP_DSI_HPSS_MISC_H
+#define GRIDFTP_DSI_HPSS_MISC_H
 
 /*
  * System includes.
@@ -84,53 +84,57 @@ GlobusDebugDeclare(GLOBUS_GRIDFTP_SERVER_HPSS);
 
 
 globus_result_t
-globus_l_gfs_hpss_common_gfs_stat(char              *  Path,
-                                  globus_bool_t        FileOnly,
-                                  globus_bool_t        UseSymlinkInfo,
-                                  globus_bool_t        IncludePathStat,
-                                  globus_gfs_stat_t ** GfsStatArray,
-                                  int               *  GfsStatCount);
+misc_gfs_stat(char *  Path,
+              globus_bool_t        FileOnly,
+              globus_bool_t        UseSymlinkInfo,
+              globus_bool_t        IncludePathStat,
+              globus_gfs_stat_t ** GfsStatArray,
+              int               *  GfsStatCount);
 
 void
-globus_l_gfs_hpss_common_destroy_gfs_stat_array(
-    globus_gfs_stat_t * GfsStatArray,
-    int                 GfsStatCount);
+misc_destroy_gfs_stat_array(globus_gfs_stat_t * GfsStatArray,
+                            int                 GfsStatCount);
 
 globus_result_t
-globus_l_gfs_hpss_common_file_archived(char          * Path,
-                                       globus_bool_t * Archived);
+misc_file_archived(char          * Path,
+                   globus_bool_t * Archived,
+                   globus_bool_t * TapeOnly);
+
+globus_result_t
+misc_get_file_size(char * Path, globus_off_t * FileSize);
+
 
 /*
  * Passwd file translations.
  */
+#ifdef DEPRECATED
 globus_result_t
-globus_l_gfs_hpss_common_username_to_home(char *  UserName, 
-                                          char ** HomeDirectory);
+misc_username_to_home(char * UserName, char ** HomeDirectory);
+#endif /* DEPRECATED */
 
 globus_result_t
-globus_l_gfs_hpss_common_username_to_uid(char * UserName,
-                                         int  * Uid);
+misc_username_to_uid(char * UserName, int * Uid);
 
 globus_result_t
-globus_l_gfs_hpss_common_uid_to_username(int     Uid,
-                                         char ** UserName);
+misc_uid_to_username(int Uid, char ** UserName);
 
 
 globus_result_t
-globus_l_gfs_hpss_common_groupname_to_gid(char  * GroupName,
-                                          gid_t * Gid);
+misc_groupname_to_gid(char * GroupName, gid_t * Gid);
 
 globus_result_t
-globus_l_gfs_hpss_common_gid_to_groupname(gid_t    Gid,
-                                          char  ** GroupName);
+misc_gid_to_groupname(gid_t Gid, char  ** GroupName);
+
+globus_bool_t
+misc_is_user_in_group(char * UserName, char * GroupName);
 
 /*
  * Helper to release memory associated with errors.
  */
 void
-globus_l_gfs_hpss_common_destroy_result(globus_result_t Result);
+misc_destroy_result(globus_result_t Result);
 
 char *
-globus_l_gfs_hpss_common_strndup(char * String, int Length);
+misc_strndup(char * String, int Length);
 
-#endif /* GLOBUS_GRIDFTP_SERVER_HPSS_COMMON_H */
+#endif /* GRIDFTP_DSI_HPSS_MISC_H */

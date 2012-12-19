@@ -1,26 +1,27 @@
-For the latest build instructions, see https://github.com/JasonAlt/GridFTP-DSI-for-HPSS/wiki/Installation-of-Version-0.1-Alpha
-
-BUILD GRIDFTP
-=============
-
-You'll need to download and build Globus Toolkit 5.2.x. Follow the instructions in the INSTALL file to build gridftp. Since HPSS is 32bit (until the 7.4 release), be sure to build the toolkit 32bit:
-
-globus$ ./configure --prefix=/usr/local/globus-5.2.x --with-flavor=gcc32dbg
-
-globus$ make gridftp
-
-globus$ make install
+For the latest build instructions, see https://github.com/JasonAlt/GridFTP-DSI-for-HPSS/wiki/Installation-of-Version-1.0
 
 BUILD AND INSTALL HPSS
 ======================
 
-This is beyond the scope of this article but you should have a working HPSS installation. This version of the DSI was built against HPSS 7.3.3p4.
+Building HPSS is beyond the scope of this guide but you should have a working HPSS installation. This version of the DSI was tested against HPSS 7.3.3p7. The DSI requires either a full HPSS build or a 'clnt' HPSS build. Note whether the HPSS build is 32bit or 64bit; you'll need to build GridFTP and the DSI that same way.
 
-Build and Install the DSI
+BUILD GRIDFTP
+=============
 
-Build the HPSS DSI with the following options. Note that kerberos authentication is not yet supported.
+You'll need to download and build Globus Toolkit 5.2.3rc1 or later. Follow the instructions in the Globus Toolkit INSTALL file to build gridftp. The following example assumes you are building against 32bit HPSS. If you are building against 64bit HPSS, replace 'gcc32dbg' with 'gcc64dbg'.
+
+globus$ ./configure --prefix=/usr/local/globus-5.2.x --with-flavor=gcc32dbg
+globus$ make gridftp
+globus$ make install
+
+BUILD AND INSTALL THE DSI
+=========================
+
+Build the HPSS DSI with the following options. If your HPSS installation uses Kerberos, replace '--with-unixauth'
+with '--with_krb5auth' below. If you are building against 64bit HPSS, change 'gcc32dbg' to 'gcc64dbg' and add '--libdir=/usr/local/globus-5.2.x/lib64' to the configure options.
 
 ./configure --with-globus=/usr/local/globus-5.2.x --with-globus-flavor=gcc32dbg --with-hpssdir=/opt/hpss --with-unixauth
+
 Install the DSI into the Globus Toolkit installation directory:
 
 make install
@@ -36,71 +37,41 @@ gridftp:x:316:316:GridFTP Server:/home/gridftp:/bin/bash
 Next, you must give this new user 'control' permission to the core server's client interface:
 
 [root@hpss gridftp_hpss_dsi_0_1]# /opt/hpss/bin/hpss_server_acl
-
 hsa> acl -m
-
 1) Mover (blynken)
-
 2) Log Daemon
-
 3) Mover (wynken)
-
 4) SCSI PVR
-
 5) Mover (nod)
-
 6) Log Client (hpss)
-
 7) Migration/Purge Server
-
 8) Core Server
-
 9) SSM System Manager
-
 10) Location Server
-
 11) PVL
-
 12) Mover (ahab)
-
 13) Startup Daemon (hpss)
-
 Select a server
-
 Choose an item by number (RET to cancel):
-
 8
 1) PVL Mount Notification Interface (v1) 007ff347-e533-1cc6-b22d-02608c2cedf4
-
 2) Realtime Monitor Interface (v1) 80c9a256-2f13-11d3-a0c8-000001341966
-
 3) Client Interface (v1) 32ba9692-4667-11d6-aa3a-0004ac49692b
-
 4) Account Validation Interface (v1) 647f22a8-a1e9-11d3-a739-000001341966
-
 Select an interface
-
 Choose an item by number (RET to cancel):
-
 3
 hsa> add user gridftp c
-
 hsa> show
 
 perms - type - ID (name) - realm ID (realm)
-
 rw-c-d- - user - 304 (hpssssm) - 81000 (hpss.ncsa.illinois.edu)
 
 hsa> quit
-
 rw-c-dt - user - 308 (hpssmps) - 81000 (hpss.ncsa.illinois.edu)
-
 rw-c--- - user - 309 (hpssfs) - 81000 (hpss.ncsa.illinois.edu)
-
 r--c--- - user - 315 (hpssftp) - 81000 (hpss.ncsa.illinois.edu)
-
 ---c--- - user - 316 (gridftp) - 81000 (hpss.ncsa.illinois.edu)
-
 ------t - any_other
 .... set a password for user gridftp ...
 
@@ -116,44 +87,36 @@ The globus gridftp server does not need to run as a privileged user. You should 
 Add an entry to /etc/services for the default gsiftp port:
 
 gsiftp 2811/tcp # GSI FTP
-Here's an example xinetd entry (/etc/xinetd.d/gridftp). Note the specific changes for 5.2.0 vs later 5.2.x versions.
+
+Here's an example xinetd entry (/etc/xinetd.d/gridftp). Note that the DSI requires that the server run with threads so you must use -threads with a value of 2 or greater.
 
 service gsiftp
 
 {
-
-flags       = IPv4
-
-wait        = no
-
-user        = gridftp
-
-# You may need to set group depending upon the account chosen
-
-#group       = 
-
-server      = /usr/local/globus/sbin/globus-gridftp-server
-
-# auth-level 6 = 2 for frontend default + 4 for no-change-uid/gid
-
-#  0 - Disables all authorization checks
-
-#  1 - Authorize identity
-
-#  2 - Authorize all file/resource accesses (Default for fronend)
-
-#  4 - Disable changing process uid to authenticated user
-
-# For Globus Toolkit versions > 5.2.0, add '-threads 2' to server_args
-
-server_args = -inetd -exec /usr/local/globus/sbin/globus-gridftp-server -auth-level 7 -dsi hpss 
-
-# For Globus Toolkit versions > 5.2.0, remove 'GLOBUS_THREAD_MODEL=pthread' from env
-
-env         = GRIDMAP=/etc/grid-security/grid-mapfile GLOBUS_THREAD_MODEL=pthread
-
-socket_type = stream
-
-per_source  = 100
-
+	flags       = IPv4
+	wait        = no
+	user        = gridftp
+	# You may need to set group depending upon the account chosen
+	group       = gridftp
+	server      = /usr/local/globus/sbin/globus-gridftp-server
+	# auth-level 6 = 2 for frontend default + 4 for no-change-uid/gid
+	#  0 - Disables all authorization checks
+	#  1 - Authorize identity
+	#  2 - Authorize all file/resource accesses (Default for fronend)
+	#  4 - Disable changing process uid to authenticated user
+	server_args = -inetd -threads 2 -auth-level 7 -dsi hpss -disable-command-list SCKS,APPE
+	env         = GRIDMAP=/etc/grid-security/grid-mapfile
+	socket_type = stream
+	per_source  = 100
 }
+
+SETUP THE DSI CONFIG FILE
+=========================
+
+Review 'ConfigFile' in the source directory for any changes you may wish to make for your site. Then copy ConfigFile into place on the target system. The DSI will use the following search order for locating the configuration file:
+
+ 1) $HPSS_PATH_ETC/gridftp.conf
+ 2) /var/hpss/etc/gridftp.conf
+
+Make sure the configuration file's permissions allow for the GridFTP process to read it. For example, if you chose to run the GridFTP server as user 'gridftp', make sure the user 'gridftp' has read access to the configuration file.
+

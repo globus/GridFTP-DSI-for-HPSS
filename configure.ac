@@ -1,7 +1,7 @@
 dnl
 
 AC_REVISION($Revision: 1.8 $)
-AC_INIT([GridFTP HPSS DSI], [0.2 alpha])
+AC_INIT([GridFTP HPSS DSI], [1.0 rc2])
 
 AC_PROG_LIBTOOL
 
@@ -133,18 +133,75 @@ AC_ARG_WITH(rpath, AC_HELP_STRING([--without-rpath],\
     [rpathopt=''], [])
 AC_SUBST(RPATHOPT, $rpathopt)
 
+#
+# Note from Damian Hazen of LBL:
+# The auth libraries are mechanism plugins and we shouldn't be linking
+# against them directly.  I tried removing this, and instead just
+# linking against libhpss but it doesn't work because the mechanisms need
+# symbols defined in libhpssgss.so.  This is normally fine since
+# libhpssgss.so is a dependency of libhpss.so which we link against.
+# But, since the DSI is dlopen'd itself, and w/o the RTLD_GLOBAL flag
+# to make the symbols globally visable, it doesn't work here.  The
+# right fix I think is to be able to specify RTLD_GLOBAL to dlopen for
+# the DSI plugin.  That's a change to globus, so I've just left for
+# now.  If the ability to pass RTLD_GLOBAL when mapping in the DSI is
+# added, then the --with-unixauth and --with-krb5auth options should be
+# removed from configure, and the sec. plugins could function as
+# intended.  You would then add a configuration option for
+# authentication type, and make the following calls:
+#
+# authenticator_str = config_get_keytab_file(SessionHandle->ConfigHandle);
+# authn_mech_str = config_get_authn_mech(SessionHandle->ConfigHandle);
+#
+# hpss_AuthnMechTypeFromString(authn_mech_str, &authn_mech);
+# hpss_ParseAuthString(authenticator_str,
+#                      &authn_mech,
+#                      &authenticator_type,
+#                      &authenticator);
+#
+# hpss_GetConfiguration(&api_config);
+# api_config.AuthnMech = authn_mech;
+#
+# hpss_SetLoginCred(login_name,
+#	            authn_mech,
+#	            hpss_rpc_cred_client,
+#	            authenticator_type,
+#	            authenticator);
+#
+# This would let you change the authentication mechanism
+# w/o a recompile -- woohoo!
+#
+#
+# Also, the symbol issue is the same for the authz mechanisms.  For
+# example, if a site is using kerberos for authentication and unix for
+# authorization, then they need to link against both the kerberos and
+# unix mechanisms (the unix sec library has both auth and authz
+# interfaces).  Because of this, I've made linking against the unix
+# library unconditional.  We should also add an option for sites using
+# LDAP for authz.
+#
+
+
 hpssauthlibs=''
 #AC_ARG_WITH(hpss-auth-libs, AC_HELP_STRING([--with-hpss-auth-libs],\
 #    [Link against libhpsskrb5auth and libhpssunixauth.]),
 #    [hpssauthlibs="$hpssauthlibs -lhpsskrb5auth -lhpssunixauth"], [])
 
-AC_ARG_WITH(unixauth, AC_HELP_STRING([--with-unixauth],\
-    [Link against libhpssunixauth.]),
-    [hpssauthlibs="$hpssauthlibs -lhpssunixauth"], [])
+AC_ARG_WITH(unixauth, 
+    AC_HELP_STRING([--with-unixauth], [Link against libhpssunixauth.]),
+    [
+        hpssauthlibs="$hpssauthlibs -lhpssunixauth"
+        AC_DEFINE(HPSS_UNIX_AUTH, 1, [Using Unix authentication])
+    ], 
+    [])
 
-AC_ARG_WITH(krb5auth, AC_HELP_STRING([--with-krb5auth],\
-    [Link against libhpsskrb5auth.]),
-    [hpssauthlibs="$hpssauthlibs -lhpsskrb5auth"], [])
+AC_ARG_WITH(krb5auth, 
+    AC_HELP_STRING([--with-krb5auth], [Link against libhpsskrb5auth.]),
+    [
+        hpssauthlibs="$hpssauthlibs -lhpsskrb5auth -lhpssunixauth"
+        AC_DEFINE(HPSS_KRB5_AUTH, 1, [Using Kerberos authentication])
+    ],
+    [])
 
 if test "${hpssauthlibs+set}" != set; then
 	echo "Must specifiy one of --with-unixauth or --with-krb5auth"
@@ -161,8 +218,10 @@ dnl
 DIRT_TIMESTAMP=`perl -e 'print time'`
 DIRT_BRANCH_ID=99999
 
-AC_SUBST(GPT_MAJOR_VERSION, 0)
-AC_SUBST(GPT_MINOR_VERSION, 2)
+AC_CONFIG_HEADERS([config.h])
+
+AC_SUBST(GPT_MAJOR_VERSION, 1)
+AC_SUBST(GPT_MINOR_VERSION, 0)
 AC_SUBST(DIRT_TIMESTAMP)
 AC_SUBST(DIRT_BRANCH_ID)
 

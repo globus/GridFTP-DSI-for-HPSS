@@ -38,32 +38,70 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS WITH THE SOFTWARE.
  */
-
-#ifndef GLOBUS_GRIDFTP_SERVER_HPSS_CONFIG_H
-#define GLOBUS_GRIDFTP_SERVER_HPSS_CONFIG_H
+#ifndef GRIDFTP_DSI_HPSS_GRIDFTP_H
+#define GRIDFTP_DSI_HPSS_GRIDFTP_H
 
 /*
  * Globus includes.
  */
-#include <globus_common.h>
+#include <globus_gridftp_server.h>
 
-#define DEFAULT_CONFIG_FILE   "/var/hpss/etc/gridftp.conf"
+/*
+ * Local includes.
+ */
+#include "gridftp_dsi_hpss_transfer_data.h"
+#include "gridftp_dsi_hpss_buffer.h"
+#include "gridftp_dsi_hpss_misc.h"
 
-typedef struct {
-	char * LoginName;
-	char * KeytabFile;
-} config_t;
+typedef struct gridftp gridftp_t;
+
+typedef enum {
+	GRIDFTP_OP_TYPE_RETR,
+	GRIDFTP_OP_TYPE_STOR,
+} gridftp_op_type_t;
+
+/*
+ * This implementation should only callback once.
+ */
+typedef void
+(*gridftp_eof_callback_t)(void          * CallbackArg,
+                          globus_result_t Result);
+
+typedef void
+(*gridftp_buffer_pass_t) (void       * CallbackArg,
+                          char       * Buffer,
+                          globus_off_t Offset,
+                          globus_off_t Length);
 
 globus_result_t
-globus_l_gfs_hpss_config_init(char * ConfigFile);
+gridftp_init(gridftp_op_type_t             OpType,
+             globus_gfs_operation_t        Operation,
+             globus_gfs_transfer_info_t *  TransferInfo,
+             buffer_handle_t            *  BufferHandle,
+             msg_handle_t               *  MsgHandle,
+             gridftp_eof_callback_t        EofCallbackFunc,
+             void                       *  EofCallbackArg,
+             gridftp_t                  ** GridFTP);
 
 void
-globus_l_gfs_hpss_config_destroy();
+gridftp_set_buffer_pass_func(gridftp_t              * GridFTP,
+                              gridftp_buffer_pass_t   BufferPassFunc,
+                              void                  * BufferPassArg);
 
-char *
-globus_l_gfs_hpss_config_get_login_name();
+void
+gridftp_destroy(gridftp_t * GridFTP);
 
-char *
-globus_l_gfs_hpss_config_get_keytab();
+void
+gridftp_buffer(void         * CallbackArg,
+               char         * Buffer,
+               globus_off_t   Offset,
+               globus_off_t   Length);
 
-#endif /* GLOBUS_GRIDFTP_SERVER_HPSS_CONFIG_H */
+void
+gridftp_flush(gridftp_t * GridFTP);
+
+void
+gridftp_stop(gridftp_t * GridFTP);
+
+
+#endif /* GRIDFTP_DSI_HPSS_GRIDFTP_H */
