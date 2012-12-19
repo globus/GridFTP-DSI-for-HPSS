@@ -1,4 +1,4 @@
-Version 1.0 RC2
+Version 1.0 : Dec 19, 2012
 	- Added fixes sent by Damian Hazen of LBL:
 		- Fixed user->home directory mapping to use HPSS LDAP
 		- Fixed KRB5 authentication issues
@@ -11,8 +11,6 @@ Version 1.0 RC2
 	- Fixed config file's AdminList syntax
 	- No longer force max segment size in hints
 	- Fix for RETR that end early, presumably due to a large segment count
-
-Version 1.0 RC1
 	- Now requires Globus Toolkit 5.2.3rc1 or newer. See 
 	  http://jira.globus.org/browse/GT-299
 	- Added support for ESTO, ERET, REST (APPE, SCKS not supported yet)
