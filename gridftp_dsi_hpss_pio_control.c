@@ -86,6 +86,7 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
                                   int             CosID)
 {
 	int                     oflags      = 0;
+	int                     retval      = 0;
 	globus_off_t            file_length = 0;
 	globus_result_t         result      = GLOBUS_SUCCESS;
 	hpss_cos_hints_t        hints_in;
