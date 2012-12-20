@@ -427,9 +427,8 @@ pio_control_transfer_ranges(pio_control_t                         * PioControl,
 
 		/* Send the stripe index message to the pio data node. */
 		result = msg_send(PioControl->MsgHandle,
-		                  node_id,
-		                  MSG_ID_PIO_DATA,
-		                  MSG_ID_PIO_CONTROL,
+		                  MSG_COMP_ID_TRANSFER_DATA_PIO,
+		                  MSG_COMP_ID_TRANSFER_CONTROL_PIO,
 		                  PIO_CONTROL_MSG_TYPE_STRIPE_INDEX,
 		                  sizeof(int_buf),
 		                  int_buf);
@@ -439,9 +438,8 @@ pio_control_transfer_ranges(pio_control_t                         * PioControl,
 
 		/* Send the stripe group message to the pio data node. */
 		result = msg_send(PioControl->MsgHandle,
-		                  node_id,
-		                  MSG_ID_PIO_DATA,
-		                  MSG_ID_PIO_CONTROL,
+		                  MSG_COMP_ID_TRANSFER_DATA_PIO,
+		                  MSG_COMP_ID_TRANSFER_CONTROL_PIO,
 		                  PIO_CONTROL_MSG_TYPE_STRIPE_GROUP,
 		                  buffer_length,
 		                  group_buffer);
@@ -449,6 +447,7 @@ pio_control_transfer_ranges(pio_control_t                         * PioControl,
 		if (result != GLOBUS_SUCCESS)
 			goto cleanup;
 	}
+
 
 	/* Launch the pio execute thread. */
 	retval = globus_thread_create(&thread_id,
@@ -534,6 +533,7 @@ pio_control_execute_thread(void * Arg)
 			break;
 		}
 	}
+
 
 	/* Stop PIO */
 	retval = hpss_PIOEnd(pio_control->PioExecute.StripeGroup);

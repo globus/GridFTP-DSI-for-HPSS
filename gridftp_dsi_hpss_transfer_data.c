@@ -79,8 +79,8 @@ typedef enum {
 } transfer_data_op_type_t;
 
 typedef struct range_msg_list {
-	msg_range_received_t    Msg;
-	struct range_msg_list * Next;
+	data_ranges_msg_range_received_t   Msg;
+	struct range_msg_list            * Next;
 } range_msg_list_t;
 
 struct transfer_data {
@@ -142,18 +142,18 @@ static void
 transfer_data_msg_range_received(transfer_data_t * TransferData,
                                  void            * Msg)
 {
-	char                  * buffer = NULL;
-	globus_off_t            offset = 0;
-	globus_off_t            length = 0;
-	range_msg_list_t      * new_range_msg      = NULL;
-	range_msg_list_t      * range_msg          = NULL;
-	msg_range_received_t  * msg_range_received = NULL;
+	char                              * buffer             = NULL;
+	globus_off_t                        offset             = 0;
+	globus_off_t                        length             = 0;
+	range_msg_list_t                  * new_range_msg      = NULL;
+	range_msg_list_t                  * range_msg          = NULL;
+	data_ranges_msg_range_received_t  * msg_range_received = NULL;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Cast to our message. */
-	msg_range_received = (msg_range_received_t *) Msg;
+	msg_range_received = (data_ranges_msg_range_received_t *) Msg;
 
 	globus_mutex_lock(&TransferData->Lock);
 	{
@@ -244,47 +244,22 @@ transfer_data_msg_range_received(transfer_data_t * TransferData,
 	GlobusGFSHpssDebugExit();
 }
 
-static globus_result_t
-transfer_data_msg_recv_type(void       * CallbackArg,
-                            msg_type_t   MsgType,
-                            int          MsgLen,
-                            void       * Msg)
+static void
+transfer_data_msg_recv(void          * CallbackArg,
+                       msg_comp_id_t   DstMsgCompID,
+                       msg_comp_id_t   SrcMsgCompID,
+                       int             MsgType,
+                       int             MsgLen,
+                       void          * Msg)
 {
 	transfer_data_t * transfer_data = (transfer_data_t *) CallbackArg;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	switch (MsgType)
+	switch (SrcMsgCompID)
 	{
-	case MSG_TYPE_RANGE_RECEIVED:
-		transfer_data_msg_range_received(transfer_data, Msg);
-		break;
-	default:
-		break;
-	}
-
-	GlobusGFSHpssDebugExit();
-	return GLOBUS_SUCCESS;
-}
-
-static globus_result_t
-transfer_data_msg_recv(void     * CallbackArg,
-                       int        NodeIndex,
-                       msg_id_t   DestinationID,
-                       msg_id_t   SourceID,
-                       int        MsgType,
-                       int        MsgLen,
-                       void     * Msg)
-{
-	transfer_data_t * transfer_data = (transfer_data_t *) CallbackArg;
-
-	GlobusGFSName(__func__);
-	GlobusGFSHpssDebugEnter();
-
-	switch (SourceID)
-	{
-	case MSG_ID_TRANSFER_CONTROL:
+	case MSG_COMP_ID_TRANSFER_CONTROL:
 
 		switch (MsgType)
 		{
@@ -305,12 +280,21 @@ transfer_data_msg_recv(void     * CallbackArg,
 		}
 		break;
 
+	case MSG_COMP_ID_TRANSFER_DATA_RANGES:
+		switch (MsgType)
+		{
+		case DATA_RANGES_MSG_TYPE_RANGE_RECEIVED:
+			transfer_data_msg_range_received(transfer_data, Msg);
+			break;
+		default:
+			break;
+		}
+		break;
 	default:
 		globus_assert(0);
 	}
 
 	GlobusGFSHpssDebugExit();
-	return GLOBUS_SUCCESS;
 }
 
 static globus_result_t
@@ -341,16 +325,15 @@ transfer_data_common_init(transfer_data_op_type_t    OpType,
 	(*TransferData)->MsgRegisterID = MSG_REGISTER_ID_NONE;
 
 	/* Register to receive messages. */
-	msg_register_recv(MsgHandle, 
-	                  MSG_ID_TRANSFER_DATA, 
-	                  transfer_data_msg_recv, 
-	                  *TransferData);
+	result = msg_register(MsgHandle,
+	                      MSG_COMP_ID_TRANSFER_DATA_RANGES,
+	                      MSG_COMP_ID_TRANSFER_DATA,
+	                      transfer_data_msg_recv,
+	                      *TransferData,
+	                      &(*TransferData)->MsgRegisterID);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
 
-	(*TransferData)->MsgRegisterID = msg_register_for_type(MsgHandle,
-	                                                       MSG_TYPE_RANGE_RECEIVED,
-	                                                       transfer_data_msg_recv_type,
-	                                                       *TransferData);
-	
 	/* Get the server's block size. */
 /* XXX this should be globus_gridftp_server_get_block_size()
  * but PIO requies that the block(buffer) size and stripe block size
@@ -482,9 +465,8 @@ transfer_data_stor_init(msg_handle_t               *  MsgHandle,
 
 	/* Tell the control side that we are ready. */
 	result = msg_send(MsgHandle,
-	                  0,
-	                  MSG_ID_TRANSFER_CONTROL,
-	                  MSG_ID_TRANSFER_DATA,
+	                  MSG_COMP_ID_TRANSFER_CONTROL,
+	                  MSG_COMP_ID_TRANSFER_DATA,
 	                  TRANSFER_DATA_MSG_TYPE_READY,
 	                  0,
 	                  NULL);
@@ -572,9 +554,8 @@ transfer_data_retr_init(msg_handle_t               *  MsgHandle,
 
 	/* Tell the control side that we are ready. */
 	result = msg_send(MsgHandle,
-	                  0,
-	                  MSG_ID_TRANSFER_CONTROL,
-	                  MSG_ID_TRANSFER_DATA,
+	                  MSG_COMP_ID_TRANSFER_CONTROL,
+	                  MSG_COMP_ID_TRANSFER_DATA,
 	                  TRANSFER_DATA_MSG_TYPE_READY,
 	                  0,
 	                  NULL);
@@ -665,9 +646,8 @@ transfer_data_cksm_init(msg_handle_t               *  MsgHandle,
 
 	/* Tell the control side that we are ready. */
 	result = msg_send(MsgHandle,
-	                  0,
-	                  MSG_ID_TRANSFER_CONTROL,
-	                  MSG_ID_TRANSFER_DATA,
+	                  MSG_COMP_ID_TRANSFER_CONTROL,
+	                  MSG_COMP_ID_TRANSFER_DATA,
 	                  TRANSFER_DATA_MSG_TYPE_READY,
 	                  0,
 	                  NULL);
@@ -686,11 +666,7 @@ transfer_data_destroy(transfer_data_t * TransferData)
 	if (TransferData != NULL)
 	{
 		/* Unregister to reveive messages. */
-		msg_unregister_recv(TransferData->MsgHandle, MSG_ID_TRANSFER_DATA);
-
-		msg_unregister_for_type(TransferData->MsgHandle,
-		                        MSG_TYPE_RANGE_RECEIVED,
-		                        TransferData->MsgRegisterID);
+		msg_unregister(TransferData->MsgHandle, TransferData->MsgRegisterID);
 
 		/* Destroy the buffer handle. */
 		buffer_destroy(TransferData->BufferHandle);

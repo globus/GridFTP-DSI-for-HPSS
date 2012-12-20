@@ -50,9 +50,7 @@
 #include "gridftp_dsi_hpss_transfer_control.h"
 #include "gridftp_dsi_hpss_transfer_data.h"
 #include "gridftp_dsi_hpss_pio_control.h"
-#ifdef REMOTE
 #include "gridftp_dsi_hpss_ipc_control.h"
-#endif /* REMOTE */
 #include "gridftp_dsi_hpss_range_list.h"
 #include "gridftp_dsi_hpss_gridftp.h"
 #include "gridftp_dsi_hpss_session.h"
@@ -82,6 +80,7 @@ struct transfer_control {
 	globus_result_t              Result;
 	transfer_control_state_t     State;
 	globus_mutex_t               Lock;
+	msg_register_id_t            MsgRegisterID;
 };
 
 static void
@@ -119,13 +118,15 @@ transfer_control_event_range_complete(void            * CallbackArg,
 		complete_msg.Result = transfer_control->Result;
 
 		/* Send the message. */
-		msg_send(transfer_control->MsgHandle,
-		         0,
-		         MSG_ID_MAIN,
-		         MSG_ID_TRANSFER_CONTROL,
-		         TRANSFER_CONTROL_MSG_TYPE_COMPLETE,
-		         sizeof(transfer_control_complete_msg_t),
-		         &complete_msg);
+		result = msg_send(transfer_control->MsgHandle,
+		                  MSG_COMP_ID_ANY,
+		                  MSG_COMP_ID_TRANSFER_CONTROL,
+		                  TRANSFER_CONTROL_MSG_TYPE_COMPLETE,
+		                  sizeof(transfer_control_complete_msg_t),
+		                  &complete_msg);
+
+		/* XXX */
+		globus_assert(result == GLOBUS_SUCCESS);
 	}
 unlock:
 	globus_mutex_unlock(&transfer_control->Lock);
@@ -141,6 +142,7 @@ transfer_control_event_data_ready(transfer_control_t * TransferControl)
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
+
 	/*
 	 * If there is nothing to transfer...
 	 */
@@ -150,13 +152,15 @@ transfer_control_event_data_ready(transfer_control_t * TransferControl)
 		TransferControl->State = TRANSFER_CONTROL_WAIT_FOR_DATA_COMPLETE;
 
 		/* Tell the data side to shutdown. */
-		msg_send(TransferControl->MsgHandle,
-		         0,
-		         MSG_ID_TRANSFER_DATA,
-		         MSG_ID_TRANSFER_CONTROL,
-		         TRANSFER_CONTROL_MSG_TYPE_SHUTDOWN,
-		         0,
-		         NULL);
+		result = msg_send(TransferControl->MsgHandle,
+		                  MSG_COMP_ID_TRANSFER_DATA,
+		                  MSG_COMP_ID_TRANSFER_CONTROL,
+		                  TRANSFER_CONTROL_MSG_TYPE_SHUTDOWN,
+		                  0,
+		                  NULL);
+
+		/* XXX */
+		globus_assert(result == GLOBUS_SUCCESS);
 
 		goto cleanup;
 	}
@@ -171,7 +175,6 @@ transfer_control_event_data_ready(transfer_control_t * TransferControl)
 	                            TransferControl->TransferRangeList,
 	                            transfer_control_event_range_complete,
 	                            TransferControl);
-
 cleanup:
 	GlobusGFSHpssDebugExit();
 }
@@ -180,6 +183,7 @@ static void
 transfer_control_event_data_complete(transfer_control_t * TransferControl,
                                      globus_result_t      Result)
 {
+	globus_result_t                 result = GLOBUS_SUCCESS;
 	transfer_control_complete_msg_t complete_msg;
 
 	GlobusGFSName(__func__);
@@ -207,13 +211,15 @@ transfer_control_event_data_complete(transfer_control_t * TransferControl,
 		complete_msg.Result = TransferControl->Result;
 
 		/* Send the message. */
-		msg_send(TransferControl->MsgHandle,
-		         0,
-		         MSG_ID_MAIN,
-		         MSG_ID_TRANSFER_CONTROL,
-		         TRANSFER_CONTROL_MSG_TYPE_COMPLETE,
-		         sizeof(transfer_control_complete_msg_t),
-		         &complete_msg);
+		result = msg_send(TransferControl->MsgHandle,
+		                  MSG_COMP_ID_ANY,
+		                  MSG_COMP_ID_TRANSFER_CONTROL,
+		                  TRANSFER_CONTROL_MSG_TYPE_COMPLETE,
+		                  sizeof(transfer_control_complete_msg_t),
+		                  &complete_msg);
+
+		/* XXX */
+		globus_assert(result == GLOBUS_SUCCESS);
 	}
 unlock:
 	globus_mutex_unlock(&TransferControl->Lock);
@@ -242,7 +248,6 @@ transfer_control_data_complete(transfer_control_t * TransferControl,
  */
 static void
 transfer_control_transfer_data_msg(transfer_control_t * TransferControl,
-                                   int                  NodeIndex,
                                    int                  MsgType,
                                    int                  MsgLen,
                                    void               * Msg)
@@ -262,7 +267,6 @@ transfer_control_transfer_data_msg(transfer_control_t * TransferControl,
 	GlobusGFSHpssDebugExit();
 }
 
-#ifdef REMOTE
 /*
  * On data process segfault, this is called with Result set.
  *
@@ -282,21 +286,20 @@ $1 = {type = GLOBUS_GFS_OP_RECV, id = 1, code = 500, msg = 0x0, result = 32, inf
  */
 static void
 transfer_control_ipc_msg(transfer_control_t * TransferControl,
-                         int                  NodeIndex,
+/*                         int                  NodeIndex, */
                          int                  MsgType,
                          int                  MsgLen,
                          void               * Msg)
 {
-/*
 	ipc_control_transfer_event_t    * transfer_event    = NULL;
 	ipc_control_transfer_complete_t * transfer_complete = NULL;
-*/
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 #ifdef NOT
 	globus_assert(NodeIndex >= 0 && NodeIndex < TransferControl->DataNodeCount);
+#endif /* NOT */
 
 	switch (MsgType)
 	{
@@ -308,16 +311,18 @@ transfer_control_ipc_msg(transfer_control_t * TransferControl,
 	case IPC_CONTROL_MSG_TYPE_TRANSFER_COMPLETE:
 		transfer_complete = (ipc_control_transfer_complete_t *) Msg;
 
+		transfer_control_data_complete(TransferControl, transfer_complete->Result);
+#ifdef NOT
 		globus_mutex_lock(&TransferControl->Lock);
 		{
 			/* Increase the thread count so cleanup doesn't happen before we exit. */
 			TransferControl->ThreadCount++;
 
 			/* Indicate that this node has completed. */
-			TransferControl->DataNodes[NodeIndex].Complete = GLOBUS_TRUE;
-			TransferControl->DataNodes[NodeIndex].Result = transfer_complete->Result;
-			if (TransferControl->DataNodes[NodeIndex].Result == GLOBUS_SUCCESS)
-				TransferControl->DataNodes[NodeIndex].Result = transfer_complete->Reply->result;
+			TransferControl->DataNodes[0].Complete = GLOBUS_TRUE;
+			TransferControl->DataNodes[0].Result = transfer_complete->Result;
+			if (TransferControl->DataNodes[0].Result == GLOBUS_SUCCESS)
+				TransferControl->DataNodes[0].Result = transfer_complete->Reply->result;
 
 			/* Increment the completion count. */
 			TransferControl->NodesDone++;
@@ -326,49 +331,44 @@ transfer_control_ipc_msg(transfer_control_t * TransferControl,
 
 		/* Update our state. */
 		transfer_control_update_state(TransferControl);
+#endif /* NOT */
 
 		break;
 	default:
 		globus_assert(0);
 	}
-#endif /* NOT */
 	GlobusGFSHpssDebugExit();
 }
-#endif /* REMOTE */
 
 /*
  * All incoming messages.
  */
-static globus_result_t
-transfer_control_msg_recv(void     * CallbackArg,
-                          int        NodeIndex,
-                          msg_id_t   DestinationID,
-                          msg_id_t   SourceID,
-                          int        MsgType,
-                          int        MsgLen,
-                          void     * Msg)
+static void
+transfer_control_msg_recv(void          * CallbackArg,
+                          msg_comp_id_t   DstMsgCompID,
+                          msg_comp_id_t   SrcMsgCompID,
+                          int             MsgType,
+                          int             MsgLen,
+                          void          * Msg)
 {
 	transfer_control_t * transfer_control = (transfer_control_t *) CallbackArg;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	switch (SourceID)
+	switch (SrcMsgCompID)
 	{
-	case MSG_ID_TRANSFER_DATA:
-		transfer_control_transfer_data_msg(transfer_control, NodeIndex, MsgType, MsgLen, Msg);
+	case MSG_COMP_ID_TRANSFER_DATA:
+		transfer_control_transfer_data_msg(transfer_control, MsgType, MsgLen, Msg);
 		break;
-#ifdef REMOTE
-	case MSG_ID_IPC_CONTROL:
-		transfer_control_ipc_msg(transfer_control, NodeIndex, MsgType, MsgLen, Msg);
+	case MSG_COMP_ID_IPC_CONTROL:
+		transfer_control_ipc_msg(transfer_control, /*NodeIndex,*/ MsgType, MsgLen, Msg);
 		break;
-#endif /* REMOTE */
 	default:
 		globus_assert(0);
 	}
 
 	GlobusGFSHpssDebugExit();
-	return GLOBUS_SUCCESS;
 }
 
 static globus_result_t
@@ -394,6 +394,7 @@ transfer_control_common_init(transfer_control_msg_type_t    OpType,
 	(*TransferControl)->OpType        = OpType;
 	(*TransferControl)->MsgHandle     = MsgHandle;
 	(*TransferControl)->State         = TRANSFER_CONTROL_WAIT_FOR_DATA_READY;
+	(*TransferControl)->MsgRegisterID = MSG_REGISTER_ID_NONE;
 
 	/* Intialize the range list. Fill it later. */
 	result = range_list_init(&(*TransferControl)->TransferRangeList);
@@ -401,10 +402,12 @@ transfer_control_common_init(transfer_control_msg_type_t    OpType,
 		goto cleanup;
 
 	/* Register to receive messages. */
-	msg_register_recv(MsgHandle,
-	                  MSG_ID_TRANSFER_CONTROL,
-	                  transfer_control_msg_recv,
-	                  *TransferControl);
+	result = msg_register(MsgHandle,
+	                      MSG_COMP_ID_IPC_CONTROL,
+	                      MSG_COMP_ID_TRANSFER_CONTROL,
+	                      transfer_control_msg_recv,
+	                      *TransferControl,
+	                      &(*TransferControl)->MsgRegisterID);
 
 cleanup:
     if (result != GLOBUS_SUCCESS)
@@ -541,7 +544,7 @@ transfer_control_destroy(transfer_control_t * TransferControl)
 	if (TransferControl != NULL)
 	{
 		/* Unregister to receive messages. */
-		msg_unregister_recv(TransferControl->MsgHandle, MSG_ID_TRANSFER_CONTROL);
+		msg_unregister(TransferControl->MsgHandle, TransferControl->MsgRegisterID);
 
 		/* Destroy the PIO control handle. */
 		pio_control_destroy(TransferControl->PioControl);

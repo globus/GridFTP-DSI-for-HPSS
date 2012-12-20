@@ -87,7 +87,6 @@ GlobusDebugDefine(GLOBUS_GRIDFTP_SERVER_HPSS);
 
 typedef struct monitor {
 	globus_gfs_operation_t   Operation;
-	msg_handle_t           * MsgHandle;
 	globus_mutex_t           Lock;
 	globus_cond_t            Cond;
 	globus_result_t          Result;
@@ -125,14 +124,13 @@ local_monitor_destroy(monitor_t * Monitor)
 	GlobusGFSHpssDebugExit();
 }
 
-static globus_result_t
-local_msg_recv(void     * CallbackArg,
-               int        NodeIndex,
-               msg_id_t   DestinationID,
-               msg_id_t   SourceID,
-               int        MsgType,
-               int        MsgLen,
-               void     * Msg)
+static void
+local_msg_recv(void          * CallbackArg,
+               msg_comp_id_t   DstMsgCompID,
+               msg_comp_id_t   SrcMsgCompID,
+               int             MsgType,
+               int             MsgLen,
+               void          * Msg)
 {
 	monitor_t                       * monitor       = NULL;
 	transfer_control_complete_msg_t * complete_msg  = NULL;
@@ -144,9 +142,9 @@ local_msg_recv(void     * CallbackArg,
 	/* Cast to our monitor. */
 	monitor = (monitor_t *)CallbackArg;
 
-	switch (SourceID)
+	switch (SrcMsgCompID)
 	{
-	case MSG_ID_TRANSFER_CONTROL:
+	case MSG_COMP_ID_TRANSFER_CONTROL:
 		switch(MsgType)
 		{
 		case TRANSFER_CONTROL_MSG_TYPE_COMPLETE:
@@ -165,11 +163,11 @@ local_msg_recv(void     * CallbackArg,
 			globus_mutex_unlock(&monitor->Lock);
 			break;
 		default:
-			globus_assert(0);
+			break;
 		}
 		break;
 
-	case MSG_ID_PIO_DATA:
+	case MSG_COMP_ID_TRANSFER_DATA_PIO:
 		switch (MsgType)
 		{
 		case PIO_DATA_MSG_TYPE_BYTES_WRITTEN:
@@ -182,7 +180,7 @@ local_msg_recv(void     * CallbackArg,
 			                                           bytes_written->Length);
 			break;
 		default:
-			globus_assert(0);
+			break;
 		}
 		break;
 
@@ -191,7 +189,6 @@ local_msg_recv(void     * CallbackArg,
 	}
 
 	GlobusGFSHpssDebugExit();
-	return GLOBUS_SUCCESS;
 }
 
 /*
@@ -208,6 +205,7 @@ local_retr(globus_gfs_operation_t       Operation,
 	transfer_data_t    * transfer_data     = NULL;
 	transfer_control_t * transfer_control  = NULL;
 	msg_handle_t       * msg_handle        = NULL;
+	msg_register_id_t    msg_register_id   = MSG_REGISTER_ID_NONE;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -228,10 +226,14 @@ local_retr(globus_gfs_operation_t       Operation,
 	                                         SESSION_CACHE_OBJECT_ID_MSG_HANDLE);
 
 	/* Register to receive messages. */
-	msg_register_recv(msg_handle, MSG_ID_MAIN, local_msg_recv, &monitor);
-
-	/* Stuff the message handle in the monitor. */
-	monitor.MsgHandle = msg_handle;
+	result = msg_register(msg_handle,
+	                      MSG_COMP_ID_TRANSFER_DATA_PIO|MSG_COMP_ID_TRANSFER_CONTROL,
+	                      MSG_COMP_ID_NONE,
+	                      local_msg_recv,
+	                      &monitor,
+	                      &msg_register_id);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
 
 	/* Initialize the control side. */
 	result = transfer_control_retr_init(msg_handle,
@@ -268,7 +270,7 @@ local_retr(globus_gfs_operation_t       Operation,
 
 cleanup:
 	/* Unregister to receive messages. */
-	msg_unregister_recv(msg_handle, MSG_ID_MAIN);
+	msg_unregister(msg_handle, msg_register_id);
 
 	/* Destroy the data side. */
 	transfer_data_destroy(transfer_data);
@@ -301,6 +303,7 @@ local_stor(globus_gfs_operation_t       Operation,
 	transfer_data_t    * transfer_data     = NULL;
 	transfer_control_t * transfer_control  = NULL;
 	msg_handle_t       * msg_handle        = NULL;
+	msg_register_id_t    msg_register_id   = MSG_REGISTER_ID_NONE;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -321,10 +324,14 @@ local_stor(globus_gfs_operation_t       Operation,
 	                                         SESSION_CACHE_OBJECT_ID_MSG_HANDLE);
 
 	/* Register to receive messages. */
-	msg_register_recv(msg_handle, MSG_ID_MAIN, local_msg_recv, &monitor);
-
-	/* Stuff the message handle in the monitor. */
-	monitor.MsgHandle = msg_handle;
+	result = msg_register(msg_handle,
+	                      MSG_COMP_ID_TRANSFER_DATA_PIO|MSG_COMP_ID_TRANSFER_CONTROL,
+	                      MSG_COMP_ID_NONE,
+	                      local_msg_recv,
+	                      &monitor,
+	                      &msg_register_id);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
 
 	/* Initialize the control side. */
 	result = transfer_control_stor_init(msg_handle,
@@ -362,7 +369,7 @@ local_stor(globus_gfs_operation_t       Operation,
 
 cleanup:
 	/* Unregister to receive messages. */
-	msg_unregister_recv(msg_handle, MSG_ID_MAIN);
+	msg_unregister(msg_handle, msg_register_id);
 
 	/* Destroy the data side. */
 	transfer_data_destroy(transfer_data);

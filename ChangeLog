@@ -1,8 +1,9 @@
-Version 1.1: (Develop)
+Version 1.1 : (Develop)
 	- Fixed Range Markers with partial stores (ESTO)
 	- Fixed transfer restarts
 	- Fixed range_list_insert() to correctly insert on the tail
 	- Fixed setting of COS on truncated files
+	- Added asyncronous message passing
 
 Version 1.0 : Dec 19, 2012
 	- Added fixes sent by Damian Hazen of LBL:
