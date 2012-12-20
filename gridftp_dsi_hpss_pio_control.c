@@ -157,6 +157,22 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 		goto cleanup;
 	}
 
+	/* Handle the case of the file that already existed. */
+	if (Truncate == GLOBUS_TRUE)
+	{
+		retval = hpss_SetCOSByHints(PioControl->FileFD,
+		                            0,
+		                            &hints_in,
+		                            &priorities,
+		                            NULL);
+
+		if (PioControl->FileFD < 0)
+		{
+			result = GlobusGFSErrorSystemError("hpss_SetCOSByHints", -(retval));
+			goto cleanup;
+		}
+	}
+
 	/* Copy out the file stripe width. */
 	PioControl->FileStripeWidth = hints_out.StripeWidth;
 
