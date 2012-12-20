@@ -50,7 +50,9 @@
 #include "gridftp_dsi_hpss_transfer_control.h"
 #include "gridftp_dsi_hpss_transfer_data.h"
 #include "gridftp_dsi_hpss_pio_control.h"
+#ifdef REMOTE
 #include "gridftp_dsi_hpss_ipc_control.h"
+#endif /* REMOTE */
 #include "gridftp_dsi_hpss_range_list.h"
 #include "gridftp_dsi_hpss_gridftp.h"
 #include "gridftp_dsi_hpss_session.h"
@@ -267,6 +269,7 @@ transfer_control_transfer_data_msg(transfer_control_t * TransferControl,
 	GlobusGFSHpssDebugExit();
 }
 
+#ifdef REMOTE
 /*
  * On data process segfault, this is called with Result set.
  *
@@ -339,6 +342,7 @@ transfer_control_ipc_msg(transfer_control_t * TransferControl,
 	}
 	GlobusGFSHpssDebugExit();
 }
+#endif /* REMOTE */
 
 /*
  * All incoming messages.
