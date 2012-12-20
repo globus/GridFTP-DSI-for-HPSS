@@ -365,9 +365,11 @@ transfer_control_msg_recv(void          * CallbackArg,
 	case MSG_COMP_ID_TRANSFER_DATA:
 		transfer_control_transfer_data_msg(transfer_control, MsgType, MsgLen, Msg);
 		break;
+#ifdef REMOTE
 	case MSG_COMP_ID_IPC_CONTROL:
 		transfer_control_ipc_msg(transfer_control, /*NodeIndex,*/ MsgType, MsgLen, Msg);
 		break;
+#endif /* REMOTE */
 	default:
 		globus_assert(0);
 	}
