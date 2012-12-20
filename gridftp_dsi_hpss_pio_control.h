@@ -55,6 +55,7 @@
 /*
  * Local includes.
  */
+#include "gridftp_dsi_hpss_range_list.h"
 #include "gridftp_dsi_hpss_session.h"
 #include "gridftp_dsi_hpss_msg.h"
 
@@ -105,12 +106,11 @@ void
 pio_control_destroy(pio_control_t * PioControl);
 
 void
-pio_control_transfer_range(pio_control_t                       * PioControl,
-                           unsigned32                            ClntStripeWidth,
-                           globus_off_t                          StripeBlockSize,
-                           globus_off_t                          Offset,
-                           globus_off_t                          Length,
-                           pio_control_transfer_range_callback_t Callback,
-                           void                                * CallbackArg);
+pio_control_transfer_ranges(pio_control_t                         * PioControl,
+                            unsigned32                              ClntStripeWidth,
+                            globus_off_t                            StripeBlockSize,
+                            range_list_t                          * RangeList,
+                            pio_control_transfer_range_callback_t   Callback,
+                            void                                  * CallbackArg);
 
 #endif /* GRIDFTP_DSI_HPSS_PIO_CONTROL_H */

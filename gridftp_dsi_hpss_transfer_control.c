@@ -88,8 +88,7 @@ static void
 transfer_control_event_range_complete(void            * CallbackArg,
                                       globus_result_t   Result)
 {
-	globus_off_t         offset           = 0;
-	globus_off_t         length           = 0;
+	globus_result_t      result           = GLOBUS_SUCCESS;
 	transfer_control_t * transfer_control = NULL;
 	transfer_control_complete_msg_t complete_msg;
 
@@ -104,33 +103,6 @@ transfer_control_event_range_complete(void            * CallbackArg,
 		/* Save the error. */
 		if (transfer_control->Result == GLOBUS_SUCCESS)
 			transfer_control->Result = Result;
-
-		/* If an error has not occurred... */
-		if (transfer_control->Result == GLOBUS_SUCCESS)
-		{
-			/* Look for another range to transfer. */
-			while (!range_list_empty(transfer_control->TransferRangeList))
-			{
-				/* Pop the next range. */
-				range_list_pop(transfer_control->TransferRangeList, &offset, &length);
-
-				if (length != 0)
-					break;
-			}
-
-			/* If we have a valid range... */
-			if (length != 0)
-			{
-				/* Tell PIO to perform the transfer. */
-				pio_control_transfer_range(transfer_control->PioControl,
-				                           1,
-				                           transfer_control->StripeBlockSize,
-				                           offset,
-				                           length,
-				                           transfer_control_event_range_complete,
-				                           transfer_control);
-			}
-		}
 
 		/* If the data side has not reported in. */
 		if (transfer_control->State == TRANSFER_CONTROL_TRANSFER_RUNNING)
@@ -164,23 +136,15 @@ unlock:
 static void
 transfer_control_event_data_ready(transfer_control_t * TransferControl)
 {
-	globus_off_t offset = 0;
-	globus_off_t length = 0;
+	globus_result_t result = GLOBUS_SUCCESS;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	while (!range_list_empty(TransferControl->TransferRangeList))
-	{
-		/* Pop the next range. */
-		range_list_pop(TransferControl->TransferRangeList, &offset, &length);
-
-		if (length != 0)
-			break;
-	}
-
-	/* If there are no ranges to transfer... */
-	if (length == 0)
+	/*
+	 * If there is nothing to transfer...
+	 */
+	if (range_list_empty(TransferControl->TransferRangeList))
 	{
 		/* Update our state. */
 		TransferControl->State = TRANSFER_CONTROL_WAIT_FOR_DATA_COMPLETE;
@@ -201,13 +165,13 @@ transfer_control_event_data_ready(transfer_control_t * TransferControl)
 	TransferControl->State = TRANSFER_CONTROL_TRANSFER_RUNNING;
 
 	/* Tell PIO to perform the transfer. */
-	pio_control_transfer_range(TransferControl->PioControl,
-	                           1,
-	                           TransferControl->StripeBlockSize,
-	                           offset,
-	                           length,
-	                           transfer_control_event_range_complete,
-	                           TransferControl);
+	pio_control_transfer_ranges(TransferControl->PioControl,
+	                            1,
+	                            TransferControl->StripeBlockSize,
+	                            TransferControl->TransferRangeList,
+	                            transfer_control_event_range_complete,
+	                            TransferControl);
+
 cleanup:
 	GlobusGFSHpssDebugExit();
 }
@@ -590,6 +554,9 @@ globus_mutex_lock(&TransferControl->Lock);
 globus_mutex_unlock(&TransferControl->Lock);
 		/* Dellocate the lock. */
 		globus_mutex_destroy(&TransferControl->Lock);
+
+		/* Destroy the transfer range list. */
+		range_list_destroy(TransferControl->TransferRangeList);
 
 		/* Deallocate our handle. */
 		globus_free(TransferControl);
