@@ -8,7 +8,7 @@ Building HPSS is beyond the scope of this guide but you should have a working HP
 BUILD GRIDFTP
 =============
 
-You'll need to download and build Globus Toolkit 5.2.3rc1 or later. Follow the instructions in the Globus Toolkit INSTALL file to build gridftp. The following example assumes you are building against 32bit HPSS. If you are building against 64bit HPSS, replace 'gcc32dbg' with 'gcc64dbg'.
+You'll need to download and build Globus Toolkit 5.2.3 or later. Follow the instructions in the Globus Toolkit INSTALL file to build gridftp. The following example assumes you are building against 32bit HPSS. If you are building against 64bit HPSS, replace 'gcc32dbg' with 'gcc64dbg'.
 
 globus$ ./configure --prefix=/usr/local/globus-5.2.x --with-flavor=gcc32dbg
 globus$ make gridftp
@@ -18,11 +18,11 @@ BUILD AND INSTALL THE DSI
 =========================
 
 Build the HPSS DSI with the following options. If your HPSS installation uses Kerberos, replace '--with-unixauth'
-with '--with_krb5auth' below. If you are building against 64bit HPSS, change 'gcc32dbg' to 'gcc64dbg' and add '--libdir=/usr/local/globus-5.2.x/lib64' to the configure options.
+with '--with_krb5auth' below. If you are building against 64bit HPSS, change 'gcc32dbg' to 'gcc64dbg'. Set the value of '--libdir' to the directory where you want to place the DSI. For your sanity, I recommend putting it in a new directory with the version information stored in the name. Ex. /usr/local/gridftp_hpss_dsi-1.0. You can then set the environment variable LD_LIBRARY_PATH to this location so that the GridFTP server can find the DSI.
 
-./configure --with-globus=/usr/local/globus-5.2.x --with-globus-flavor=gcc32dbg --with-hpssdir=/opt/hpss --with-unixauth
+./configure --with-globus=/usr/local/globus-5.2.x --with-globus-flavor=gcc32dbg --with-hpssdir=/opt/hpss --with-unixauth -libdir=/usr/local/gridftp_hpss_dsi-<version>.
 
-Install the DSI into the Globus Toolkit installation directory:
+Install the DSI into libdir:
 
 make install
 
@@ -106,6 +106,7 @@ service gsiftp
 	#  4 - Disable changing process uid to authenticated user
 	server_args = -inetd -threads 2 -auth-level 7 -dsi hpss -disable-command-list SCKS,APPE
 	env         = GRIDMAP=/etc/grid-security/grid-mapfile
+	env         = LD_LIBRARY_PATH=/usr/local/gridftp_hpss_dsi-<version>
 	socket_type = stream
 	per_source  = 100
 }
