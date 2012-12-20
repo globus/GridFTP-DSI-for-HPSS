@@ -228,12 +228,14 @@ range_list_insert(range_list_t * RangeList,
 					current_range->Prev->Next = new_range;
 				else
 					RangeList->Head = new_range;
+
+				current_range->Prev = new_range;
 			} else
 			{
 				/* Put it on the tail. */
 				if (RangeList->Tail != NULL)
 				{
-					RangeList->Tail->Prev = new_range;
+					RangeList->Tail->Next = new_range;
 					new_range->Prev = RangeList->Tail;
 					RangeList->Tail = new_range;
 				} else
@@ -428,6 +430,10 @@ range_list_pop(range_list_t * RangeList,
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
+	/* Initialize the return. */
+	*Offset = 0;
+	*Length = 0;
+
 	globus_mutex_lock(&RangeList->Lock);
 	{
 		/* Make sure we have something to return. */
@@ -438,6 +444,9 @@ range_list_pop(range_list_t * RangeList,
 
 		/* Move the head forward. */
 		RangeList->Head = range->Next;
+
+		if (RangeList->Head != NULL)
+			RangeList->Head->Prev = NULL;
 
 		/* Update the tail if needed. */
 		if (RangeList->Head == NULL)
@@ -455,98 +464,117 @@ range_list_pop(range_list_t * RangeList,
 	GlobusGFSHpssDebugExit();
 }
 
-static globus_result_t
-range_list_fill_range(range_list_t        * RangeList,
-                      globus_off_t          OffsetAdjustment,
-                      globus_off_t          Length,
-                      globus_range_list_t   RestartRangeList)
+/******************************************************************************
+ *
+ * NOTE ABOUT RESTART MARKERS, TRANSFER OFFSETS, FILE OFFSETS, PARTIAL OFFSETS
+ *
+ * The inital offset of any NEW transfer is 0 regardless of partial offsets
+ * or restart markers.
+ *
+ * Range markers are in terms of transfer offsets
+ *  PUT file
+ *  111 Range Marker 0-1046478848
+ *  111 Range Marker 1046478848-2217738240
+ *  111 Range Marker 2217738240-3312451584
+ *
+ *  PPUT 1048576 16106127360 file
+ *  111 Range Marker 0-1280311296
+ *  111 Range Marker 1280311296-250085376
+ *
+ * Restart markers are in terms of transfer offsets, not file offsets. So:
+ *  PUT file
+ *  111 Range Marker 0-1046478848
+ *  111 Range Marker 1046478848-2217738240
+ *  111 Range Marker 2217738240-3312451584
+ *
+ *  REST 0-3312451584
+ *  PUT file
+ *  111 Range Marker 3312451584-4543479808
+ *  111 Range Marker 4543479808-5715787776
+ *  111 Range Marker 5715787776-6896484352
+ *
+ *  PPUT 1048576 16106127360 file
+ *  111 Range Marker 0-1280311296
+ *  111 Range Marker 1280311296-250085376
+ *
+ *  REST 0-250085376
+ *  PPUT 1048576 16106127360 file
+ *  111 Range Marker 250085376-345832957 (+1048576 to get file offset)
+ *
+ *  Partial offsets are not reflected in transfer offsets. So:
+ *    File Offset = TransferOffset + Partial Offset
+ *
+ *  Restart markers are the portion of the transfer offsets to skip on
+ *  the next transfer.
+ *
+ *****************************************************************************/
+
+/*
+ * We need to populate RangeList with the File Offsets to transfer.
+ * TransferInfo->partial_length will be  = -1.
+ * TransferInfo->partial_offset will be >= 0
+ * TransferInfo->alloc_size = the amount of incoming data
+ * 
+ * RangeList is the inverse of the restart markers; it is the transfer
+ * offsets that should be transferred. The last entry will have a length
+ * of -1 meaning end of file.
+ */
+globus_result_t
+range_list_fill_stor_range(range_list_t               * RangeList,
+                           globus_gfs_transfer_info_t * TransferInfo)
 {
-	int               index            = 0;
-	globus_off_t      remaining_length = Length;
-	globus_off_t      tmp_offset       = 0;
-	globus_off_t      tmp_length       = 0;
-	globus_result_t   result           = GLOBUS_SUCCESS;
+	int             index                 = 0;
+	globus_off_t    range_offset          = 0;
+	globus_off_t    range_length          = 0;
+	globus_off_t    remaining_file_length = 0;
+	globus_off_t    starting_file_offset  = 0;
+	globus_result_t result                = GLOBUS_SUCCESS;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
+	/* Get the starting file offset. */
+	starting_file_offset = TransferInfo->partial_offset;
+
+	/* Get the remaining file length. */
+	remaining_file_length = TransferInfo->alloc_size;
+
 	/* For each range in the restart list. */
 	for (index = 0;
-	     index < globus_range_list_size(RestartRangeList);
+	     index < globus_range_list_size(TransferInfo->range_list);
 	     index++)
 	{
-		globus_range_list_at(RestartRangeList, index, &tmp_offset, &tmp_length);
+		globus_range_list_at(TransferInfo->range_list, index, &range_offset, &range_length);
 
-		/* Make sure we don't add more than 'Length' bytes. */
-		if (tmp_length == -1 || tmp_length > Length)
-			tmp_length = Length;
+		/* Convert from transfer offset to file offset. */
+		range_offset += TransferInfo->partial_offset;
 
-		result = range_list_insert(RangeList, tmp_offset+OffsetAdjustment, tmp_length);
-		if (result != GLOBUS_SUCCESS)
-			break;
+		/* Skip zero-length ranges. */
+		if (range_length == 0)
+			continue;
 
-		/* Adjust the remaining_length. */
-		remaining_length -= tmp_length;
+		/* -1 is code for 'remainder of transfer'. */
+		if (range_length == -1)
+			range_length = remaining_file_length;
 
-		/* If we've run out of 'Length' bytes... */
-		if (remaining_length == 0)
-			break;
-	}
+		/* Truncate the range to fit the alloc_size. */
+		if (range_length > remaining_file_length)
+			range_length = remaining_file_length;
 
-#ifdef NOT
-	/*
- 	* Populate the transfer range list.
- 	*/
-	result = range_list_insert(RangeList, Offset, Length);
-	if (result != GLOBUS_SUCCESS)
-		goto cleanup;
-
-	if (RestartRangeList != NULL)
-	{
-		/* Create the 'exclude' range list. */
-		result = range_list_init(&exclude_range_list);
+		/* Insert this range into the list. */
+		result = range_list_insert(RangeList, range_offset, range_length);
 		if (result != GLOBUS_SUCCESS)
 			goto cleanup;
 
-		/* Seed this exclude range list with the maximum length. */
-		result = range_list_insert(exclude_range_list, 0, RANGE_LIST_MAX_LENGTH);
-		if (result != GLOBUS_SUCCESS)
-			goto cleanup;
+		/* Decrement the remaining file length to transfer. */
+		remaining_file_length -= range_length;
 
-		/*
-		 * Now delete the ranges in RestartRangeList from our exclude range
-		 * list. It includes portions of the file NOT covered by restart markers.
-		 */
-		for (index = 0;
-		     index < globus_range_list_size(RestartRangeList);
-		     index++)
-		{
-			globus_range_list_at(RestartRangeList, index, &tmp_offset, &tmp_length);
-
-			/* -1 is shorthand for 'to end of file' */
-			if (tmp_length == -1)
-				tmp_length = RANGE_LIST_MAX_LENGTH;
-
-			range_list_delete(exclude_range_list, tmp_offset, tmp_length);
-		}
-
-		/*
-		 * Now for each range in the exlude list, remove it from our transfer list.
-		 */
-
-		while (!range_list_empty(exclude_range_list))
-		{
-			/* Pop the next excluded range. */
-			range_list_pop(exclude_range_list, &tmp_offset, &tmp_length);
-
-			/* Delete it from our transfer range list. */
-			range_list_delete(RangeList, tmp_offset, tmp_length);
-		}
+		/* Bail if there is nothing to transfer. */
+		if (remaining_file_length == 0)
+			break;
 	}
 
-#endif /* NOT */
 cleanup:
-
 	if (result != GLOBUS_SUCCESS)
 	{
 		GlobusGFSHpssDebugExitWithError();
@@ -557,49 +585,77 @@ cleanup:
 	return GLOBUS_SUCCESS;
 }
 
-globus_result_t
-range_list_fill_stor_range(range_list_t               * RangeList,
-                           globus_gfs_transfer_info_t * TransferInfo)
-{
-	globus_result_t result = GLOBUS_SUCCESS;
-
-	GlobusGFSName(__func__);
-	GlobusGFSHpssDebugEnter();
-
-	result = range_list_fill_range(RangeList,
-	                               TransferInfo->partial_offset,
-	                               TransferInfo->alloc_size,
-	                               TransferInfo->range_list);
-
-	GlobusGFSHpssDebugExit();
-	return result;
-}
-
+/*
+ * We need to populate RangeList with the File Offsets to transfer.
+ * TransferInfo->partial_length will be >= -1.
+ * TransferInfo->partial_offset will be >= 0
+ * 
+ * RangeList is the inverse of the restart markers; it is the transfer
+ * offsets that should be transferred. The last entry will have a length
+ * of -1 meaning end of file.
+ */
 globus_result_t
 range_list_fill_retr_range(range_list_t               * RangeList,
                            globus_gfs_transfer_info_t * TransferInfo)
 {
-	globus_off_t    length = TransferInfo->partial_length;
-	globus_result_t result = GLOBUS_SUCCESS;
+	int             index                = 0;
+	globus_off_t    range_offset         = 0;
+	globus_off_t    range_length         = 0;
+	globus_off_t    file_length          = 0;
+	globus_off_t    starting_file_offset = 0;
+	globus_off_t    ending_file_offset   = 0;
+	globus_result_t result               = GLOBUS_SUCCESS;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	/* -1 is shorthand for 'to end of file' */
-	if (length == -1)
-	{
-		result = misc_get_file_size(TransferInfo->pathname, &length);
-		if (result != GLOBUS_SUCCESS)
-			goto cleanup;
+	/* Get the length of the file. */
+	result = misc_get_file_size(TransferInfo->pathname, &file_length);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
 
-		/* Adjust the length component of the range. */
-		length -= TransferInfo->partial_offset;
+	/* starting and ending are file offsets. */
+	starting_file_offset = TransferInfo->partial_offset;
+	ending_file_offset   = starting_file_offset + TransferInfo->partial_length;
+
+	/* -1 is shorthand for 'to end of file' */
+	if (TransferInfo->partial_length == -1)
+	{
+		/* Adjust the ending offset. */
+		ending_file_offset = file_length - starting_file_offset;
 	}
 
-	result = range_list_fill_range(RangeList,
-	                               TransferInfo->partial_offset,
-	                               length,
-	                               TransferInfo->range_list);
+	/* Truncate the ending file offset to fit the file length. */
+	if (ending_file_offset > file_length)
+		ending_file_offset = file_length;
+
+	/* For each range in the restart list. */
+	for (index = 0;
+	     index < globus_range_list_size(TransferInfo->range_list);
+	     index++)
+	{
+		globus_range_list_at(TransferInfo->range_list, index, &range_offset, &range_length);
+
+		/* Convert from transfer offset to file offset. */
+		range_offset += TransferInfo->partial_offset;
+
+		/* Skip anything at the end or past the end of the file. */
+		if (range_offset >= ending_file_offset)
+			continue;
+
+		/* Adjust the length. */
+		if (range_length == -1)
+			range_length = ending_file_offset - range_offset;
+
+		/* Truncate the length to fit the file. */
+		if ((range_length + range_offset) > ending_file_offset)
+			range_length = ending_file_offset - range_offset;
+
+		/* Insert this range into the list. */
+		result = range_list_insert(RangeList, range_offset, range_length);
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+	}
 
 cleanup:
 	if (result != GLOBUS_SUCCESS)
