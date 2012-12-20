@@ -1,4 +1,5 @@
 Version 1.1: (Develop)
+	- Fixed range_list_insert() to correctly insert on the tail
 	- Fixed setting of COS on truncated files
 
 Version 1.0 : Dec 19, 2012
