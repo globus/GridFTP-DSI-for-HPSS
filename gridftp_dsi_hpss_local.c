@@ -92,11 +92,13 @@ typedef struct monitor {
 	globus_cond_t            Cond;
 	globus_result_t          Result;
 	globus_bool_t            Complete;
+	globus_off_t             PartialOffset;
 } monitor_t;
 
 static void
-local_monitor_init(globus_gfs_operation_t   Operation, 
-                   monitor_t              * Monitor)
+local_monitor_init(globus_gfs_operation_t       Operation, 
+                   globus_gfs_transfer_info_t * TransferInfo,
+                   monitor_t                  * Monitor)
 {
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -106,6 +108,7 @@ local_monitor_init(globus_gfs_operation_t   Operation,
 	globus_cond_init(&Monitor->Cond, NULL);
 	Monitor->Result        = GLOBUS_SUCCESS;
 	Monitor->Complete      = GLOBUS_FALSE;
+	Monitor->PartialOffset = TransferInfo->partial_offset;
 
 	GlobusGFSHpssDebugExit();
 }
@@ -175,7 +178,7 @@ local_msg_recv(void     * CallbackArg,
 
 			/* Inform the server of the bytes written. */
 			globus_gridftp_server_update_bytes_written(monitor->Operation,
-			                                           bytes_written->Offset,
+			                                           bytes_written->Offset - monitor->PartialOffset,
 			                                           bytes_written->Length);
 			break;
 		default:
@@ -218,7 +221,7 @@ local_retr(globus_gfs_operation_t       Operation,
 	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
 	/* Initialize the monitor */
-	local_monitor_init(Operation, &monitor);
+	local_monitor_init(Operation, TransferInfo, &monitor);
 
 	/* Get the message handle. */
 	msg_handle = session_cache_lookup_object(session,
@@ -311,7 +314,7 @@ local_stor(globus_gfs_operation_t       Operation,
 	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
 	/* Initialize the monitor */
-	local_monitor_init(Operation, &monitor);
+	local_monitor_init(Operation, TransferInfo, &monitor);
 
 	/* Get the message handle. */
 	msg_handle = session_cache_lookup_object(session,
