@@ -210,7 +210,10 @@ fi
 
 AC_SUBST(HPSS_AUTH_LIBS, $hpssauthlibs)
 
-#AC_SUBST(CFLAGS, "-D_LARGEFILE_SOURCE=1 -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DLINUX")
+AC_CHECK_HEADER(openssl/md5.h, [MD5_HEADER=yes])
+if test x"$MD5_HEADER" != x"yes"; then
+	AC_MSG_ERROR([Missing openssl/md5.h])
+fi
 
 dnl
 dnl These values are hardcoded for now, until I can get the packaging stuff working again
