@@ -340,6 +340,8 @@ pio_data_buffer(void         * CallbackArg,
 void
 pio_data_flush(pio_data_t * PioData)
 {
+	int ready_buffer_count = 0;
+
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
@@ -354,6 +356,23 @@ pio_data_flush(pio_data_t * PioData)
 		 */
 		globus_cond_signal(&PioData->Cond);
 
+		/*
+		 * Make sure that all ready buffers have been processed.
+		 */
+		while (1)
+		{
+			ready_buffer_count = buffer_get_ready_buffer_count(PioData->BufferHandle,
+			                                                   PioData->PrivateBufferID);
+
+			if (ready_buffer_count == 0)
+				break;
+
+			globus_cond_wait(&PioData->Cond, &PioData->Lock);
+		}
+
+		/*
+		 * Make sure the register thread has completed.
+		 */
 		while (PioData->PioRegisterRunning == GLOBUS_TRUE)
 		{
 			globus_cond_wait(&PioData->Cond, &PioData->Lock);
@@ -614,7 +633,7 @@ pio_data_register_write_callback(void         *  Arg,
 			globus_mutex_unlock(&pio_data->Lock);
 
 			/* Indicate error. */
-			retval = 1;
+			retval = 2;
 
 			/* Bail. */
 			goto cleanup;
@@ -648,7 +667,7 @@ pio_data_register_write_callback(void         *  Arg,
 				if (pio_data->Stop == GLOBUS_TRUE)
 				{
 					/* Set our retval so we stop. */
-					retval = 1;
+					retval = 3;
 					goto unlock;
 				}
 
@@ -772,7 +791,7 @@ pio_data_register_write_callback(void         *  Arg,
 				pio_data->Result = GlobusGFSErrorGeneric("Transfer ended prematurely");
 
 			/* Indicate an error. */
-			retval = 1;
+			retval = 4;
 			goto unlock;
 		}
 

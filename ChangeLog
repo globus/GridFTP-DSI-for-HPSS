@@ -6,6 +6,10 @@ Version 1.1 : (Develop)
 	- Added asynchronous message passing
 	- Use the system MD5 library which is considerably faster than the
 	  HPSS hash functions
+	- Fixed a race condition in pio data which caused alarms with error
+	  code -50 in HPSS and reported 
+	    "system error in hpss_PIOExecute: Input/output error" 
+	  through GridFTP.
 
 Version 1.0 : Dec 19, 2012
 	- Added fixes sent by Damian Hazen of LBL:
