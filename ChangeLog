@@ -10,6 +10,8 @@ Version 1.1 : (Develop)
 	  code -50 in HPSS and reported 
 	    "system error in hpss_PIOExecute: Input/output error" 
 	  through GridFTP.
+	- Fix to allow files larger than the COS max file size to be placed
+	  into the COS when enforce max file size is disabled.
 
 Version 1.0 : Dec 19, 2012
 	- Added fixes sent by Damian Hazen of LBL:

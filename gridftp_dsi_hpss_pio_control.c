@@ -116,6 +116,9 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 		/* Get our preferened cos id. */
 		if (CosID != -1)
 		{
+			/*
+			 * COSIdPriority must be REQUIRED_PRIORITY or it is ignored.
+			 */
 			hints_in.COSId = CosID;
 			priorities.COSIdPriority = REQUIRED_PRIORITY;
 		} 
@@ -129,7 +132,13 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 			CONVERT_LONGLONG_TO_U64(file_length, hints_in.MinFileSize);
 			CONVERT_LONGLONG_TO_U64(file_length, hints_in.MaxFileSize);
 			priorities.MinFileSizePriority = REQUIRED_PRIORITY;
-			priorities.MaxFileSizePriority = REQUIRED_PRIORITY;
+			/*
+			 * If MaxFileSizePriority is required, you can not place
+			 *  a file into a COS where it's max size is < the size
+			 *  of this file regardless of whether or not enforce max
+			 *  is enabled on the COS (it doesn't even try).
+			 */
+			priorities.MaxFileSizePriority = HIGHLY_DESIRED_PRIORITY;
 		}
 
 		/* Get our preferred family id. */
