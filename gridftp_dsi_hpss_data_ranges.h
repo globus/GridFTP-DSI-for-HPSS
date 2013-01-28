@@ -54,6 +54,36 @@
 
 typedef struct data_ranges data_ranges_t;
 
+typedef struct {
+	globus_off_t Offset;
+	globus_off_t Length;
+} data_ranges_msg_range_complete_t;
+
+typedef struct {
+	globus_off_t Offset;
+	globus_off_t Length;
+} data_ranges_msg_range_received_t;
+
+typedef enum {
+	/*
+	 * DATA_RANGES_MSG_TYPE_RANGE_COMPLETE:
+	 *   This message is sent to any listener when this module is configured 
+	 *   with DATA_RANGE_MODE_RANGE_COMPLETE.
+	 *   MsgLen: sizeof(data_ranges_msg_range_complete_t)
+	 *   Msg: data_ranges_msg_range_complete_t
+	 */
+	DATA_RANGES_MSG_TYPE_RANGE_COMPLETE,
+
+	/*
+	 * DATA_RANGES_MSG_TYPE_RANGE_RECEIVED:
+	 *   This message is sent to any listener when this module is configured 
+	 *   with DATA_RANGE_MODE_RANGE_RECEIVED.
+	 *   MsgLen: sizeof(data_ranges_msg_range_received_t)
+	 *   Msg: data_ranges_msg_range_received_t
+	 */
+	DATA_RANGES_MSG_TYPE_RANGE_RECEIVED,
+} data_ranges_msg_type_t;
+
 typedef enum {
 	DATA_RANGE_MODE_RANGE_COMPLETE     = 0x1,
 	DATA_RANGE_MODE_RANGE_RECEIVED     = 0x2,

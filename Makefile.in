@@ -373,15 +373,6 @@ Common_Sources = gridftp_dsi_hpss_transfer_control.c \
 	             gridftp_dsi_hpss_msg.h
 
 
-#	             gridftp_dsi_hpss_ipc_data.c         \
-#	             gridftp_dsi_hpss_ipc_data.h         \
-#	             gridftp_dsi_hpss_xio_server.c       \
-#	             gridftp_dsi_hpss_xio_server.h       \
-#	             gridftp_dsi_hpss_xio_client.c       \
-#	             gridftp_dsi_hpss_xio_client.h       \
-#	             gridftp_dsi_hpss_ipc_control.c      \
-#	             gridftp_dsi_hpss_ipc_control.h
-
 #DMALLOC_FLAGS=-DDMALLOC -DDMALLOC_FUNC_CHECK -I/usr/local/dmalloc/include
 #DMALLOC_LIBS=/usr/local/dmalloc/lib/libdmallocth.a
 

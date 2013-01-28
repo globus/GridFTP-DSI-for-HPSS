@@ -123,7 +123,8 @@ data_ranges_send_range_complete(data_ranges_t * DataRanges,
                                 globus_off_t    Offset,
                                 globus_off_t    Length)
 {
-	msg_range_complete_t range_complete;
+	globus_result_t result = GLOBUS_SUCCESS;
+	data_ranges_msg_range_complete_t range_complete;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -133,10 +134,15 @@ data_ranges_send_range_complete(data_ranges_t * DataRanges,
 	range_complete.Length = Length;
 
 	/* Send this message to anyone that is listening. */
-	msg_send_by_type(DataRanges->MsgHandle,
-	                 MSG_TYPE_RANGE_COMPLETE,
-	                 sizeof(range_complete),
-	                 &range_complete);
+	result = msg_send(DataRanges->MsgHandle,
+	                  MSG_COMP_ID_ANY,
+	                  MSG_COMP_ID_TRANSFER_DATA_RANGES,
+	                  DATA_RANGES_MSG_TYPE_RANGE_COMPLETE,
+	                  sizeof(range_complete),
+	                  &range_complete);
+
+	/* XXX */
+	globus_assert(result == GLOBUS_SUCCESS);
 
 	GlobusGFSHpssDebugExit();
 }
@@ -146,7 +152,8 @@ data_ranges_send_range_received(data_ranges_t * DataRanges,
                                 globus_off_t    Offset,
                                 globus_off_t    Length)
 {
-	msg_range_received_t range_received;
+	globus_result_t result = GLOBUS_SUCCESS;
+	data_ranges_msg_range_received_t range_received;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -156,10 +163,15 @@ data_ranges_send_range_received(data_ranges_t * DataRanges,
 	range_received.Length = Length;
 
 	/* Send this message to anyone that is listening. */
-	msg_send_by_type(DataRanges->MsgHandle,
-	                 MSG_TYPE_RANGE_RECEIVED,
-	                 sizeof(range_received),
-	                 &range_received);
+	result = msg_send(DataRanges->MsgHandle,
+	                  MSG_COMP_ID_ANY,
+	                  MSG_COMP_ID_TRANSFER_DATA_RANGES,
+	                  DATA_RANGES_MSG_TYPE_RANGE_RECEIVED,
+	                  sizeof(range_received),
+	                  &range_received);
+
+	/* XXX */
+	globus_assert(result == GLOBUS_SUCCESS);
 
 	GlobusGFSHpssDebugExit();
 }

@@ -53,6 +53,7 @@
  * Local includes.
  */
 #include "gridftp_dsi_hpss_pio_control.h"
+#include "gridftp_dsi_hpss_range_list.h"
 #include "gridftp_dsi_hpss_misc.h"
 #include "gridftp_dsi_hpss_msg.h"
 
@@ -65,9 +66,8 @@ struct pio_control {
 	msg_handle_t         * MsgHandle;
 
 	struct {
-		hpss_pio_grp_t StripeGroup;
-		globus_off_t   Offset;
-		globus_off_t   Length;
+		hpss_pio_grp_t   StripeGroup;
+		range_list_t   * RangeList;
 
 		pio_control_transfer_range_callback_t Callback;
 		void                                * CallbackArg;
@@ -86,6 +86,7 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
                                   int             CosID)
 {
 	int                     oflags      = 0;
+	int                     retval      = 0;
 	globus_off_t            file_length = 0;
 	globus_result_t         result      = GLOBUS_SUCCESS;
 	hpss_cos_hints_t        hints_in;
@@ -115,6 +116,9 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 		/* Get our preferened cos id. */
 		if (CosID != -1)
 		{
+			/*
+			 * COSIdPriority must be REQUIRED_PRIORITY or it is ignored.
+			 */
 			hints_in.COSId = CosID;
 			priorities.COSIdPriority = REQUIRED_PRIORITY;
 		} 
@@ -128,7 +132,13 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 			CONVERT_LONGLONG_TO_U64(file_length, hints_in.MinFileSize);
 			CONVERT_LONGLONG_TO_U64(file_length, hints_in.MaxFileSize);
 			priorities.MinFileSizePriority = REQUIRED_PRIORITY;
-			priorities.MaxFileSizePriority = REQUIRED_PRIORITY;
+			/*
+			 * If MaxFileSizePriority is required, you can not place
+			 *  a file into a COS where it's max size is < the size
+			 *  of this file regardless of whether or not enforce max
+			 *  is enabled on the COS (it doesn't even try).
+			 */
+			priorities.MaxFileSizePriority = HIGHLY_DESIRED_PRIORITY;
 		}
 
 		/* Get our preferred family id. */
@@ -155,6 +165,22 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 	{
 		result = GlobusGFSErrorSystemError("hpss_Open", -(PioControl->FileFD));
 		goto cleanup;
+	}
+
+	/* Handle the case of the file that already existed. */
+	if (Truncate == GLOBUS_TRUE)
+	{
+		retval = hpss_SetCOSByHints(PioControl->FileFD,
+		                            0,
+		                            &hints_in,
+		                            &priorities,
+		                            NULL);
+
+		if (PioControl->FileFD < 0)
+		{
+			result = GlobusGFSErrorSystemError("hpss_SetCOSByHints", -(retval));
+			goto cleanup;
+		}
 	}
 
 	/* Copy out the file stripe width. */
@@ -347,13 +373,12 @@ pio_control_destroy(pio_control_t * PioControl)
 }
 
 void
-pio_control_transfer_range(pio_control_t                       * PioControl,
-                           unsigned32                            ClntStripeWidth,
-                           globus_off_t                          StripeBlockSize,
-                           globus_off_t                          Offset,
-                           globus_off_t                          Length,
-                           pio_control_transfer_range_callback_t Callback,
-                           void                                * CallbackArg)
+pio_control_transfer_ranges(pio_control_t                         * PioControl,
+                            unsigned32                              ClntStripeWidth,
+                            globus_off_t                            StripeBlockSize,
+                            range_list_t                          * RangeList,
+                            pio_control_transfer_range_callback_t   Callback,
+                            void                                  * CallbackArg)
 {
 	int                 retval        = 0;
 	int                 node_id       = 0;
@@ -368,8 +393,7 @@ pio_control_transfer_range(pio_control_t                       * PioControl,
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	PioControl->PioExecute.Offset      = Offset;
-	PioControl->PioExecute.Length      = Length;
+	PioControl->PioExecute.RangeList   = RangeList;
 	PioControl->PioExecute.Callback    = Callback;
 	PioControl->PioExecute.CallbackArg = CallbackArg;
 
@@ -412,9 +436,8 @@ pio_control_transfer_range(pio_control_t                       * PioControl,
 
 		/* Send the stripe index message to the pio data node. */
 		result = msg_send(PioControl->MsgHandle,
-		                  node_id,
-		                  MSG_ID_PIO_DATA,
-		                  MSG_ID_PIO_CONTROL,
+		                  MSG_COMP_ID_TRANSFER_DATA_PIO,
+		                  MSG_COMP_ID_TRANSFER_CONTROL_PIO,
 		                  PIO_CONTROL_MSG_TYPE_STRIPE_INDEX,
 		                  sizeof(int_buf),
 		                  int_buf);
@@ -424,9 +447,8 @@ pio_control_transfer_range(pio_control_t                       * PioControl,
 
 		/* Send the stripe group message to the pio data node. */
 		result = msg_send(PioControl->MsgHandle,
-		                  node_id,
-		                  MSG_ID_PIO_DATA,
-		                  MSG_ID_PIO_CONTROL,
+		                  MSG_COMP_ID_TRANSFER_DATA_PIO,
+		                  MSG_COMP_ID_TRANSFER_CONTROL_PIO,
 		                  PIO_CONTROL_MSG_TYPE_STRIPE_GROUP,
 		                  buffer_length,
 		                  group_buffer);
@@ -435,7 +457,6 @@ pio_control_transfer_range(pio_control_t                       * PioControl,
 			goto cleanup;
 	}
 
-/* XXX Do I free group_buffer or do they? */
 
 	/* Launch the pio execute thread. */
 	retval = globus_thread_create(&thread_id,
@@ -476,8 +497,10 @@ pio_control_execute_thread(void * Arg)
 	pio_control_t      * pio_control = NULL;
 	hpss_pio_gapinfo_t   gap_info;
 	u_signed64           bytes_moved;
-	u_signed64           offset;
-	u_signed64           length;
+	u_signed64           u_offset;
+	u_signed64           u_length;
+	globus_off_t         range_offset = 0;
+	globus_off_t         range_length = 0;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -487,30 +510,39 @@ pio_control_execute_thread(void * Arg)
 	/* Cast the handle. */
 	pio_control = (pio_control_t *)Arg;
 
-	/* Convert to HPSS 64. */
-	CONVERT_LONGLONG_TO_U64(pio_control->PioExecute.Offset, offset);
-	CONVERT_LONGLONG_TO_U64(pio_control->PioExecute.Length, length);
+	while (range_list_empty(pio_control->PioExecute.RangeList) == GLOBUS_FALSE)
+	{
+		range_list_pop(pio_control->PioExecute.RangeList, &range_offset, &range_length);
 
-	/* Initialize bytes_moved. */
-	bytes_moved = cast64(0);
+		/* Convert to HPSS 64. */
+		CONVERT_LONGLONG_TO_U64(range_offset, u_offset);
+		CONVERT_LONGLONG_TO_U64(range_length, u_length);
 
-	do {
-		offset = add64m(offset, bytes_moved);
-		length = sub64m(length, bytes_moved);
+		/* Initialize bytes_moved. */
 		bytes_moved = cast64(0);
 
-		/* Call pio execute. */
-		retval = hpss_PIOExecute(pio_control->FileFD,
-		                         offset,
-		                         length,
-		                         pio_control->PioExecute.StripeGroup,
-		                         &gap_info,
-		                         &bytes_moved);
+		do {
+			u_offset = add64m(u_offset, bytes_moved);
+			u_length = sub64m(u_length, bytes_moved);
+			bytes_moved = cast64(0);
 
-	} while (retval == 0 && !eq64(bytes_moved, length));
+			/* Call pio execute. */
+			retval = hpss_PIOExecute(pio_control->FileFD,
+			                         u_offset,
+			                         u_length,
+			                         pio_control->PioExecute.StripeGroup,
+			                         &gap_info,
+			                         &bytes_moved);
 
-	if (retval != 0)
-		result = GlobusGFSErrorSystemError("hpss_PIOExecute", -retval);
+		} while (retval == 0 && !eq64(bytes_moved, u_length));
+
+		if (retval != 0)
+		{
+			result = GlobusGFSErrorSystemError("hpss_PIOExecute", -retval);
+			break;
+		}
+	}
+
 
 	/* Stop PIO */
 	retval = hpss_PIOEnd(pio_control->PioExecute.StripeGroup);

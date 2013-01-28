@@ -70,6 +70,7 @@ struct pio_data {
 	void                    * BufferPassArg;
 	msg_handle_t            * MsgHandle;
 	globus_off_t              BufferSize;
+	msg_register_id_t         MsgRegisterID;
 
 	globus_mutex_t            Lock;
 	globus_cond_t             Cond;
@@ -96,14 +97,13 @@ pio_data_register_write_callback(void         *  Arg,
                                  unsigned int *  BufferLength,
                                  void         ** Buffer);
 
-static globus_result_t
-pio_data_msg_recv(void     * CallbackArg,
-                  int        NodeID,
-                  msg_id_t   DestinationID,
-                  msg_id_t   SourceID,
-                  int        MsgType,
-                  int        MsgLen,
-                  void     * Msg);
+static void
+pio_data_msg_recv(void          * CallbackArg,
+                  msg_comp_id_t   DstMsgCompID,
+                  msg_comp_id_t   SrcMsgCompID,
+                  int             MsgType,
+                  int             MsgLen,
+                  void          * Msg);
 
 globus_result_t
 pio_data_init(pio_data_op_type_t         OpType,
@@ -136,12 +136,15 @@ pio_data_init(pio_data_op_type_t         OpType,
 	(*PioData)->PrivateBufferID    = buffer_create_private_list(BufferHandle);
 	(*PioData)->MsgHandle          = MsgHandle;
 	(*PioData)->BufferSize         = buffer_get_alloc_size(BufferHandle);
+	(*PioData)->MsgRegisterID      = MSG_REGISTER_ID_NONE;
 
 	/* Register to receive messages. */
-	msg_register_recv(MsgHandle, 
-	                  MSG_ID_PIO_DATA,
-	                  pio_data_msg_recv,
-	                  *PioData);
+	result = msg_register(MsgHandle,
+	                      MSG_COMP_ID_NONE,
+	                      MSG_COMP_ID_TRANSFER_DATA_PIO,
+	                      pio_data_msg_recv,
+	                      *PioData,
+	                      &(*PioData)->MsgRegisterID);
 
 	globus_mutex_init(&(*PioData)->Lock, NULL);
 	globus_cond_init(&(*PioData)->Cond, NULL);
@@ -181,7 +184,7 @@ pio_data_destroy(pio_data_t * PioData)
 	if (PioData != NULL)
 	{
 		/* Unregister to receive messages. */
-		msg_unregister_recv(PioData->MsgHandle, MSG_ID_PIO_DATA);
+		msg_unregister(PioData->MsgHandle, PioData->MsgRegisterID);
 
 		globus_mutex_destroy(&PioData->Lock);
 		globus_cond_destroy(&PioData->Cond);
@@ -256,23 +259,22 @@ pio_data_stripe_index_msg(pio_data_t * PioData,
 /*
  * Message handle callback function. 
  */
-static globus_result_t
-pio_data_msg_recv(void     * CallbackArg,
-                  int        NodeID,
-                  msg_id_t   DestinationID,
-                  msg_id_t   SourceID,
-                  int        MsgType,
-                  int        MsgLen,
-                  void     * Msg)
+static void
+pio_data_msg_recv(void          * CallbackArg,
+                  msg_comp_id_t   DstMsgCompID,
+                  msg_comp_id_t   SrcMsgCompID,
+                  int             MsgType,
+                  int             MsgLen,
+                  void          * Msg)
 {
 	pio_data_t * pio_data = (pio_data_t *) CallbackArg;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	switch (SourceID)
+	switch (SrcMsgCompID)
 	{
-	case MSG_ID_PIO_CONTROL:
+	case MSG_COMP_ID_TRANSFER_CONTROL_PIO:
 		switch (MsgType)
 		{
 		case PIO_CONTROL_MSG_TYPE_STRIPE_GROUP:
@@ -293,7 +295,6 @@ pio_data_msg_recv(void     * CallbackArg,
 	}
 
 	GlobusGFSHpssDebugExit();
-	return GLOBUS_SUCCESS;
 }
 
 void
@@ -339,6 +340,8 @@ pio_data_buffer(void         * CallbackArg,
 void
 pio_data_flush(pio_data_t * PioData)
 {
+	int ready_buffer_count = 0;
+
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
@@ -353,6 +356,23 @@ pio_data_flush(pio_data_t * PioData)
 		 */
 		globus_cond_signal(&PioData->Cond);
 
+		/*
+		 * Make sure that all ready buffers have been processed.
+		 */
+		while (1)
+		{
+			ready_buffer_count = buffer_get_ready_buffer_count(PioData->BufferHandle,
+			                                                   PioData->PrivateBufferID);
+
+			if (ready_buffer_count == 0)
+				break;
+
+			globus_cond_wait(&PioData->Cond, &PioData->Lock);
+		}
+
+		/*
+		 * Make sure the register thread has completed.
+		 */
 		while (PioData->PioRegisterRunning == GLOBUS_TRUE)
 		{
 			globus_cond_wait(&PioData->Cond, &PioData->Lock);
@@ -571,13 +591,28 @@ pio_data_register_write_callback(void         *  Arg,
 		bytes_written.Offset = flagged_offset;
 		bytes_written.Length = flagged_length;
 
-		msg_send(pio_data->MsgHandle,
-		         0,
-		         MSG_ID_MAIN,
-		         MSG_ID_PIO_DATA,
-		         PIO_DATA_MSG_TYPE_BYTES_WRITTEN,
-		         sizeof(bytes_written),
-		         &bytes_written);
+		result = msg_send(pio_data->MsgHandle,
+		                  MSG_COMP_ID_ANY,
+		                  MSG_COMP_ID_TRANSFER_DATA_PIO,
+		                  PIO_DATA_MSG_TYPE_BYTES_WRITTEN,
+		                  sizeof(bytes_written),
+		                  &bytes_written);
+
+		if (result != GLOBUS_SUCCESS)
+		{
+			globus_mutex_lock(&pio_data->Lock);
+			{
+				/* Save our error. */
+				pio_data->Result = result;
+			}
+			globus_mutex_unlock(&pio_data->Lock);
+
+			/* Indicate error. */
+			retval = 1;
+
+			/* Bail. */
+			goto cleanup;
+		}
 	}
 
 	/* If we do not have one... */
@@ -598,7 +633,7 @@ pio_data_register_write_callback(void         *  Arg,
 			globus_mutex_unlock(&pio_data->Lock);
 
 			/* Indicate error. */
-			retval = 1;
+			retval = 2;
 
 			/* Bail. */
 			goto cleanup;
@@ -632,7 +667,7 @@ pio_data_register_write_callback(void         *  Arg,
 				if (pio_data->Stop == GLOBUS_TRUE)
 				{
 					/* Set our retval so we stop. */
-					retval = 1;
+					retval = 3;
 					goto unlock;
 				}
 
@@ -666,7 +701,7 @@ pio_data_register_write_callback(void         *  Arg,
 			                                &stored_ready_offset,
 			                                &stored_ready_length);
 
-			/* If there was not stored offset... */
+			/* If there was no stored offset... */
 			if (stored_ready_offset == (globus_off_t)-1)
 			{
 				stored_ready_offset = ready_offset;
@@ -720,9 +755,6 @@ pio_data_register_write_callback(void         *  Arg,
 				        ready_buffer + (ready_offset - stored_ready_offset),
 				        pio_data->BufferSize - flagged_length);
 
-				/* Update the flagged buffer's length. */
-				flagged_length += pio_data->BufferSize - flagged_length;
-
 				/* Store the original offset/length of this buffer. */
 				buffer_store_offset_length(pio_data->BufferHandle,
 				                           pio_data->PrivateBufferID,
@@ -739,6 +771,9 @@ pio_data_register_write_callback(void         *  Arg,
 
 				/* Release our reference on ready buffer. */
 				ready_buffer = NULL;
+
+				/* Update the flagged buffer's length. */
+				flagged_length += (pio_data->BufferSize - flagged_length);
 			}
 		}
 
@@ -751,17 +786,12 @@ pio_data_register_write_callback(void         *  Arg,
 			/* This should only happen on early EOF. */
 			globus_assert(pio_data->Eof == GLOBUS_TRUE);
 
-			globus_mutex_lock(&pio_data->Lock);
-			{
-				/* Save our error. */
-				if (pio_data->Result == GLOBUS_SUCCESS)
-					pio_data->Result = GlobusGFSErrorGeneric("Transfer ended prematurely");
-
-			}
-			globus_mutex_unlock(&pio_data->Lock);
+			/* Save our error. */
+			if (pio_data->Result == GLOBUS_SUCCESS)
+				pio_data->Result = GlobusGFSErrorGeneric("Transfer ended prematurely");
 
 			/* Indicate an error. */
-			retval = 1;
+			retval = 4;
 			goto unlock;
 		}
 

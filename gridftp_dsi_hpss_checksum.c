@@ -40,6 +40,11 @@
  */
 
 /*
+ * System includes.
+ */
+#include <openssl/md5.h>
+
+/*
  * Globus includes.
  */
 #include <globus_gridftp_server.h>
@@ -58,7 +63,7 @@
 #include "gridftp_dsi_hpss_misc.h"
 
 struct checksum {
-	hpss_hash_t               HpssHash;
+	MD5_CTX                   MD5Context;
 	buffer_handle_t         * BufferHandle;
 	buffer_priv_id_t          PrivateBufferID;
 	checksum_eof_callback_t   EofCallbackFunc;
@@ -80,6 +85,7 @@ checksum_init(buffer_handle_t        *  BufferHandle,
               void                   *  EofCallbackArg,
               checksum_t             ** Checksum)
 {
+	int             retval = 0;
 	globus_result_t result = GLOBUS_SUCCESS;
 
 	GlobusGFSName(__func__);
@@ -93,10 +99,10 @@ checksum_init(buffer_handle_t        *  BufferHandle,
 		goto cleanup;
 	}
 
-	(*Checksum)->HpssHash = hpss_HashCreateMD5();
-	if ((*Checksum)->HpssHash == NULL)
+	retval = MD5_Init(&(*Checksum)->MD5Context);
+	if (retval == 0)
 	{
-		result = GlobusGFSErrorGeneric("Failed to create checksum handle");
+		result = GlobusGFSErrorGeneric("Failed to create MD5 context");
 		goto cleanup;
 	}
 
@@ -144,8 +150,6 @@ checksum_destroy(checksum_t * Checksum)
 
 	if (Checksum != NULL)
 	{
-		if (Checksum->HpssHash != NULL)
-			hpss_HashDelete(Checksum->HpssHash);
 		globus_mutex_destroy(&Checksum->Lock);
 		globus_cond_destroy(&Checksum->Cond);
 		globus_free(Checksum);
@@ -212,12 +216,8 @@ checksum_buffer(void         * CallbackArg,
 		if (Buffer == NULL)
 			break;
 
-		/* Hash this buffer. */
-		retval = hpss_HashAppendBuf(checksum->HpssHash,
-		                            (unsigned char *)Buffer,
-		                            Length);
-
-		if (retval != 0)
+		retval = MD5_Update(&checksum->MD5Context, Buffer, Length);
+		if (retval == 0)
 		{
 			globus_mutex_lock(&checksum->Lock);
 			{
@@ -328,14 +328,22 @@ checksum_stop(checksum_t * Checksum)
 globus_result_t
 checksum_get_sum(checksum_t * Checksum, char ** ChecksumString)
 {
+	int             index  = 0;
+	int             retval = 0;
 	globus_result_t result = GLOBUS_SUCCESS;
+	unsigned char   md5_digest[MD5_DIGEST_LENGTH];
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	*ChecksumString = hpss_HashFinishHex(Checksum->HpssHash);
-	if (*ChecksumString == NULL)
-		result = GlobusGFSErrorGeneric("hpss_HashFinishHex() has failed.");
+	*ChecksumString = (char *) malloc(2*MD5_DIGEST_LENGTH + 1);
+
+	retval = MD5_Final(md5_digest, &Checksum->MD5Context);
+globus_assert(retval == 1);
+	for (index = 0; index < MD5_DIGEST_LENGTH; index++)
+	{
+		sprintf(&((*ChecksumString)[index*2]), "%02x", (unsigned int)md5_digest[index]);
+	}
 
 	GlobusGFSHpssDebugExit();
 	return result;

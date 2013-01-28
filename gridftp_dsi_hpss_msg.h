@@ -50,59 +50,92 @@
 typedef struct msg_handle msg_handle_t;
 
 /*
- * Local includes.
+ * IDs that identify individual components.
  */
-#include "gridftp_dsi_hpss_msg_types.h"
-
 typedef enum {
-	MSG_ID_PIO_DATA = 0,
-	MSG_ID_MIN_ID   = 0, /* Listed second so debuggers don't use it. */
-	MSG_ID_PIO_CONTROL,
-	MSG_ID_IPC_CONTROL,
-	MSG_ID_TRANSFER_DATA,
-	MSG_ID_TRANSFER_CONTROL,
-	MSG_ID_DATA_RANGES,
-	MSG_ID_GRIDFTP,
-	MSG_ID_MAIN,
-	MSG_ID_MAX_ID,
-} msg_id_t;
+	MSG_COMP_ID_NONE                      = 0x0000,
+	MSG_COMP_ID_TRANSFER_CONTROL          = 0x0001,
+	MSG_COMP_ID_TRANSFER_CONTROL_PIO      = 0x0002,
+	MSG_COMP_ID_TRANSFER_DATA             = 0x0004,
+	MSG_COMP_ID_TRANSFER_DATA_GRIDFTP     = 0x0008,
+	MSG_COMP_ID_TRANSFER_DATA_RANGES      = 0x0010,
+	MSG_COMP_ID_TRANSFER_DATA_CHECKSUM    = 0x0020,
+	MSG_COMP_ID_TRANSFER_DATA_PIO         = 0x0040,
+	MSG_COMP_ID_IPC_CONTROL               = 0x0080,
+	MSG_COMP_ID_IPC_DATA                  = 0x0100,
+	MSG_COMP_ID_MASK                      = 0x01FF,
 
-typedef globus_result_t (*msg_recv_func_t) (void     * CallbackArg,
-                                            int        NodeIndex,
-                                            msg_id_t   DestinationID,
-                                            msg_id_t   SourceID,
-                                            int        MsgType,
-                                            int        MsgLen,
-                                            void     * Msg);
+	/*
+	 * Keep this out of the mask.
+	 */
+	MSG_COMP_ID_ANY                       = 0x0200,
+} msg_comp_id_t;
 
+#define MSG_COMP_ID_COUNT (9)
+
+typedef struct msg_register_id * msg_register_id_t;
+#define MSG_REGISTER_ID_NONE NULL
+
+/*
+ * Msg will be a duplicate of the original but the receiver should
+ * not free it; the msg code will do that for your.
+ */
+typedef void (*msg_recv_func_t) (void          * CallbackArg,
+                                 msg_comp_id_t   DstMsgCompID,
+                                 msg_comp_id_t   SrcMsgCompID,
+                                 int             MsgType,
+                                 int             MsgLen,
+                                 void          * Msg);
+
+/*
+ * Initialize the message handle. The handle is shared by
+ * all components.
+ */
 globus_result_t
 msg_init(msg_handle_t ** MsgHandle);
 
+/*
+ * Destroy the message handle.
+ */
 void
 msg_destroy(msg_handle_t * MsgHandle);
 
-void
-msg_register_recv(msg_handle_t    * MsgHandle,
-                  msg_id_t          DestinationID,
-                  msg_recv_func_t   MsgRecvFunc,
-                  void            * CallbackArg);
-
-void
-msg_unregister_recv(msg_handle_t * MsgHandle,
-                    msg_id_t       DestinationID);
+/*
+ * Caller will receive messages that:
+ *   1) Sender specifies SrcMsgCompID in SrcMsgCompIDs and DstMsgCompID is MSG_COMP_ID_ANY
+ *   2) Sender specifies DstMsgCompID in DstMsgCompIDs
+ *
+ * Either SrcMsgCompIDs or DstMsgCompIDs can be MSG_COMP_ID_NONE
+ */
+globus_result_t
+msg_register(msg_handle_t      * MsgHandle,
+             msg_comp_id_t       SrcMsgCompIDs,
+             msg_comp_id_t       DstMsgCompIDs,
+             msg_recv_func_t     MsgRecvFunc,
+             void              * MsgRecvFuncArg,
+             msg_register_id_t * MsgRegisterID);
 
 /*
- * We pass DestinationID for routers like IPC.
- * We pass SourceID so receipents can decipher the message.
+ * No longer receive messages.
+ */
+void
+msg_unregister(msg_handle_t      * MsgHandle,
+               msg_register_id_t   MsgRegisterID);
+
+
+/*
+ * Caller must give a valid SrcMsgCompID (not ANY or NONE). Message will
+ * go to handler that:
+ *  1) Specified SrcMsgCompID in SrcMsgCompIDs if DstMsgCompIDs is ANY
+ *  2) Specified DstMsgCompID in DstMsgCompIDs
  *
- * NodeIndex is zero except for when the control side sends
- * messages for striped transfers.
+ * Msg must not contain pointers unless it points to an external object.
+ * msg_send() will duplicate Msg for each recipient.
  */
 globus_result_t
 msg_send(msg_handle_t * MsgHandle,
-         int            NodeIndex,
-         msg_id_t       DestinationID,
-         msg_id_t       SourceID,
+         msg_comp_id_t  DstMsgCompIDs, /* Can be mask of multiple destinations. */
+         msg_comp_id_t  SrcMsgCompID,
          int            MsgType,
          int            MsgLen,
          void         * Msg);

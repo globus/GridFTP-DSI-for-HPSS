@@ -64,6 +64,7 @@
  */
 #include "gridftp_dsi_hpss_transfer_control.h"
 #include "gridftp_dsi_hpss_transfer_data.h"
+#include "gridftp_dsi_hpss_data_ranges.h"
 #include "gridftp_dsi_hpss_commands.h"
 #include "gridftp_dsi_hpss_session.h"
 #include "gridftp_dsi_hpss_config.h"
@@ -91,7 +92,7 @@ typedef struct marker_handle {
 	globus_mutex_t             Lock;
 	globus_off_t               TotalBytes;
 	globus_gfs_operation_t     Operation;
-	msg_register_id_t          RegisterID;
+	msg_register_id_t          MsgRegisterID;
 	globus_callback_handle_t   CallbackHandle;
 	msg_handle_t             * MsgHandle;
 } marker_handle_t;
@@ -607,74 +608,63 @@ commands_monitor_destroy(monitor_t * Monitor)
 	GlobusGFSHpssDebugExit();
 }
 
-static globus_result_t
-commands_msg_recv(void     * CallbackArg,
-                  int        NodeIndex,
-                  msg_id_t   DestinationID,
-                  msg_id_t   SourceID,
-                  int        MsgType,
-                  int        MsgLen,
-                  void     * Msg)
+
+static void
+commands_recv_transfer_control_msg(void * CallbackArg,
+                                   int    MsgType,
+                                   int    MsgLen,
+                                   void * Msg)
 {
 	monitor_t                       * monitor      = NULL;
 	transfer_control_complete_msg_t * complete_msg = NULL;
 
-	/* Cast to our monitor. */
-	monitor = (monitor_t *)CallbackArg;
-
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	switch (SourceID)
+	/* Cast to our monitor. */
+	monitor = (monitor_t *)CallbackArg;
+
+	switch(MsgType)
 	{
-	case MSG_ID_TRANSFER_CONTROL:
-		switch(MsgType)
+	case TRANSFER_CONTROL_MSG_TYPE_COMPLETE:
+		/* Cast our message. */
+		complete_msg = (transfer_control_complete_msg_t*) Msg;
+
+		globus_mutex_lock(&monitor->Lock);
 		{
-		case TRANSFER_CONTROL_MSG_TYPE_COMPLETE:
-			/* Cast our message. */
-			complete_msg = (transfer_control_complete_msg_t*) Msg;
-
-			globus_mutex_lock(&monitor->Lock);
-			{
-				/* Indicate that we have finished. */
-				monitor->Complete = GLOBUS_TRUE;
-				/* Save any error. */
-				monitor->Result   = complete_msg->Result;
-				/* Wake any waiters. */
-				globus_cond_signal(&monitor->Cond);
-			}
-			globus_mutex_unlock(&monitor->Lock);
-			break;
-		default:
-			globus_assert(0);
+			/* Indicate that we have finished. */
+			monitor->Complete = GLOBUS_TRUE;
+			/* Save any error. */
+			monitor->Result   = complete_msg->Result;
+			/* Wake any waiters. */
+			globus_cond_signal(&monitor->Cond);
 		}
+		globus_mutex_unlock(&monitor->Lock);
 		break;
-
 	default:
-		globus_assert(0);
+		break;
 	}
 
 	GlobusGFSHpssDebugExit();
-	return GLOBUS_SUCCESS;
 }
 
-static globus_result_t
-commands_msg_recv_type(void       * CallbackArg,
-                       msg_type_t   MsgType,
-                       int          MsgLen,
-                       void       * Msg)
+static void
+commands_recv_data_ranges_msg(void * CallbackArg,
+                              int    MsgType,
+                              int    MsgLen,
+                              void * Msg)
 {
-	marker_handle_t      * marker_handle  = (marker_handle_t *) CallbackArg;
-	msg_range_complete_t * range_complete = NULL;
+	marker_handle_t                  * marker_handle  = (marker_handle_t *) CallbackArg;
+	data_ranges_msg_range_complete_t * range_complete = NULL;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	switch (MsgType)
 	{
-	case MSG_TYPE_RANGE_COMPLETE:
+	case DATA_RANGES_MSG_TYPE_RANGE_COMPLETE:
 		/* Cast the msg. */
-		range_complete = (msg_range_complete_t *) Msg;
+		range_complete = (data_ranges_msg_range_complete_t *) Msg;
 
 		globus_mutex_lock(&marker_handle->Lock);
 		{
@@ -683,11 +673,38 @@ commands_msg_recv_type(void       * CallbackArg,
 		globus_mutex_unlock(&marker_handle->Lock);
 		break;
 	default:
+		break;
+	}
+
+	GlobusGFSHpssDebugExit();
+}
+
+static void
+commands_msg_recv(void          * CallbackArg,
+                  msg_comp_id_t   DstMsgCompID,
+                  msg_comp_id_t   SrcMsgCompID,
+                  int             MsgType,
+                  int             MsgLen,
+                  void          * Msg)
+{
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	switch (SrcMsgCompID)
+	{
+	case MSG_COMP_ID_TRANSFER_CONTROL:
+		commands_recv_transfer_control_msg(CallbackArg, MsgType, MsgLen, Msg);
+		break;
+
+	case MSG_COMP_ID_TRANSFER_DATA_RANGES:
+		commands_recv_data_ranges_msg(CallbackArg, MsgType, MsgLen, Msg);
+		break;
+
+	default:
 		globus_assert(0);
 	}
 
 	GlobusGFSHpssDebugExit();
-	return GLOBUS_SUCCESS;
 }
 
 static void
@@ -730,7 +747,7 @@ commands_start_markers(marker_handle_t        * MarkerHandle,
 	globus_mutex_init(&MarkerHandle->Lock, NULL);
 	MarkerHandle->TotalBytes     = 0;
 	MarkerHandle->Operation      = Operation;
-	MarkerHandle->RegisterID     = MSG_REGISTER_ID_NONE;
+	MarkerHandle->MsgRegisterID  = MSG_REGISTER_ID_NONE;
 	MarkerHandle->CallbackHandle = GLOBUS_NULL_HANDLE;
 	MarkerHandle->MsgHandle      = MsgHandle;
 
@@ -739,12 +756,15 @@ commands_start_markers(marker_handle_t        * MarkerHandle,
 
 	if (marker_freq > 0)
 	{
-		/* Register to receive messages by type. */
-		MarkerHandle->RegisterID = msg_register_for_type(MsgHandle,
-		                                                 MSG_TYPE_RANGE_COMPLETE,
-		                                                 commands_msg_recv_type,
-		                                                 MarkerHandle);
-	                                    
+		/* Register to receive completed data range messages. */
+		result = msg_register(MsgHandle,
+		                      MSG_COMP_ID_TRANSFER_DATA_RANGES,
+		                      MSG_COMP_ID_NONE,
+		                      commands_msg_recv,
+		                      MarkerHandle,
+		                      &MarkerHandle->MsgRegisterID);
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
 
 		/* Setup the periodic callback. */
 		GlobusTimeReltimeSet(delay, marker_freq, 0);
@@ -770,10 +790,7 @@ commands_stop_markers(marker_handle_t * MarkerHandle)
 	GlobusGFSHpssDebugEnter();
 
 	/* Unregister for the messages. */
-	if (MarkerHandle->RegisterID != MSG_REGISTER_ID_NONE)
-		msg_unregister_for_type(MarkerHandle->MsgHandle,
-		                        MSG_TYPE_RANGE_COMPLETE,
-		                        MarkerHandle->RegisterID);
+	msg_unregister(MarkerHandle->MsgHandle, MarkerHandle->MsgRegisterID);
 
 	/* Unregister our periodic marker callback. */
 	if (MarkerHandle->CallbackHandle != GLOBUS_NULL_HANDLE)
@@ -796,6 +813,7 @@ commands_checksum(globus_gfs_operation_t       Operation,
 	transfer_control_t * transfer_control = NULL;
 	msg_handle_t       * msg_handle       = NULL;
 	marker_handle_t      marker_handle;
+	msg_register_id_t    msg_register_id  = MSG_REGISTER_ID_NONE;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -808,7 +826,14 @@ commands_checksum(globus_gfs_operation_t       Operation,
 	                                         SESSION_CACHE_OBJECT_ID_MSG_HANDLE);
 
 	/* Register to receive messages. */
-	msg_register_recv(msg_handle, MSG_ID_MAIN, commands_msg_recv, &monitor);
+	result = msg_register(msg_handle,
+	                      MSG_COMP_ID_TRANSFER_CONTROL,
+	                      MSG_COMP_ID_NONE,
+	                      commands_msg_recv,
+	                      &monitor,
+	                      &msg_register_id);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
 
 	/* Setup perf markers. */
 	result = commands_start_markers(&marker_handle, msg_handle, Operation);
@@ -857,7 +882,7 @@ commands_checksum(globus_gfs_operation_t       Operation,
 
 cleanup:
 	/* Unregister to receive messages. */
-	msg_unregister_recv(msg_handle, MSG_ID_MAIN);
+	msg_unregister(msg_handle, msg_register_id);
 
 	/* Stop perf markers. */
 	commands_stop_markers(&marker_handle);
