@@ -36,10 +36,6 @@
 /* Using Unix authentication */
 #undef HPSS_UNIX_AUTH
 
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
-#undef LT_OBJDIR
-
 /* Name of package */
 #undef PACKAGE
 
