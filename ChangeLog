@@ -1,4 +1,4 @@
-Version 1.1 : (Develop)
+Version 1.1 : January 28, 2013
 	- Fixed Range Markers with partial stores (ESTO)
 	- Fixed transfer restarts
 	- Fixed range_list_insert() to correctly insert on the tail
