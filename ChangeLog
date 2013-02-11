@@ -1,3 +1,11 @@
+Version 1.2 (RC1)
+	- Change misc_file_archived() to check for any bytes on disk. Due to holes,
+	  we can not expect DataLength to be on disk.
+	- Added handling for files with gaps during RETR/CKSM
+	- Fixed race condition in gridftp_register_read() which caused a deadlock
+	- Throttled the call to globus_ftp_control_data_query_channels() to avoid
+	  signal 11
+
 Version 1.1 : January 28, 2013
 	- Fixed Range Markers with partial stores (ESTO)
 	- Fixed transfer restarts
