@@ -390,12 +390,11 @@ transfer_data_stor_init_modules(transfer_data_t            * TransferData,
 		goto cleanup;
 
 	/* Allocate the PIO data handle. */
-	result = pio_data_init(PIO_DATA_OP_TYPE_STOR,
-	                       TransferData->BufferHandle,
-	                       TransferData->MsgHandle,
-	                       transfer_data_eof_callback,
-	                       TransferData,
-	                       &TransferData->PioData);
+	result = pio_data_stor_init(TransferData->BufferHandle,
+	                            TransferData->MsgHandle,
+	                            transfer_data_eof_callback,
+	                            TransferData,
+	                            &TransferData->PioData);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
@@ -487,12 +486,12 @@ transfer_data_retr_init_modules(transfer_data_t            * TransferData,
 	GlobusGFSHpssDebugEnter();
 
 	/* Allocate the PIO data handle. */
-	result = pio_data_init(PIO_DATA_OP_TYPE_RETR,
-	                       TransferData->BufferHandle,
-	                       TransferData->MsgHandle,
-	                       transfer_data_eof_callback,
-	                       TransferData,
-	                       &TransferData->PioData);
+	result = pio_data_retr_init(TransferData->BufferHandle,
+	                            TransferData->MsgHandle,
+	                            TransferInfo,
+	                            transfer_data_eof_callback,
+	                            TransferData,
+	                            &TransferData->PioData);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
@@ -566,7 +565,8 @@ cleanup:
 }
 
 static globus_result_t
-transfer_data_cksm_init_modules(transfer_data_t * TransferData)
+transfer_data_cksm_init_modules(transfer_data_t           * TransferData,
+                                globus_gfs_command_info_t * CommandInfo)
 {
 	globus_result_t result = GLOBUS_SUCCESS;
 
@@ -574,12 +574,12 @@ transfer_data_cksm_init_modules(transfer_data_t * TransferData)
 	GlobusGFSHpssDebugEnter();
 
 	/* Allocate the PIO data handle. */
-	result = pio_data_init(PIO_DATA_OP_TYPE_RETR,
-	                       TransferData->BufferHandle,
-	                       TransferData->MsgHandle,
-	                       transfer_data_eof_callback,
-	                       TransferData,
-	                       &TransferData->PioData);
+	result = pio_data_cksm_init(TransferData->BufferHandle,
+	                            TransferData->MsgHandle,
+	                            CommandInfo,
+	                            transfer_data_eof_callback,
+	                            TransferData,
+	                            &TransferData->PioData);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
@@ -640,7 +640,7 @@ transfer_data_cksm_init(msg_handle_t               *  MsgHandle,
 		goto cleanup;
 
 	/* Create the modules. */
-	result = transfer_data_cksm_init_modules(*TransferData);
+	result = transfer_data_cksm_init_modules(*TransferData, CommandInfo);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 

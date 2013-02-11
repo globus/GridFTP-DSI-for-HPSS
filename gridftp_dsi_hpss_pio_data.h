@@ -72,11 +72,6 @@ typedef enum {
 	PIO_DATA_MSG_TYPE_BYTES_WRITTEN,
 } pio_data_msg_type_t;
 
-typedef enum {
-	PIO_DATA_OP_TYPE_RETR,
-	PIO_DATA_OP_TYPE_STOR,
-} pio_data_op_type_t;
-
 /* XXX move these to buffer.h */
 typedef void
 (*pio_data_buffer_pass_t)(void       * CallbackArg,
@@ -93,12 +88,27 @@ typedef void
 
 
 globus_result_t
-pio_data_init(pio_data_op_type_t         OpType,
-              buffer_handle_t         *  BufferHandle,
-              msg_handle_t            *  MsgHandle,
-              pio_data_eof_callback_t    EofCallbackFunc,
-              void                    *  EofCallbackArg,
-              pio_data_t              ** PioData);
+pio_data_stor_init(buffer_handle_t         *  BufferHandle,
+                   msg_handle_t            *  MsgHandle,
+                   pio_data_eof_callback_t    EofCallbackFunc,
+                   void                    *  EofCallbackArg,
+                   pio_data_t              ** PioData);
+
+globus_result_t
+pio_data_retr_init(buffer_handle_t            *  BufferHandle,
+                   msg_handle_t               *  MsgHandle,
+                   globus_gfs_transfer_info_t *  TransferInfo,
+                   pio_data_eof_callback_t       EofCallbackFunc,
+                   void                       *  EofCallbackArg,
+                   pio_data_t                 ** PioData);
+
+globus_result_t
+pio_data_cksm_init(buffer_handle_t            *  BufferHandle,
+                   msg_handle_t               *  MsgHandle,
+                   globus_gfs_command_info_t  *  CommandInfo,
+                   pio_data_eof_callback_t       EofCallbackFunc,
+                   void                       *  EofCallbackArg,
+                   pio_data_t                 ** PioData);
 
 void
 pio_data_set_buffer_pass_func(pio_data_t             *  PioData,

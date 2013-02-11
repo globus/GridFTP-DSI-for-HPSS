@@ -397,16 +397,13 @@ pio_control_transfer_ranges(pio_control_t                         * PioControl,
 	PioControl->PioExecute.Callback    = Callback;
 	PioControl->PioExecute.CallbackArg = CallbackArg;
 
-	/*
-	 * Don't use HPSS_PIO_HANDLE_GAP, it's bugged in HPSS 7.4.
-	 */
 	pio_params.Operation       = PioControl->OperationType;
 	pio_params.ClntStripeWidth = ClntStripeWidth;
 	pio_params.BlockSize       = StripeBlockSize;
 	pio_params.FileStripeWidth = PioControl->FileStripeWidth;
 	pio_params.IOTimeOutSecs   = 0;
 	pio_params.Transport       = HPSS_PIO_MVR_SELECT;
-	pio_params.Options         = 0;
+	pio_params.Options         = HPSS_PIO_HANDLE_GAP;
 
 	/* Now call the start routine. */
 	retval = hpss_PIOStart(&pio_params, &PioControl->PioExecute.StripeGroup);
@@ -525,6 +522,7 @@ pio_control_execute_thread(void * Arg)
 			u_offset = add64m(u_offset, bytes_moved);
 			u_length = sub64m(u_length, bytes_moved);
 			bytes_moved = cast64(0);
+			memset(&gap_info, 0, sizeof(gap_info));
 
 			/* Call pio execute. */
 			retval = hpss_PIOExecute(pio_control->FileFD,
@@ -533,6 +531,17 @@ pio_control_execute_thread(void * Arg)
 			                         pio_control->PioExecute.StripeGroup,
 			                         &gap_info,
 			                         &bytes_moved);
+
+
+			/* If we found a hole.... */
+			if (neqz64m(gap_info.Offset))
+			{
+				/*
+				 * bytes_moved (with handle gaps) is the number of bytes past the
+				 * last gap recorded in gap_info. 
+				 */
+				bytes_moved = sub64m(add64m(add64m(gap_info.Offset, gap_info.Length), bytes_moved), u_offset);
+			}
 
 		} while (retval == 0 && !eq64(bytes_moved, u_length));
 
