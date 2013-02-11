@@ -83,6 +83,14 @@ range_list_pop(range_list_t * RangeList,
                globus_off_t * Offset,
                globus_off_t * Length);
 
+globus_off_t
+range_list_get_transfer_offset(range_list_t * FileRangeList, 
+                               globus_off_t   FileOffset);
+
+globus_off_t
+range_list_get_file_offset(range_list_t * FileRangeList, 
+                           globus_off_t   TransferOffset);
+
 globus_result_t
 range_list_fill_stor_range(range_list_t               * RangeList,
                            globus_gfs_transfer_info_t * TransferInfo);
