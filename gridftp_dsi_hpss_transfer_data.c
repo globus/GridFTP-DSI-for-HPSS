@@ -585,6 +585,7 @@ transfer_data_cksm_init_modules(transfer_data_t           * TransferData,
 
 	/* Allocate the checksum handle. */
 	result = checksum_init(TransferData->BufferHandle,
+	                       CommandInfo,
 	                       transfer_data_eof_callback,
 	                       TransferData,
 	                       &TransferData->Checksum);

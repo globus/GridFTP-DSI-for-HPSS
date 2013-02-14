@@ -74,10 +74,11 @@ typedef void
                            globus_off_t Length);
 
 globus_result_t
-checksum_init(buffer_handle_t        *  BufferHandle,
-              checksum_eof_callback_t   EofCallbackFunc,
-              void                   *  EofCallbackArg,
-              checksum_t             ** Checksum);
+checksum_init(buffer_handle_t           *  BufferHandle,
+              globus_gfs_command_info_t *  CommandInfo,
+              checksum_eof_callback_t      EofCallbackFunc,
+              void                      *  EofCallbackArg,
+              checksum_t                ** Checksum);
 
 void
 checksum_set_buffer_pass_func(checksum_t            * Checksum,

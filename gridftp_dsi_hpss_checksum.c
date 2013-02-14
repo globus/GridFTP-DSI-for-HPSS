@@ -58,6 +58,7 @@
 /*
  * Local includes.
  */
+#include "gridftp_dsi_hpss_range_list.h"
 #include "gridftp_dsi_hpss_checksum.h"
 #include "gridftp_dsi_hpss_buffer.h"
 #include "gridftp_dsi_hpss_misc.h"
@@ -75,15 +76,16 @@ struct checksum {
 	globus_cond_t             Cond;
 	globus_result_t           Result;
 	globus_bool_t             Stop;
-	globus_off_t              NextOffset;
+	range_list_t            * RangeList;
 	int                       ThreadCount;
 };
 
 globus_result_t
-checksum_init(buffer_handle_t        *  BufferHandle,
-              checksum_eof_callback_t   EofCallbackFunc,
-              void                   *  EofCallbackArg,
-              checksum_t             ** Checksum)
+checksum_init(buffer_handle_t           *  BufferHandle,
+              globus_gfs_command_info_t *  CommandInfo,
+              checksum_eof_callback_t      EofCallbackFunc,
+              void                      *  EofCallbackArg,
+              checksum_t                ** Checksum)
 {
 	int             retval = 0;
 	globus_result_t result = GLOBUS_SUCCESS;
@@ -111,12 +113,20 @@ checksum_init(buffer_handle_t        *  BufferHandle,
 	(*Checksum)->EofCallbackArg  = EofCallbackArg;
 	(*Checksum)->Result          = GLOBUS_SUCCESS;
 	(*Checksum)->Stop            = GLOBUS_FALSE;
-	(*Checksum)->NextOffset      = 0;
 	(*Checksum)->ThreadCount     = 0;
 	(*Checksum)->PrivateBufferID = buffer_create_private_list(BufferHandle);
 
 	globus_mutex_init(&(*Checksum)->Lock, NULL);
 	globus_cond_init(&(*Checksum)->Cond, NULL);
+
+	/* Create the range list. */
+	result = range_list_init(&(*Checksum)->RangeList);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	/* Populate the range list with our ranges. */
+	result = range_list_fill_cksm_range((*Checksum)->RangeList, CommandInfo);
+
 cleanup:
 	if (result != GLOBUS_SUCCESS)
 	{
@@ -150,6 +160,9 @@ checksum_destroy(checksum_t * Checksum)
 
 	if (Checksum != NULL)
 	{
+		/* Destroy the range list. */
+		range_list_destroy(Checksum->RangeList);
+
 		globus_mutex_destroy(&Checksum->Lock);
 		globus_cond_destroy(&Checksum->Cond);
 		globus_free(Checksum);
@@ -167,7 +180,11 @@ checksum_buffer(void         * CallbackArg,
 	int             retval        = 0;
 	globus_bool_t   call_callback = GLOBUS_FALSE;
 	globus_bool_t   stop          = GLOBUS_FALSE;
+	globus_bool_t   empty         = GLOBUS_FALSE;
 	globus_result_t result        = GLOBUS_SUCCESS;
+	globus_off_t    range_offset  = 0;
+	globus_off_t    range_length  = 0;
+	globus_off_t    buffer_length = 0;
 	checksum_t    * checksum      = (checksum_t *) CallbackArg;
 
 	GlobusGFSName(__func__);
@@ -190,9 +207,6 @@ checksum_buffer(void         * CallbackArg,
 
 		/* Save the stop flag. */
 		stop = checksum->Stop;
-
-		/* Save the next offset. */
-		Offset = checksum->NextOffset;
 	}
 	globus_mutex_unlock(&checksum->Lock);
 
@@ -206,17 +220,30 @@ checksum_buffer(void         * CallbackArg,
 
 		Buffer = NULL;
 
+		globus_mutex_lock(&checksum->Lock);
+		{
+			empty = range_list_empty(checksum->RangeList);
+
+			/* Peek at the next offset we need. */
+			if (empty == GLOBUS_FALSE)
+				range_list_peek(checksum->RangeList, &range_offset, &range_length);
+		}
+		globus_mutex_unlock(&checksum->Lock);
+
+		if (empty == GLOBUS_TRUE)
+			break;
+
 		/* Try to get the next ready buffer. */
 		buffer_get_ready_buffer(checksum->BufferHandle,
 		                        checksum->PrivateBufferID,
 		                        &Buffer, 
-		                        Offset, 
-		                        &Length);
+		                        range_offset, 
+		                        &buffer_length);
 
 		if (Buffer == NULL)
 			break;
 
-		retval = MD5_Update(&checksum->MD5Context, Buffer, Length);
+		retval = MD5_Update(&checksum->MD5Context, Buffer, buffer_length);
 		if (retval == 0)
 		{
 			globus_mutex_lock(&checksum->Lock);
@@ -238,14 +265,10 @@ checksum_buffer(void         * CallbackArg,
 		}
 
 		/* Pass the buffer forward. */
-		checksum->BufferPassFunc(checksum->BufferPassArg, Buffer, Offset, Length);
+		checksum->BufferPassFunc(checksum->BufferPassArg, Buffer, range_offset, buffer_length);
 
-		globus_mutex_lock(&checksum->Lock);
-		{
-			/* Move the next offset forward. */
-			Offset = checksum->NextOffset += Length;
-		}
-		globus_mutex_unlock(&checksum->Lock);
+		/* Remove this range from our range list. */
+		range_list_delete(checksum->RangeList, range_offset, buffer_length);
 	}
 
 	globus_mutex_lock(&checksum->Lock);
