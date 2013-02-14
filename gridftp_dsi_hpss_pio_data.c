@@ -698,7 +698,7 @@ unlock:
 				pio_data->BufferPassFunc(pio_data->BufferPassArg,
 				                         free_buffer,
 				                         range_offset,
-				                         free_length);
+				                         bytes_to_copy);
 
 				/* Release our reference on the free buffer. */
 				free_buffer = NULL;
@@ -730,9 +730,6 @@ unlock:
 		memcpy(free_buffer  + free_offset, 
 		       *ReadyBuffer + ready_offset, 
 		       bytes_to_copy);
-
-		/* Update our offset into ready buffer. */
-		ready_offset += bytes_to_copy;
 
 		/* Remove this range from our range list. */
 		range_list_delete(pio_data->RangeList, range_offset, bytes_to_copy);
