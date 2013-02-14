@@ -5,6 +5,8 @@ Version 1.2 (RC1)
 	- Fixed race condition in gridftp_register_read() which caused a deadlock
 	- Throttled the call to globus_ftp_control_data_query_channels() to avoid
 	  signal 11
+	- Fixed partial checksums deadlock
+	- Ordered buffers for RETR in streams mode
 
 Version 1.1 : January 28, 2013
 	- Fixed Range Markers with partial stores (ESTO)
