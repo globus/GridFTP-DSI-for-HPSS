@@ -1,14 +1,49 @@
-For the latest build instructions, see https://github.com/JasonAlt/GridFTP-DSI-for-HPSS/wiki/Installation-of-Version-1.0
+For the latest build instructions, see 
+https://github.com/JasonAlt/GridFTP-DSI-for-HPSS/wiki/Installation-of-Version-1.0
 
 BUILD AND INSTALL HPSS
 ======================
 
-Building HPSS is beyond the scope of this guide but you should have a working HPSS installation. This version of the DSI was tested against HPSS 7.3.3p7. The DSI requires either a full HPSS build or a 'clnt' HPSS build. Note whether the HPSS build is 32bit or 64bit; you'll need to build GridFTP and the DSI that same way.
+Building HPSS is beyond the scope of this guide but you should have a working 
+HPSS installation. This version of the DSI was tested against HPSS 7.3.3p7. The
+DSI requires either a full HPSS build or a 'clnt' HPSS build. Note whether the
+HPSS build is 32bit or 64bit; you'll need to build GridFTP and the DSI that same
+way.
+
+REQUIRED HPSS PATCHES
+=====================
+This one is required:
+BZ2146 - PIO with HPSS_PIO_HANDLE_GAP does not properly handle 32 IOD SrcSink 
+         descriptor boundaries 
+
+This one will be required soon:
+BZ2487 - PIO returns wrong bytes moved when reading without regard to file 
+         length, also returns incorrect data
+
+This one helps performance:
+BZ2876 - PIO 60 second delay impacts small file performance
+
+This one will require code rewrite if they ever fix it:
+BZ1660 - PIO callback buffer switching does not persist across calls to 
+         hpss_PIOExecute
+
+PERFORMANCE
+===========
+Mention something about fixed length classic. Variable length is bad mojo.
+
+GRIDFTP PATCHES
+===============
+These are fixed in Globus Toolkit 5.2.4:
+  GT-296 globus_ftp_control_data_read() race condition
+  GT-297 globus_ftp_control_data_query_channels() SIGSEGV on proxy expiration
 
 BUILD GRIDFTP
 =============
 
-You'll need to download and build Globus Toolkit 5.2.3 or later. Follow the instructions in the Globus Toolkit INSTALL file to build gridftp. The following example assumes you are building against 32bit HPSS. If you are building against 64bit HPSS, replace 'gcc32dbg' with 'gcc64dbg'.
+You'll need to download and build Globus Toolkit 5.2.4 or later. Follow the
+instructions in the Globus Toolkit INSTALL file to build gridftp. The following
+example assumes you are building against 32bit HPSS. If you are building against
+64bit HPSS, replace 'gcc32dbg' with 'gcc64dbg'.
 
 globus$ ./configure --prefix=/usr/local/globus-5.2.x --with-flavor=gcc32dbg
 globus$ make gridftp
@@ -17,8 +52,14 @@ globus$ make install
 BUILD AND INSTALL THE DSI
 =========================
 
-Build the HPSS DSI with the following options. If your HPSS installation uses Kerberos, replace '--with-unixauth'
-with '--with_krb5auth' below. If you are building against 64bit HPSS, change 'gcc32dbg' to 'gcc64dbg'. Set the value of '--libdir' to the directory where you want to place the DSI. For your sanity, I recommend putting it in a new directory with the version information stored in the name. Ex. /usr/local/gridftp_hpss_dsi-1.0. You can then set the environment variable LD_LIBRARY_PATH to this location so that the GridFTP server can find the DSI.
+Build the HPSS DSI with the following options. If your HPSS installation uses
+Kerberos, replace '--with-unixauth' with '--with_krb5auth' below. If you are
+building against 64bit HPSS, change 'gcc32dbg' to 'gcc64dbg'. Set the value of
+'--libdir' to the directory where you want to place the DSI. For your sanity, I
+recommend putting it in a new directory with the version information stored in
+the name. Ex. /usr/local/gridftp_hpss_dsi-1.0. You can then set the environment
+variable LD_LIBRARY_PATH to this location so that the GridFTP server can find
+the DSI.
 
 ./configure --with-globus=/usr/local/globus-5.2.x --with-globus-flavor=gcc32dbg --with-hpssdir=/opt/hpss --with-unixauth -libdir=/usr/local/gridftp_hpss_dsi-<version>.
 
@@ -29,12 +70,25 @@ make install
 ADD A GRIDFTP USER FOR HPSS
 ===========================
 
-The HPSS user 'gridftp' is a special user; his only purpose is to allow the DSI to authenticate to HPSS. When a user logs into the GridFTP server, the DSI will authenticate to HPSS as the special user 'gridftp' and then immediately change it's credentials to the user that just logged into the GridFTP server.
+The HPSS user 'gridftp' is a special user; his only purpose is to allow the DSI
+to authenticate to HPSS. When a user logs into the GridFTP server, the DSI will
+authenticate to HPSS as the special user 'gridftp' and then immediately change
+it's credentials to the user that just logged into the GridFTP server.
 
-Add the new user 'gridftp' to the password file used by HPSS. You can determine which password file is in use by checking the value of HPSS_UNIX_USE_SYSTEM_COMMANDS in /var/hpss/etc/env.conf. If it is set to TRUE (or if it is not present in the file), HPSS is using /etc/passwd. Otherwise, look for /var/hpss/etc/passwd. Whichever file you use, your entry should look something like the following:
+Add the new user 'gridftp' to the password file used by HPSS. You can determine
+which password file is in use by checking the value of
+HPSS_UNIX_USE_SYSTEM_COMMANDS in /var/hpss/etc/env.conf. If it is set to TRUE
+(or if it is not present in the file), HPSS is using /etc/passwd. Otherwise,
+look for /var/hpss/etc/passwd. Whichever file you use, your entry should look
+something like the following:
 
 gridftp:x:316:316:GridFTP Server:/home/gridftp:/bin/bash
-Next, you must give this new user 'control' permission to the core server's client interface:
+
+If your site uses kerberos authentication with HPSS, create a 'gridftp'
+kerberos principal and password also.
+
+Next, you must give this new user 'control' permission to the core server's
+client interface:
 
 [root@hpss gridftp_hpss_dsi_0_1]# /opt/hpss/bin/hpss_server_acl
 hsa> acl -m
@@ -73,22 +127,44 @@ rw-c--- - user - 309 (hpssfs) - 81000 (hpss.ncsa.illinois.edu)
 r--c--- - user - 315 (hpssftp) - 81000 (hpss.ncsa.illinois.edu)
 ---c--- - user - 316 (gridftp) - 81000 (hpss.ncsa.illinois.edu)
 ------t - any_other
+
+Once the ACL has been created, restart the HPSS core server so that the new
+ACL takes effect (otherwise, GridFTP will not be able to change its
+credentials to the actual user and will attempt to perform operations as the
+'gridftp' user).
+
 .... set a password for user gridftp ...
 
-Now you'll need to create a keytab file for the gridftp user. This will be used by the DSI in order to authenticate to HPSS:
+Now you'll need to create a keytab file for the gridftp user. This will be used
+by the DSI in order to authenticate to HPSS. For sites using unix
+authentication with HPSS (rather than kerberos):
 
 [root@hpss gridftp_hpss_dsi_0_1]# /opt/hpss/bin/hpss_unix_keytab -f /var/hpss/etc/gridftp.keytab add gridftp
+
+For sites using kerberos authentication with HPSS, you'll need to create
+and use a kerberos keytab file (rather than a unix keytab). The kerberos
+utility 'ktutil' can be used for that purpose.
 
 CONFIGURING XINETD
 ==================
 
-The globus gridftp server does not need to run as a privileged user. You should create a system account for this purpose. It is important to make sure that both the keytab files generated above and the GSI host key are both owned by this system account. In the following example, I will use the system account 'gridftp'. Since our HPSS installation currently uses the system password file (instead of the HPSS specific password file) this is the same account created earlier for authentication to HPSS. However, if your site uses the HPSS specific password file, you will need to create a separate system account for the GridFTP server process (they may both have the same name).
+The globus gridftp server does not need to run as a privileged user. You should
+create a system account for this purpose. It is important to make sure that both
+the keytab files generated above and the GSI host key are both owned by this
+system account. In the following example, I will use the system account
+'gridftp'. Since our HPSS installation currently uses the system password file
+(instead of the HPSS specific password file) this is the same account created
+earlier for authentication to HPSS. However, if your site uses the HPSS specific
+password file, you will need to create a separate system account for the GridFTP
+server process (they may both have the same name).
 
 Add an entry to /etc/services for the default gsiftp port:
 
 gsiftp 2811/tcp # GSI FTP
 
-Here's an example xinetd entry (/etc/xinetd.d/gridftp). Note that the DSI requires that the server run with threads so you must use -threads with a value of 2 or greater.
+Here's an example xinetd entry (/etc/xinetd.d/gridftp). Note that the DSI
+requires that the server run with threads so you must use -threads with a value
+of 2 or greater.
 
 service gsiftp
 
@@ -104,9 +180,9 @@ service gsiftp
 	#  1 - Authorize identity
 	#  2 - Authorize all file/resource accesses (Default for fronend)
 	#  4 - Disable changing process uid to authenticated user
-	server_args = -inetd -threads 2 -auth-level 7 -dsi hpss -disable-command-list SCKS,APPE
+	server_args = -inetd -threads 2 -auth-level 7 -dsi hpss_local -disable-command-list SCKS,APPE
 	env         = GRIDMAP=/etc/grid-security/grid-mapfile
-	env         = LD_LIBRARY_PATH=/usr/local/gridftp_hpss_dsi-<version>
+	env         = LD_LIBRARY_PATH=/opt/hpss/lib:/usr/local/gridftp_hpss_dsi-<version>
 	socket_type = stream
 	per_source  = 100
 }
@@ -114,10 +190,29 @@ service gsiftp
 SETUP THE DSI CONFIG FILE
 =========================
 
-Review 'ConfigFile' in the source directory for any changes you may wish to make for your site. Then copy ConfigFile into place on the target system. The DSI will use the following search order for locating the configuration file:
+Review 'ConfigFile' in the source directory for any changes you may wish to
+make for your site. Then copy ConfigFile into place on the target system. The
+DSI will use the following search order for locating the configuration file:
 
  1) $HPSS_PATH_ETC/gridftp.conf
  2) /var/hpss/etc/gridftp.conf
 
-Make sure the configuration file's permissions allow for the GridFTP process to read it. For example, if you chose to run the GridFTP server as user 'gridftp', make sure the user 'gridftp' has read access to the configuration file.
+Make sure the configuration file's permissions allow for the GridFTP process to
+read it. For example, if you chose to run the GridFTP server as user 'gridftp',
+make sure the user 'gridftp' has read access to the configuration file.
 
+HPSS Configuration Files
+========================
+The HPSS DSI needs to run on a system that has sufficient HPSS configuration files installed
+to permit it to talk to the appropriate HPSS servers (such as an HPSS mover node), as well as
+to perform authentication of users.  These files typically are kept under /var/hpss/etc.
+The HPSS user authentication files may be separate from the system's authentication files
+(i.e. in /var/hpss/etc/{group,passwd}), but can be set in /var/hpss/etc/env.conf to point
+to any suitable files.  The DSI will also need to store credential files in the /var/hpss/cred
+directory.
+
+Kerberos Configuration
+======================
+Kerberos must be configured for access to the proper Kerberos realm that contains HPSS.
+This file is usually kept in /etc/krb5.conf.  You may need to enable the allow_weak_crypto
+option in the [libdefaults] section if the DSI module can not talk to the HPSS servers.
