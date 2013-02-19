@@ -72,7 +72,6 @@ struct gridftp {
 	gridftp_buffer_pass_t    BufferPassFunc;
 	void                   * BufferPassArg;
 	msg_handle_t           * MsgHandle;
-	globus_off_t             OffsetAdjustment;
 
 	globus_mutex_t           Lock;
 	globus_cond_t            Cond;
@@ -83,7 +82,6 @@ struct gridftp {
 	int                      OpCount;
 	int                      OptOpCount;
 	int                      OptCallRetryCnt;
-	range_list_t           * TranslateRanges;
 	range_list_t           * StreamRanges; /* For ordering retrieves. */
 };
 
@@ -115,6 +113,8 @@ gridftp_init(gridftp_op_type_t             OpType,
              void                       *  EofCallbackArg,
              gridftp_t                  ** GridFTP)
 {
+	globus_off_t    offset = 0;
+	globus_off_t    length = 0;
 	globus_result_t result = GLOBUS_SUCCESS;
 
 	GlobusGFSName(__func__);
@@ -133,7 +133,6 @@ gridftp_init(gridftp_op_type_t             OpType,
 	(*GridFTP)->Operation         = Operation;
 	(*GridFTP)->BufferHandle      = BufferHandle;
 	(*GridFTP)->MsgHandle         = MsgHandle;
-	(*GridFTP)->OffsetAdjustment  = TransferInfo->partial_offset;
 	(*GridFTP)->EofCallbackFunc   = EofCallbackFunc;
 	(*GridFTP)->EofCallbackArg    = EofCallbackArg;
 	(*GridFTP)->EofCallbackCalled = GLOBUS_FALSE;
@@ -160,18 +159,21 @@ gridftp_init(gridftp_op_type_t             OpType,
 			goto cleanup;
 	}
 
-	/* Initialize the file <-> offset range list. */
-	result = range_list_init(&(*GridFTP)->TranslateRanges);
-	if (result != GLOBUS_SUCCESS)
-		goto cleanup;
-
+	/*
+	 * We need to call the appropriate _get_read/write_range() function.
+	 * It will setup Operation to return the correct file offsets. Without
+	 * this call, our first read callback would always return 0 for streams mode
+	 * regardless of REST commands. And since we can not tell streams mode from
+	 * extended block mode, this is critical. We do not need to use offset or
+	 * length; just making the call is good enough.
+	 */
 	switch (OpType)
 	{
 	case GRIDFTP_OP_TYPE_RETR:
-		result = range_list_fill_retr_range((*GridFTP)->TranslateRanges, TransferInfo);
+		globus_gridftp_server_get_read_range(Operation, &offset, &length);
 		break;
 	case GRIDFTP_OP_TYPE_STOR:
-		result = range_list_fill_stor_range((*GridFTP)->TranslateRanges, TransferInfo);
+		globus_gridftp_server_get_write_range(Operation, &offset, &length);
 		break;
 	}
 
@@ -209,7 +211,6 @@ gridftp_destroy(gridftp_t * GridFTP)
 	if (GridFTP != NULL)
 	{
 		/* Destroy the file range lists. */
-		range_list_destroy(GridFTP->TranslateRanges);
 		range_list_destroy(GridFTP->StreamRanges);
 
 		globus_mutex_destroy(&GridFTP->Lock);
@@ -339,12 +340,11 @@ gridftp_register_read_callback(globus_gfs_operation_t   Operation,
                                globus_result_t          Result,
                                globus_byte_t *          Buffer,
                                globus_size_t            BytesRead,
-                               globus_off_t             TransferOffset,
+                               globus_off_t             FileOffset,
                                globus_bool_t            Eof,
                                void                   * CallbackArg)
 {
-	gridftp_t    * gridftp     = NULL;
-	globus_off_t   file_offset = 0;
+	gridftp_t * gridftp = NULL;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -357,23 +357,17 @@ gridftp_register_read_callback(globus_gfs_operation_t   Operation,
 	/* Pass the buffer forward. */
 	if (Result == GLOBUS_SUCCESS && BytesRead > 0)
 	{
-		/* Translate from transfer offset to file offset */
-		file_offset = range_list_get_file_offset(gridftp->TranslateRanges, TransferOffset);
-
-		/* Add the offset adjustment. */
-		file_offset += gridftp->OffsetAdjustment;
-
 		/* Mark the buffer as ready. */
 		buffer_set_buffer_ready(gridftp->BufferHandle,
 		                        gridftp->PrivateBufferID,
 		                        (char *)Buffer,
-		                        file_offset,
+		                        FileOffset,
 		                        BytesRead);
 
 		/* Now pass the buffer forward. */
 		gridftp->BufferPassFunc(gridftp->BufferPassArg, 
 		                       (char*)Buffer, 
-		                       file_offset,
+		                       FileOffset,
 		                       BytesRead);
 	}
 
@@ -503,12 +497,11 @@ static void
 gridftp_register_write(gridftp_t     * GridFTP,
                        globus_bool_t   FromCallback)
 {
-	int               opt_count       = 0;
-	char            * buffer          = NULL;
-	globus_off_t      length          = 0;
-	globus_off_t      file_offset     = 0;
-	globus_off_t      transfer_offset = 0;
-	globus_result_t   result          = GLOBUS_SUCCESS;
+	int               opt_count   = 0;
+	char            * buffer      = NULL;
+	globus_off_t      length      = 0;
+	globus_off_t      file_offset = 0;
+	globus_result_t   result      = GLOBUS_SUCCESS;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -571,22 +564,11 @@ gridftp_register_write(gridftp_t     * GridFTP,
 			/* Remove this buffer from the range. */
 			range_list_delete(GridFTP->StreamRanges, file_offset, length);
 
-			/*
-			 * The initial offset of any transfer (stream or extended, restart, 
-			 * partial or full) is always 0.
-			 */
-
-			/* Convert the file offset to the transfer offset. */
-			transfer_offset = range_list_get_transfer_offset(GridFTP->TranslateRanges, file_offset);
-
-			/* Subtract the offset adjustment. */
-			transfer_offset -= GridFTP->OffsetAdjustment;
-
 			/* Register this write. */
 			result = globus_gridftp_server_register_write(GridFTP->Operation,
 			                                              (globus_byte_t*)buffer,
 			                                              length,
-			                                              transfer_offset,
+			                                              file_offset,
 			                                              0, /* Stripe index. */
 			                                              gridftp_register_write_callback,
 			                                              GridFTP);
