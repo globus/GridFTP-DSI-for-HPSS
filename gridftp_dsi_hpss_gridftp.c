@@ -421,6 +421,12 @@ gridftp_register_read(gridftp_t     * GridFTP,
 		/* Copy out the opt count. */
 		opt_count = GridFTP->OptOpCount;
 
+/*
+ * Because of bug GT-296, we are going to only submit one buffer at
+ * at time to avoid the EOF race condition.
+ */
+opt_count = 1;
+
 		/*
 		 * If we are called from the callback, we'll increment opt_count to include
 		 * us since we still exist but are exitting soon. 
