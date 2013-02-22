@@ -444,6 +444,14 @@ misc_file_archived(char          * Path,
 		goto cleanup;
 	}
 
+	/* Handle zero length files. */
+	if (eqz64m(xfileattr.Attrs.DataLength))
+	{
+		*Archived = GLOBUS_FALSE;
+		*TapeOnly = GLOBUS_FALSE;
+		goto cleanup;
+	}
+
 	/* Determine the archive status. */
 	for (storage_level = 0; storage_level < HPSS_MAX_STORAGE_LEVELS; storage_level++)
 	{
