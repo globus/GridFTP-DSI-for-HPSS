@@ -101,7 +101,7 @@ struct transfer_data {
 	globus_cond_t             Cond;
 	globus_result_t           Result;
 	globus_bool_t             Eof;
-	globus_bool_t             ControlComplete;
+	globus_bool_t             ControlShutDownMsg;
 	globus_off_t              TotalBufferCount;
 	globus_off_t              DeadLockBufferCount;
 	range_list_t            * StorRangeList;
@@ -268,7 +268,7 @@ transfer_data_msg_recv(void          * CallbackArg,
 			globus_mutex_lock(&transfer_data->Lock);
 			{
 				/* Indicate that the control says we are done. */
-				transfer_data->ControlComplete = GLOBUS_TRUE;
+				transfer_data->ControlShutDownMsg = GLOBUS_TRUE;
 				/* Wake anyone that is waiting. */
 				globus_cond_signal(&transfer_data->Cond);
 			}
@@ -750,15 +750,20 @@ transfer_data_run(transfer_data_t * TransferData)
 					break;
 				if (TransferData->Result != GLOBUS_SUCCESS)
 					break;
-				if (TransferData->ControlComplete == GLOBUS_TRUE)
+				if (TransferData->ControlShutDownMsg == GLOBUS_TRUE)
 					break;
 
 				/* Wait for an event. */
 				globus_cond_wait(&TransferData->Cond, &TransferData->Lock);
 			}
 
-			if (TransferData->Result == GLOBUS_SUCCESS)
+			/* If no error has occurred on either size... */
+			if (TransferData->Result == GLOBUS_SUCCESS &&
+			    TransferData->ControlShutDownMsg == GLOBUS_FALSE)
+			{
+				/* Flush the data. */
 				should_flush = GLOBUS_TRUE;
+			}
 		}
 		globus_mutex_unlock(&TransferData->Lock);
 
