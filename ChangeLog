@@ -9,6 +9,7 @@ Version 1.2 (RC1)
 	- Ordered buffers for RETR in streams mode
 	- Another fix for transfer restarts
 	- Prevent hang when hpss_PIOExecute() encounters an error
+	- Limited gridftp read requests to one at a time to avoid bug GT-296
 
 Version 1.1 : January 28, 2013
 	- Fixed Range Markers with partial stores (ESTO)
