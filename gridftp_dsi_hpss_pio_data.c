@@ -55,10 +55,17 @@
  */
 #include "gridftp_dsi_hpss_transfer_data.h"
 #include "gridftp_dsi_hpss_pio_control.h"
+#include "gridftp_dsi_hpss_range_list.h"
 #include "gridftp_dsi_hpss_pio_data.h"
 #include "gridftp_dsi_hpss_buffer.h"
 #include "gridftp_dsi_hpss_misc.h"
 #include "gridftp_dsi_hpss_msg.h"
+
+typedef enum {
+	PIO_DATA_OP_TYPE_RETR,
+	PIO_DATA_OP_TYPE_STOR,
+	PIO_DATA_OP_TYPE_CKSM,
+} pio_data_op_type_t;
 
 struct pio_data {
 	pio_data_op_type_t        OpType;
@@ -71,6 +78,7 @@ struct pio_data {
 	msg_handle_t            * MsgHandle;
 	globus_off_t              BufferSize;
 	msg_register_id_t         MsgRegisterID;
+	range_list_t            * RangeList;
 
 	globus_mutex_t            Lock;
 	globus_cond_t             Cond;
@@ -105,13 +113,13 @@ pio_data_msg_recv(void          * CallbackArg,
                   int             MsgLen,
                   void          * Msg);
 
-globus_result_t
-pio_data_init(pio_data_op_type_t         OpType,
-              buffer_handle_t         *  BufferHandle,
-              msg_handle_t            *  MsgHandle,
-              pio_data_eof_callback_t    EofCallbackFunc,
-              void                    *  EofCallbackArg,
-              pio_data_t              ** PioData)
+static globus_result_t
+pio_data_common_init(pio_data_op_type_t         OpType,
+                     buffer_handle_t         *  BufferHandle,
+                     msg_handle_t            *  MsgHandle,
+                     pio_data_eof_callback_t    EofCallbackFunc,
+                     void                    *  EofCallbackArg,
+                     pio_data_t              ** PioData)
 {
 	globus_result_t result = GLOBUS_SUCCESS;
 
@@ -161,6 +169,107 @@ cleanup:
 	return GLOBUS_SUCCESS;
 }
 
+globus_result_t
+pio_data_stor_init(buffer_handle_t         *  BufferHandle,
+                   msg_handle_t            *  MsgHandle,
+                   pio_data_eof_callback_t    EofCallbackFunc,
+                   void                    *  EofCallbackArg,
+                   pio_data_t              ** PioData)
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	/* Perform the common init. */
+	result = pio_data_common_init(PIO_DATA_OP_TYPE_STOR,
+	                              BufferHandle,
+	                              MsgHandle,
+	                              EofCallbackFunc,
+	                              EofCallbackArg,
+	                              PioData);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+cleanup:
+	GlobusGFSHpssDebugExit();
+	return result;
+}
+
+globus_result_t
+pio_data_retr_init(buffer_handle_t            *  BufferHandle,
+                   msg_handle_t               *  MsgHandle,
+                   globus_gfs_transfer_info_t *  TransferInfo,
+                   pio_data_eof_callback_t       EofCallbackFunc,
+                   void                       *  EofCallbackArg,
+                   pio_data_t                 ** PioData)
+
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	/* Perform the common init. */
+	result = pio_data_common_init(PIO_DATA_OP_TYPE_RETR,
+	                              BufferHandle,
+	                              MsgHandle,
+	                              EofCallbackFunc,
+	                              EofCallbackArg,
+	                              PioData);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	/* Initialize our range list. */
+	result = range_list_init(&(*PioData)->RangeList);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	/* Populate the range list with our transfer ranges. */
+	result = range_list_fill_retr_range((*PioData)->RangeList, TransferInfo);
+
+cleanup:
+	GlobusGFSHpssDebugExit();
+	return result;
+}
+
+globus_result_t
+pio_data_cksm_init(buffer_handle_t            *  BufferHandle,
+                   msg_handle_t               *  MsgHandle,
+                   globus_gfs_command_info_t  *  CommandInfo,
+                   pio_data_eof_callback_t       EofCallbackFunc,
+                   void                       *  EofCallbackArg,
+                   pio_data_t                 ** PioData)
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	/* Perform the common init. */
+	result = pio_data_common_init(PIO_DATA_OP_TYPE_CKSM,
+	                              BufferHandle,
+	                              MsgHandle,
+	                              EofCallbackFunc,
+	                              EofCallbackArg,
+	                              PioData);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	/* Initialize our range list. */
+	result = range_list_init(&(*PioData)->RangeList);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	/* Populate the range list with our transfer ranges. */
+	result = range_list_fill_cksm_range((*PioData)->RangeList, CommandInfo);
+
+cleanup:
+	GlobusGFSHpssDebugExit();
+	return result;
+}
+
+
 void
 pio_data_set_buffer_pass_func(pio_data_t             *  PioData,
                               pio_data_buffer_pass_t    BufferPassFunc,
@@ -185,6 +294,9 @@ pio_data_destroy(pio_data_t * PioData)
 	{
 		/* Unregister to receive messages. */
 		msg_unregister(PioData->MsgHandle, PioData->MsgRegisterID);
+
+		/* Destroy our range list. */
+		range_list_destroy(PioData->RangeList);
 
 		globus_mutex_destroy(&PioData->Lock);
 		globus_cond_destroy(&PioData->Cond);
@@ -320,6 +432,7 @@ pio_data_buffer(void         * CallbackArg,
 		break;
 
 	case PIO_DATA_OP_TYPE_RETR:
+	case PIO_DATA_OP_TYPE_CKSM:
 		/* Put this buffer on our free list */
 		buffer_store_free_buffer(pio_data->BufferHandle,
 		                         pio_data->PrivateBufferID,
@@ -365,6 +478,10 @@ pio_data_flush(pio_data_t * PioData)
 			                                                   PioData->PrivateBufferID);
 
 			if (ready_buffer_count == 0)
+				break;
+
+			/* Bail on error. */
+			if (PioData->Result != GLOBUS_SUCCESS)
 				break;
 
 			globus_cond_wait(&PioData->Cond, &PioData->Lock);
@@ -492,57 +609,158 @@ pio_data_register_read_callback(void         *  Arg,
                                 unsigned int *  ReadyBufferLength,
                                 void         ** ReadyBuffer)
 {
-	int             retval      = 0;
-	pio_data_t    * pio_data    = (pio_data_t *) Arg;
-	char          * free_buffer = NULL;
-	globus_off_t    file_offset = 0;
-	globus_off_t    length      = 0;
+	int             retval        = 0;
+	pio_data_t    * pio_data      = (pio_data_t *) Arg;
+	char          * free_buffer   = NULL;
+	int             bytes_to_copy = 0;
+	globus_off_t    gap_length    = 0;
+	globus_off_t    file_offset   = 0;
+	globus_off_t    free_length   = 0;
+	globus_off_t    free_offset   = 0;
+	globus_off_t    ready_offset  = 0;
+	globus_off_t    range_offset  = 0;
+	globus_off_t    range_length  = 0;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	globus_mutex_lock(&pio_data->Lock);
+	/* Convert from u64 to globus_off_t */
+	CONVERT_U64_TO_LONGLONG(FileOffset, file_offset);
+
+	/* While we still have new data... */
+	while (ready_offset < *ReadyBufferLength)
 	{
-		while (free_buffer == NULL)
+		/* Peek at the range we expect to get. */
+		range_list_peek(pio_data->RangeList, &range_offset, &range_length);
+
+		/*  Make sure something hasn't gone wrong. */
+		globus_assert(range_offset <= file_offset);
+
+		globus_mutex_lock(&pio_data->Lock);
 		{
-			if (pio_data->Stop == GLOBUS_TRUE)
+			while (free_buffer == NULL)
 			{
-				/* Set our retval so we stop. */
-				retval = 1;
-				goto unlock;
+				if (pio_data->Stop == GLOBUS_TRUE)
+				{
+					/* Set our retval so we stop. */
+					retval = 1;
+					goto unlock;
+				}
+
+				/* Get a free buffer. */
+				buffer_get_free_buffer(pio_data->BufferHandle,
+				                       pio_data->PrivateBufferID,
+				                       &free_buffer,
+				                       &free_length);
+
+				if (free_buffer == NULL)
+					globus_cond_wait(&pio_data->Cond, &pio_data->Lock);
+			}
+		}
+unlock:
+		globus_mutex_unlock(&pio_data->Lock);
+
+		/* Bail on shutdown. */
+		if (retval == 1)
+			break;
+
+		/* Reset the free offset. */
+		free_offset = 0;
+		/* Reset bytes_to_copy. */
+		bytes_to_copy = 0;
+	
+		/* If we have a gap between what we expected and what we got... */
+		if (range_offset < file_offset)
+		{
+			/*
+			 * We'll write zeroes for the difference. Use a 64 bit variable to
+			 * support large gaps.
+			 */
+			gap_length = file_offset - range_offset;
+
+			/* Initialize bytes_to_copy, this may overflow but the next check
+			 * will fix that.
+			 */
+			bytes_to_copy = gap_length;
+
+			/* Truncate for the length of the free buffer. */
+			if (gap_length > free_length)
+				bytes_to_copy = free_length;
+
+			/* Truncate for a short 'expected range'. */
+			if (bytes_to_copy > range_length)
+				bytes_to_copy = range_length;
+
+			/* Include the zeroes. */
+			memset(free_buffer, 0, bytes_to_copy);
+
+			/* Remove this range from our range list. */
+			range_list_delete(pio_data->RangeList, range_offset, bytes_to_copy);
+
+			/* Increment free_offset. */
+			free_offset += bytes_to_copy;
+
+			/* If we filled the buffer or wrote the whole range... */
+			if (bytes_to_copy == free_length || bytes_to_copy == range_length)
+			{
+				/* Now send this buffer up stream. */
+				pio_data->BufferPassFunc(pio_data->BufferPassArg,
+				                         free_buffer,
+				                         range_offset,
+				                         bytes_to_copy);
+
+				/* Release our reference on the free buffer. */
+				free_buffer = NULL;
+
+				/* Start over. */
+				continue;
 			}
 
-			/* Get a free buffer. */
-			buffer_get_free_buffer(pio_data->BufferHandle,
-			                       pio_data->PrivateBufferID,
-			                       &free_buffer,
-			                       &length);
-
-			if (free_buffer == NULL)
-				globus_cond_wait(&pio_data->Cond, &pio_data->Lock);
+			/* Increment range offset, range length */
+			range_offset += bytes_to_copy;
+			range_length -= bytes_to_copy;
 		}
-	}
-unlock:
-	globus_mutex_unlock(&pio_data->Lock);
 
-	if (free_buffer != NULL)
-	{
-		/* Copy our data out. */
-		memcpy(free_buffer, *ReadyBuffer, *ReadyBufferLength);
+		/*
+		 * Copy out real data.
+		 */
 
-		/* Convert from u64 to globus_off_t */
-		CONVERT_U64_TO_LONGLONG(FileOffset, file_offset);
+		/*  Make sure something hasn't gone wrong. */
+		globus_assert(file_offset == range_offset);
+
+		/* Try to copy all remaining data. */
+		bytes_to_copy = *ReadyBufferLength - ready_offset;
+
+		/* Truncate for the length of the free buffer. */
+		if (bytes_to_copy > (free_length - free_offset))
+			bytes_to_copy = free_length - free_offset;
+
+		/* Copy in real data. */
+		memcpy(free_buffer  + free_offset, 
+		       *ReadyBuffer + ready_offset, 
+		       bytes_to_copy);
+
+		/* Remove this range from our range list. */
+		range_list_delete(pio_data->RangeList, range_offset, bytes_to_copy);
 
 		/* Now send this buffer up stream. */
 		pio_data->BufferPassFunc(pio_data->BufferPassArg,
 		                         free_buffer,
 		                         file_offset,
-		                         *ReadyBufferLength);
+		                         bytes_to_copy + free_offset);
 
-		/* Update our ready buffer length. */
-		*ReadyBufferLength = length;
+		/* Release our reference on the free buffer. */
+		free_buffer = NULL;
+
+		/* Increment our file offset. */
+		file_offset += bytes_to_copy;
+
+		/* Increment our ready buffer offset. */
+		ready_offset += bytes_to_copy;
 	}
 
+	/* Update our ready buffer length. */
+	*ReadyBufferLength = free_length;
 
 	GlobusGFSHpssDebugExit();
 	return retval;

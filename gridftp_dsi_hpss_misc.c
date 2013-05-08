@@ -444,13 +444,24 @@ misc_file_archived(char          * Path,
 		goto cleanup;
 	}
 
+	/* Handle zero length files. */
+	if (eqz64m(xfileattr.Attrs.DataLength))
+	{
+		*Archived = GLOBUS_FALSE;
+		*TapeOnly = GLOBUS_FALSE;
+		goto cleanup;
+	}
+
 	/* Determine the archive status. */
 	for (storage_level = 0; storage_level < HPSS_MAX_STORAGE_LEVELS; storage_level++)
 	{
 		if (xfileattr.SCAttrib[storage_level].Flags & BFS_BFATTRS_LEVEL_IS_DISK)
 		{
 			/* Check for the entire file on disk at this level. */
-			if (eq64m(xfileattr.SCAttrib[storage_level].BytesAtLevel, xfileattr.Attrs.DataLength))
+			/* if (eq64m(xfileattr.SCAttrib[storage_level].BytesAtLevel, xfileattr.Attrs.DataLength)) */
+
+			/* Because of holes, we can not expect all bytes to be disk. */
+			if (neqz64m(xfileattr.SCAttrib[storage_level].BytesAtLevel))
 			{
 				*Archived = GLOBUS_FALSE;
 				break;

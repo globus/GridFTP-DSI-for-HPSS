@@ -49,6 +49,7 @@
  * Local includes.
  */
 #include "gridftp_dsi_hpss_transfer_data.h"
+#include "gridftp_dsi_hpss_range_list.h"
 #include "gridftp_dsi_hpss_gridftp.h"
 #include "gridftp_dsi_hpss_buffer.h"
 #include "gridftp_dsi_hpss_misc.h"
@@ -71,7 +72,6 @@ struct gridftp {
 	gridftp_buffer_pass_t    BufferPassFunc;
 	void                   * BufferPassArg;
 	msg_handle_t           * MsgHandle;
-	globus_off_t             OffsetAdjustment;
 
 	globus_mutex_t           Lock;
 	globus_cond_t            Cond;
@@ -80,6 +80,9 @@ struct gridftp {
 	globus_bool_t            EofCallbackCalled;
 	globus_result_t          Result;
 	int                      OpCount;
+	int                      OptOpCount;
+	int                      OptCallRetryCnt;
+	range_list_t           * StreamRanges; /* For ordering retrieves. */
 };
 
 static void
@@ -87,7 +90,9 @@ gridftp_register_read(gridftp_t     * GridFTP,
                       globus_bool_t   FromCallback);
 
 static void
-gridftp_register_write(gridftp_t * GridFTP);
+gridftp_register_write(gridftp_t    * GridFTP,
+                      globus_bool_t   FromCallback);
+
 
 static void
 gridftp_record_error(gridftp_t * GridFTP, globus_result_t Result);
@@ -108,6 +113,8 @@ gridftp_init(gridftp_op_type_t             OpType,
              void                       *  EofCallbackArg,
              gridftp_t                  ** GridFTP)
 {
+	globus_off_t    offset = 0;
+	globus_off_t    length = 0;
 	globus_result_t result = GLOBUS_SUCCESS;
 
 	GlobusGFSName(__func__);
@@ -126,7 +133,6 @@ gridftp_init(gridftp_op_type_t             OpType,
 	(*GridFTP)->Operation         = Operation;
 	(*GridFTP)->BufferHandle      = BufferHandle;
 	(*GridFTP)->MsgHandle         = MsgHandle;
-	(*GridFTP)->OffsetAdjustment  = TransferInfo->partial_offset;
 	(*GridFTP)->EofCallbackFunc   = EofCallbackFunc;
 	(*GridFTP)->EofCallbackArg    = EofCallbackArg;
 	(*GridFTP)->EofCallbackCalled = GLOBUS_FALSE;
@@ -139,6 +145,37 @@ gridftp_init(gridftp_op_type_t             OpType,
 	globus_mutex_init(&(*GridFTP)->Lock, NULL);
 	globus_cond_init(&(*GridFTP)->Cond, NULL);
 
+	/* On retrieves... */
+	if (OpType == GRIDFTP_OP_TYPE_RETR)
+	{
+		/* Generate the stream range list. */
+		result = range_list_init(&(*GridFTP)->StreamRanges);
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+
+		/* Fill the range list. */
+		result = range_list_fill_retr_range((*GridFTP)->StreamRanges, TransferInfo);
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+	}
+
+	/*
+	 * We need to call the appropriate _get_read/write_range() function.
+	 * It will setup Operation to return the correct file offsets. Without
+	 * this call, our first read callback would always return 0 for streams mode
+	 * regardless of REST commands. And since we can not tell streams mode from
+	 * extended block mode, this is critical. We do not need to use offset or
+	 * length; just making the call is good enough.
+	 */
+	switch (OpType)
+	{
+	case GRIDFTP_OP_TYPE_RETR:
+		globus_gridftp_server_get_read_range(Operation, &offset, &length);
+		break;
+	case GRIDFTP_OP_TYPE_STOR:
+		globus_gridftp_server_get_write_range(Operation, &offset, &length);
+		break;
+	}
 
 cleanup:
 	if (result != GLOBUS_SUCCESS)
@@ -173,6 +210,9 @@ gridftp_destroy(gridftp_t * GridFTP)
 
 	if (GridFTP != NULL)
 	{
+		/* Destroy the file range lists. */
+		range_list_destroy(GridFTP->StreamRanges);
+
 		globus_mutex_destroy(&GridFTP->Lock);
 		globus_cond_destroy(&GridFTP->Cond);
 		globus_free(GridFTP);
@@ -219,7 +259,7 @@ gridftp_buffer(void         * CallbackArg,
 		                          Length);
 
 		/* Fire off more writes. */
-		gridftp_register_write(gridftp);
+		gridftp_register_write(gridftp, GLOBUS_FALSE);
 
 		break;
 	}
@@ -291,12 +331,16 @@ cleanup:
 	GlobusGFSHpssDebugExit();
 }
 
+/*
+ * The initial offset of any transfer (stream or extended, restart, 
+ * partial or full) is always 0.
+ */
 static void
 gridftp_register_read_callback(globus_gfs_operation_t   Operation,
                                globus_result_t          Result,
                                globus_byte_t *          Buffer,
                                globus_size_t            BytesRead,
-                               globus_off_t             TransferOffset,
+                               globus_off_t             FileOffset,
                                globus_bool_t            Eof,
                                void                   * CallbackArg)
 {
@@ -317,13 +361,13 @@ gridftp_register_read_callback(globus_gfs_operation_t   Operation,
 		buffer_set_buffer_ready(gridftp->BufferHandle,
 		                        gridftp->PrivateBufferID,
 		                        (char *)Buffer,
-		                        TransferOffset + gridftp->OffsetAdjustment,
+		                        FileOffset,
 		                        BytesRead);
 
 		/* Now pass the buffer forward. */
 		gridftp->BufferPassFunc(gridftp->BufferPassArg, 
 		                       (char*)Buffer, 
-		                       TransferOffset + gridftp->OffsetAdjustment, 
+		                       FileOffset,
 		                       BytesRead);
 	}
 
@@ -363,17 +407,39 @@ gridftp_register_read(gridftp_t     * GridFTP,
 		if (GridFTP->Stop == GLOBUS_TRUE)
 			goto unlock;
 
-		/* Until we can find a real fix... */
-		if (FromCallback == GLOBUS_FALSE && GridFTP->OpCount > 0)
-			goto unlock;
+#ifdef NOT
+/*
+ * Skip this until bug GT-376 is fixed.
+ */
+		/* Throttle this call until there is a fix (GT 5.2.4). */
+		if (GridFTP->OptCallRetryCnt-- == 0)
+		{
+			/* Get the optimal concurrency count. */
+			globus_gridftp_server_get_optimal_concurrency(GridFTP->Operation, 
+			                                              &GridFTP->OptOpCount);
 
-		if (FromCallback == GLOBUS_TRUE && GridFTP->OpCount > 1)
-			goto unlock;
+			/* Reset the retry count. */
+			GridFTP->OptCallRetryCnt = 64;
+		}
+#endif /* NOT */
 
-		/* Get the optimal concurrency count. */
-		globus_gridftp_server_get_optimal_concurrency(GridFTP->Operation, &opt_count);
+		/* Copy out the opt count. */
+		opt_count = GridFTP->OptOpCount;
 
-		while (opt_count >= GridFTP->OpCount)
+/*
+ * Because of bug GT-296, we are going to only submit one buffer at
+ * at time to avoid the EOF race condition.
+ */
+opt_count = 1;
+
+		/*
+		 * If we are called from the callback, we'll increment opt_count to include
+		 * us since we still exist but are exitting soon. 
+		 */
+		if (FromCallback == GLOBUS_TRUE)
+			opt_count++;
+
+		while (opt_count > GridFTP->OpCount)
 		{
 			/* Get a free buffer. */
 			buffer_get_free_buffer(GridFTP->BufferHandle,
@@ -430,7 +496,7 @@ gridftp_register_write_callback(globus_gfs_operation_t   Operation,
 	gridftp_record_error(gridftp, Result);
 
 	/* Register more writes. */
-	gridftp_register_write(gridftp);
+	gridftp_register_write(gridftp, GLOBUS_TRUE);
 
 	/* Decrement the current op count. */
 	gridftp_decrement_op_count(gridftp);
@@ -439,13 +505,14 @@ gridftp_register_write_callback(globus_gfs_operation_t   Operation,
 }
 
 static void
-gridftp_register_write(gridftp_t * GridFTP)
+gridftp_register_write(gridftp_t     * GridFTP,
+                       globus_bool_t   FromCallback)
 {
-	int               opt_count = 0;
-	char            * buffer    = NULL;
-	globus_off_t      offset    = 0;
-	globus_off_t      length    = 0;
-	globus_result_t   result    = GLOBUS_SUCCESS;
+	int               opt_count   = 0;
+	char            * buffer      = NULL;
+	globus_off_t      length      = 0;
+	globus_off_t      file_offset = 0;
+	globus_result_t   result      = GLOBUS_SUCCESS;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -461,26 +528,58 @@ gridftp_register_write(gridftp_t * GridFTP)
 		if (GridFTP->Stop == GLOBUS_TRUE)
 			goto unlock;
 
-		/* Get the optimal concurrency count. */
-		globus_gridftp_server_get_optimal_concurrency(GridFTP->Operation, &opt_count);
+		/* Throttle this call until there is a fix (GT 5.2.4). */
+		if (GridFTP->OptCallRetryCnt-- == 0)
+		{
+			/* Get the optimal concurrency count. */
+			globus_gridftp_server_get_optimal_concurrency(GridFTP->Operation, 
+			                                              &GridFTP->OptOpCount);
+
+			/* Reset the retry count. */
+			GridFTP->OptCallRetryCnt = 64;
+		}
+
+		/* Copy out the opt count. */
+		opt_count = GridFTP->OptOpCount;
+
+		/*
+		 * If we are called from the callback, we'll increment opt_count to include
+		 * us since we still exist but are exitting soon. 
+		 */
+		if (FromCallback == GLOBUS_TRUE)
+			opt_count++;
 
 		while (opt_count >= GridFTP->OpCount)
 		{
-			/* Get the next ready buffer. */
-			buffer_get_next_ready_buffer(GridFTP->BufferHandle,
-			                             GridFTP->PrivateBufferID,
-			                             &buffer,
-			                             &offset,
-			                             &length);
+			/*
+			 * Assume STREAM mode. Buffers must flow in order.
+			 */
+
+			/* Bail if the ranges are done. */
+			if (range_list_empty(GridFTP->StreamRanges))
+				break;
+				
+			/* Get the next range we need to send. */
+			range_list_peek(GridFTP->StreamRanges, &file_offset, &length);
+
+			/* Get the ready buffer. */
+			buffer_get_ready_buffer(GridFTP->BufferHandle,
+			                        GridFTP->PrivateBufferID,
+			                        &buffer,
+			                        file_offset,
+			                        &length);
 
 			if (buffer == NULL)
 				break;
+
+			/* Remove this buffer from the range. */
+			range_list_delete(GridFTP->StreamRanges, file_offset, length);
 
 			/* Register this write. */
 			result = globus_gridftp_server_register_write(GridFTP->Operation,
 			                                              (globus_byte_t*)buffer,
 			                                              length,
-			                                              offset-GridFTP->OffsetAdjustment,
+			                                              file_offset,
 			                                              0, /* Stripe index. */
 			                                              gridftp_register_write_callback,
 			                                              GridFTP);

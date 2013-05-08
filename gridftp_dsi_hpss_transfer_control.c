@@ -110,6 +110,15 @@ transfer_control_event_range_complete(void            * CallbackArg,
 		{
 			/* Update our state. */
 			transfer_control->State = TRANSFER_CONTROL_WAIT_FOR_DATA_COMPLETE;
+
+			/* Tell the data side to shutdown. */
+			if (Result != GLOBUS_SUCCESS)
+				result = msg_send(transfer_control->MsgHandle,
+				                  MSG_COMP_ID_TRANSFER_DATA,
+				                  MSG_COMP_ID_TRANSFER_CONTROL,
+				                  TRANSFER_CONTROL_MSG_TYPE_SHUTDOWN,
+				                  0,
+				                  NULL);
 			goto unlock;
 		}
 

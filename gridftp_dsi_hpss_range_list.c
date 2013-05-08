@@ -464,6 +464,90 @@ range_list_pop(range_list_t * RangeList,
 	GlobusGFSHpssDebugExit();
 }
 
+/*
+ * With the way file ranges work (it's the expected ranges for
+ * this transfer in terms of file offsets), FileOffset must
+ * fall within a range in FileRangeList.
+ */
+globus_off_t
+range_list_get_transfer_offset(range_list_t * FileRangeList,
+                               globus_off_t   FileOffset)
+{
+	range_t      * range           = NULL;
+	globus_off_t   transfer_offset = 0;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	globus_mutex_lock(&FileRangeList->Lock);
+	{
+		/* For each range. */
+		for (range = FileRangeList->Head; range != NULL; range = range->Next)
+		{
+			/* If FileOffset came before this range, it was invalid. */
+			globus_assert(FileOffset >= range->Offset);
+
+			/* If FileOffset falls on this range... */
+			if (FileOffset <= (range->Offset + range->Length))
+			{
+				transfer_offset += FileOffset - range->Offset;
+				break;
+			}
+
+			/* FileOffset comes after this range, add the entire length. */
+			transfer_offset += range->Length;
+		}
+
+		/* File offset should have fallen within a range. */
+		globus_assert(range != NULL);
+	}
+	globus_mutex_unlock(&FileRangeList->Lock);
+
+	GlobusGFSHpssDebugExit();
+
+	return transfer_offset;
+}
+
+/*
+ * With the way file ranges work (it's the expected ranges for
+ * this transfer in terms of file offsets), the returned file offset
+ * must fall within a range in FileRangeList.
+ */
+globus_off_t
+range_list_get_file_offset(range_list_t * FileRangeList,
+                           globus_off_t   TransferOffset)
+{
+	range_t      * range       = NULL;
+	globus_off_t   file_offset = 0;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	globus_mutex_lock(&FileRangeList->Lock);
+	{
+		/* For each range. */
+		for (range = FileRangeList->Head; range != NULL; range = range->Next)
+		{
+			if (TransferOffset < range->Length)
+			{
+				/* Add in the remaining transfer offset. */
+				file_offset = range->Offset + TransferOffset;
+				break;
+			}
+
+			/* Subtract from our TransferOffset. */
+			TransferOffset -= range->Length;
+		}
+
+		globus_assert(range != NULL);
+	}
+	globus_mutex_unlock(&FileRangeList->Lock);
+
+	GlobusGFSHpssDebugExit();
+
+	return file_offset;
+}
+
 /******************************************************************************
  *
  * NOTE ABOUT RESTART MARKERS, TRANSFER OFFSETS, FILE OFFSETS, PARTIAL OFFSETS

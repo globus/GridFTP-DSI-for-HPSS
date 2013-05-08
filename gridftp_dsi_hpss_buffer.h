@@ -91,6 +91,7 @@ buffer_get_ready_buffer(buffer_handle_t  *  BufferHandle,
                         globus_off_t        Offset,
                         globus_off_t     *  Length);
 
+/* XXX Deprecated. */
 void
 buffer_get_next_ready_buffer(buffer_handle_t  *  BufferHandle,
                              buffer_priv_id_t    PrivateID,

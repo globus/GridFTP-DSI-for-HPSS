@@ -525,6 +525,7 @@ pio_control_execute_thread(void * Arg)
 			u_offset = add64m(u_offset, bytes_moved);
 			u_length = sub64m(u_length, bytes_moved);
 			bytes_moved = cast64(0);
+			memset(&gap_info, 0, sizeof(gap_info));
 
 			/* Call pio execute. */
 			retval = hpss_PIOExecute(pio_control->FileFD,
@@ -533,6 +534,18 @@ pio_control_execute_thread(void * Arg)
 			                         pio_control->PioExecute.StripeGroup,
 			                         &gap_info,
 			                         &bytes_moved);
+
+
+			/*
+			 * It appears that gap_info.offset is relative to u_offset. So you
+			 * must add the two to get the real offset of the gap. Also, if 
+			 * there is a gap, bytes_moved = gap_info.offset since bytes_moved
+			 * is also relative to u_offset.
+			 */
+
+			/* Add in any hole we may have found. */
+			if (neqz64m(gap_info.Length))
+				bytes_moved = add64m(gap_info.Offset, gap_info.Length);
 
 		} while (retval == 0 && !eq64(bytes_moved, u_length));
 

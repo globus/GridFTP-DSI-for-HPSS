@@ -1,3 +1,22 @@
+Version 1.2 : May 8, 2013
+	- Change misc_file_archived() to check for any bytes on disk. Due to holes,
+	  we can not expect DataLength to be on disk.
+	- Added handling for files with gaps during RETR/CKSM
+	- Fixed race condition in gridftp_register_read() which caused a deadlock
+	- Throttled the call to globus_ftp_control_data_query_channels() to avoid
+	  signal 11
+	- Fixed partial checksums deadlock
+	- Ordered buffers for RETR in streams mode
+	- Another fix for transfer restarts
+	- Prevent hang when hpss_PIOExecute() encounters an error
+	- Limited gridftp read requests to one at a time to avoid bug GT-296
+	- Removed call to globus_gridftp_server_get_optimal_concurrency() during read
+	  requests to avoid bug GT-376
+	- Fix to pio_data_register_read_callback() to handle large gaps
+	- Changed when globus_gridftp_server_begin_transfer() is called when
+	  transfers begin in order for the server to more gracefully handle
+	  open errors.
+
 Version 1.1 : January 28, 2013
 	- Fixed Range Markers with partial stores (ESTO)
 	- Fixed transfer restarts
