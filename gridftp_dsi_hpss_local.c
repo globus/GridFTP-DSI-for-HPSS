@@ -215,9 +215,6 @@ local_retr(globus_gfs_operation_t       Operation,
 	/* Cast to our session handle. */
 	session = (session_handle_t *)UserArg;
 
-    /* Inform the server that we are starting. */
-	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
-
 	/* Initialize the monitor */
 	local_monitor_init(Operation, TransferInfo, &monitor);
 
@@ -250,6 +247,9 @@ local_retr(globus_gfs_operation_t       Operation,
 	                                 &transfer_data);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
+
+    /* Inform the server that we are starting. */
+	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
 	/* Start the data side. (sync) */
 	result = transfer_data_run(transfer_data);
@@ -313,9 +313,6 @@ local_stor(globus_gfs_operation_t       Operation,
 	/* Cast to our session handle. */
 	session = (session_handle_t *)UserArg;
 
-    /* Inform the server that we are starting. */
-	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
-
 	/* Initialize the monitor */
 	local_monitor_init(Operation, TransferInfo, &monitor);
 
@@ -349,6 +346,9 @@ local_stor(globus_gfs_operation_t       Operation,
 	                                 &transfer_data);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
+
+    /* Inform the server that we are starting. */
+	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
 	/* Start the data side. (sync) */
 	result = transfer_data_run(transfer_data);
