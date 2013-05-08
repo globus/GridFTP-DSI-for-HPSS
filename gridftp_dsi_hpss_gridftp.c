@@ -407,6 +407,10 @@ gridftp_register_read(gridftp_t     * GridFTP,
 		if (GridFTP->Stop == GLOBUS_TRUE)
 			goto unlock;
 
+#ifdef NOT
+/*
+ * Skip this until bug GT-376 is fixed.
+ */
 		/* Throttle this call until there is a fix (GT 5.2.4). */
 		if (GridFTP->OptCallRetryCnt-- == 0)
 		{
@@ -417,6 +421,7 @@ gridftp_register_read(gridftp_t     * GridFTP,
 			/* Reset the retry count. */
 			GridFTP->OptCallRetryCnt = 64;
 		}
+#endif /* NOT */
 
 		/* Copy out the opt count. */
 		opt_count = GridFTP->OptOpCount;
@@ -434,7 +439,7 @@ opt_count = 1;
 		if (FromCallback == GLOBUS_TRUE)
 			opt_count++;
 
-		while (opt_count >= GridFTP->OpCount)
+		while (opt_count > GridFTP->OpCount)
 		{
 			/* Get a free buffer. */
 			buffer_get_free_buffer(GridFTP->BufferHandle,
