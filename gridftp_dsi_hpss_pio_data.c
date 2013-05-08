@@ -613,6 +613,7 @@ pio_data_register_read_callback(void         *  Arg,
 	pio_data_t    * pio_data      = (pio_data_t *) Arg;
 	char          * free_buffer   = NULL;
 	int             bytes_to_copy = 0;
+	globus_off_t    gap_length    = 0;
 	globus_off_t    file_offset   = 0;
 	globus_off_t    free_length   = 0;
 	globus_off_t    free_offset   = 0;
@@ -671,11 +672,19 @@ unlock:
 		/* If we have a gap between what we expected and what we got... */
 		if (range_offset < file_offset)
 		{
-			/* We'll write zeroes for the difference. */
-			bytes_to_copy = file_offset - range_offset;
+			/*
+			 * We'll write zeroes for the difference. Use a 64 bit variable to
+			 * support large gaps.
+			 */
+			gap_length = file_offset - range_offset;
+
+			/* Initialize bytes_to_copy, this may overflow but the next check
+			 * will fix that.
+			 */
+			bytes_to_copy = gap_length;
 
 			/* Truncate for the length of the free buffer. */
-			if (bytes_to_copy > free_length)
+			if (gap_length > free_length)
 				bytes_to_copy = free_length;
 
 			/* Truncate for a short 'expected range'. */
