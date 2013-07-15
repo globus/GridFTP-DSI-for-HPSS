@@ -84,16 +84,24 @@ GlobusDebugDeclare(GLOBUS_GRIDFTP_SERVER_HPSS);
 
 
 globus_result_t
-misc_gfs_stat(char *  Path,
-              globus_bool_t        FileOnly,
-              globus_bool_t        UseSymlinkInfo,
-              globus_bool_t        IncludePathStat,
-              globus_gfs_stat_t ** GfsStatArray,
-              int               *  GfsStatCount);
+misc_gfs_stat(char              * Path,
+              globus_bool_t       UseSymlinkInfo,
+              globus_gfs_stat_t * GfsStatArray);
+
+globus_result_t
+misc_translate_stat(char              * Name,
+                    hpss_stat_t       * HpssStat,
+                    globus_gfs_stat_t * GlobusStat);
+
+void
+misc_destroy_gfs_stat(globus_gfs_stat_t * GfsStat);
 
 void
 misc_destroy_gfs_stat_array(globus_gfs_stat_t * GfsStatArray,
                             int                 GfsStatCount);
+
+globus_result_t
+misc_build_path(char * Directory, char * EntryName, char ** EntryPath);
 
 globus_result_t
 misc_file_archived(char          * Path,

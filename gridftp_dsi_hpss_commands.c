@@ -70,6 +70,7 @@
 #include "gridftp_dsi_hpss_config.h"
 #include "gridftp_dsi_hpss_misc.h"
 #include "gridftp_dsi_hpss_msg.h"
+#include "config.h"
 
 #ifdef DMALLOC
 /*
@@ -227,22 +228,16 @@ cleanup:
 static globus_result_t
 commands_chgrp(char * Pathname, char * GroupName)
 {
-	int                 retval = 0;
-	gid_t               gid    = 0;
-	globus_result_t     result = GLOBUS_SUCCESS;
-	globus_gfs_stat_t * gfs_stat_array = NULL;
-	int                 gfs_stat_count = 0;
+	int               retval = 0;
+	gid_t             gid    = 0;
+	globus_result_t   result = GLOBUS_SUCCESS;
+	globus_gfs_stat_t gfs_stat_buf;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Stat it, make sure it exists. */
-	result = misc_gfs_stat(Pathname,
-	                       GLOBUS_TRUE,  /* FileOnly        */
-	                       GLOBUS_FALSE, /* UseSymlinkInfo  */
-	                       GLOBUS_TRUE,  /* IncludePathStat */
-	                       &gfs_stat_array,
-	                       &gfs_stat_count);
+	result = misc_gfs_stat(Pathname, GLOBUS_FALSE, &gfs_stat_buf);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
@@ -260,7 +255,7 @@ commands_chgrp(char * Pathname, char * GroupName)
 	}
 
 	/* Now change the group. */
-	retval = hpss_Chown(Pathname, gfs_stat_array[0].uid, gid);
+	retval = hpss_Chown(Pathname, gfs_stat_buf.uid, gid);
 	if (retval != 0)
 	{
 		result = GlobusGFSErrorSystemError("hpss_Chgrp", -retval);
@@ -269,7 +264,7 @@ commands_chgrp(char * Pathname, char * GroupName)
 
 cleanup:
 	/* clean up the statbuf. */
-	misc_destroy_gfs_stat_array(gfs_stat_array, gfs_stat_count);
+	misc_destroy_gfs_stat(&gfs_stat_buf);
 
 	if (result != GLOBUS_SUCCESS)
 	{
@@ -287,18 +282,17 @@ commands_stage_file(char          * Path,
                     globus_bool_t * Staged,
                     globus_bool_t * TapeOnly)
 {
-    int                 retval     = 0;
-    time_t              start_time = time(NULL);
-    hpss_reqid_t        reqid      = 0;
-	globus_bool_t       archived   = GLOBUS_TRUE;
-    globus_result_t     result     = GLOBUS_SUCCESS;
-    globus_abstime_t    timeout;
-    globus_mutex_t      mutex;
-    globus_cond_t       cond;
-    hpssoid_t           bitfile_id;
-    u_signed64          size;
-	globus_gfs_stat_t * stat_array = NULL;
-	int                 stat_count = 0;
+    int               retval     = 0;
+    time_t            start_time = time(NULL);
+    hpss_reqid_t      reqid      = 0;
+	globus_bool_t     archived   = GLOBUS_TRUE;
+    globus_result_t   result     = GLOBUS_SUCCESS;
+    globus_abstime_t  timeout;
+    globus_mutex_t    mutex;
+    globus_cond_t     cond;
+    hpssoid_t         bitfile_id;
+    u_signed64        size;
+	globus_gfs_stat_t gfs_stat_buf;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -310,17 +304,12 @@ commands_stage_file(char          * Path,
     globus_cond_init(&cond, NULL);
 
     /* Stat the object. */
-	result = misc_gfs_stat(Path,
-	                       GLOBUS_TRUE,
-	                       GLOBUS_FALSE,
-	                       GLOBUS_TRUE,
-	                       &stat_array,
-	                       &stat_count);
+	result = misc_gfs_stat(Path, GLOBUS_FALSE, &gfs_stat_buf);
     if (result != GLOBUS_SUCCESS)
         goto cleanup;
 
     /* Check if it is a file. */
-    if (!S_ISREG(stat_array[0].mode))
+    if (!S_ISREG(gfs_stat_buf.mode))
     {
         *Staged = GLOBUS_TRUE;
         goto cleanup;
@@ -346,7 +335,7 @@ commands_stage_file(char          * Path,
 	 * will request the file stage every second until complete.
 	 */
 
-    CONVERT_LONGLONG_TO_U64(stat_array[0].size, size);
+    CONVERT_LONGLONG_TO_U64(gfs_stat_buf.size, size);
     retval = hpss_StageCallBack(Path, cast64m(0), size, 0, NULL, BFS_STAGE_ALL, &reqid, &bitfile_id);
     if (retval != 0)
     {
@@ -380,7 +369,7 @@ cleanup:
     globus_cond_destroy(&cond);
 
     /* Release the stat memory. */
-    misc_destroy_gfs_stat_array(stat_array, stat_count);
+    misc_destroy_gfs_stat(&gfs_stat_buf);
 
     GlobusGFSHpssDebugExit();
     return result;
@@ -948,12 +937,37 @@ commands_handler(globus_gfs_operation_t      Operation,
 		break;
 
 	case GLOBUS_GFS_CMD_RNTO:
+#ifdef MARK_RENAMED_FILES
+		{
+			hpss_userattr_list_t attr_list;
+
+			attr_list.len  = 1;
+			attr_list.Pair = malloc(sizeof(hpss_userattr_t));
+			if (!attr_list.Pair)
+			{
+				result = GlobusGFSErrorMemory("hpss_userattr_t");
+				break;
+			}
+
+			attr_list.Pair[0].Key = "/hpss/ncsa/quota/Renamed";
+			attr_list.Pair[0].Value = "1";
+
+			retval = hpss_UserAttrSetAttrs(CommandInfo->from_pathname, &attr_list, NULL);
+			free(attr_list.Pair);
+			if (retval)
+        		result = GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
+		}
+#endif /* MARK_RENAMED_FILES */
+
 		retval = hpss_Rename(CommandInfo->from_pathname, CommandInfo->pathname);
 		if (retval != 0)
         	result = GlobusGFSErrorSystemError("hpss_Rename", -retval);
 		break;
 
 	case GLOBUS_GFS_CMD_RNFR:
+		/*
+		 * XXX This is never called.
+		 */
 		break;
 
 	case GLOBUS_GFS_CMD_SITE_CHMOD:
