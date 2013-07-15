@@ -36,6 +36,13 @@
 /* Using Unix authentication */
 #undef HPSS_UNIX_AUTH
 
+/* Define to the sub-directory in which libtool stores uninstalled libraries.
+   */
+#undef LT_OBJDIR
+
+/* Mark renamed files for quota support. */
+#undef MARK_RENAMED_FILES
+
 /* Name of package */
 #undef PACKAGE
 
