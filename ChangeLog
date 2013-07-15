@@ -1,4 +1,12 @@
-Version 1.2 : May 8, 2013
+Version Pre 1.3: 
+	- Added --with-quota_support which will mark files with UDA so that the
+	  NCSA quota system can find them later and fix the account IDs.
+	- MLSC, MLSD, LIST no longer wait until all entries have been stat()'ed,
+	  instead entries are returned 100 at a time to avoid client timeouts
+	- Fixed missing symbol in misc_get_file_size()
+	- Fix for files that change size thus change COS
+
+Version 1.2 :  : May 8, 2013
 	- Change misc_file_archived() to check for any bytes on disk. Due to holes,
 	  we can not expect DataLength to be on disk.
 	- Added handling for files with gaps during RETR/CKSM
