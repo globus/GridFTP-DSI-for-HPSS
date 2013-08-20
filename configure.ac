@@ -1,7 +1,7 @@
 dnl
 
 AC_REVISION($Revision: 1.8 $)
-AC_INIT([GridFTP HPSS DSI], [1.3_Beta1])
+AC_INIT([GridFTP HPSS DSI], [1.3])
 
 AC_PROG_LIBTOOL
 
