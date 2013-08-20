@@ -54,6 +54,7 @@
  */
 #include <hpss_hash.h>
 #include <hpss_api.h>
+#include <hpss_xml.h>
 
 /*
  * Local includes.
@@ -371,3 +372,228 @@ globus_assert(retval == 1);
 	GlobusGFSHpssDebugExit();
 	return result;
 }
+
+
+/*
+ * /hpss/user/cksum/algorithm                                  md5
+ * /hpss/user/cksum/checksum               93b885adfe0da089cdf634904fd59f71
+ * /hpss/user/cksum/lastupdate                          1376424299
+ * /hpss/user/cksum/errors                                       0
+ * /hpss/user/cksum/state                                    Valid
+ * /hpss/user/cksum/app                                    hpsssum
+ * /hpss/user/cksum/filesize                                     1
+ */
+
+static globus_result_t
+_set_uda_on_file(char * File, char * Key, char * Value)
+{
+	int retval = 0;
+	hpss_userattr_list_t attr_list;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	attr_list.len  = 1;
+	attr_list.Pair = malloc(sizeof(hpss_userattr_t));
+	if (!attr_list.Pair)
+		return GlobusGFSErrorMemory("hpss_userattr_t");
+
+	attr_list.Pair[0].Key = Key;
+	attr_list.Pair[0].Value = Value;
+
+	retval = hpss_UserAttrSetAttrs(File, &attr_list, NULL);
+	free(attr_list.Pair);
+	if (retval)
+		return GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
+
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+static globus_result_t
+_get_uda_on_file(char * File, char * Key, char * Value)
+{
+	int    retval = 0;
+	char * tmp = NULL;
+	char   xml[HPSS_XML_SIZE];
+	hpss_userattr_list_t attr_list;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	*Value = '\0';
+
+	attr_list.len  = 1;
+	attr_list.Pair = malloc(sizeof(hpss_userattr_t));
+	if (!attr_list.Pair)
+		return GlobusGFSErrorMemory("hpss_userattr_t");
+
+	attr_list.Pair[0].Key   = Key;
+	attr_list.Pair[0].Value = xml;
+
+	retval = hpss_UserAttrGetAttrs(File, &attr_list, UDA_API_VALUE);
+	free(attr_list.Pair);
+	if (retval == -ENOENT)
+		return GLOBUS_SUCCESS;
+
+	if (retval != -ENOENT)
+	{
+		if (retval)
+			return GlobusGFSErrorSystemError("hpss_UserAttrGetAttrs", -retval);
+
+		tmp = hpss_ChompXMLHeader(xml, NULL);
+		if (tmp)
+		{
+			strcpy(Value, tmp);
+			free(tmp);
+		}
+	}
+
+
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+static globus_result_t
+_remove_uda_on_file(char * File, char * Key)
+{
+	int retval = 0;
+	hpss_userattr_list_t attr_list;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	attr_list.len  = 1;
+	attr_list.Pair = malloc(sizeof(hpss_userattr_t));
+	if (!attr_list.Pair)
+		return GlobusGFSErrorMemory("hpss_userattr_t");
+
+	attr_list.Pair[0].Key   = Key;
+	attr_list.Pair[0].Value = "1";
+
+	retval = hpss_UserAttrDeleteAttrs(File, &attr_list, NULL);
+	free(attr_list.Pair);
+
+	if (retval && retval != -ENOENT)
+		return GlobusGFSErrorSystemError("hpss_UserAttrDeleteAttrs()", -retval);
+
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+/*
+ * /hpss/user/cksum/algorithm                                  md5
+ * /hpss/user/cksum/checksum               93b885adfe0da089cdf634904fd59f71
+ * /hpss/user/cksum/lastupdate                          1376424299
+ * /hpss/user/cksum/errors                                       0
+ * /hpss/user/cksum/state                                    Valid
+ * /hpss/user/cksum/app                                    hpsssum
+ * /hpss/user/cksum/filesize                                     1
+ */
+globus_result_t
+checksum_set_file_sum(char * File, char * ChecksumString)
+{
+	char buf[32];
+	globus_result_t result   = GLOBUS_SUCCESS;
+	globus_off_t    filesize = 0;
+
+	result = misc_get_file_size(File, &filesize);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	result = _set_uda_on_file(File, "/hpss/user/cksum/algorithm",  "md5");
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	result = _set_uda_on_file(File, "/hpss/user/cksum/checksum",   ChecksumString);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	snprintf(buf, sizeof(buf), "%lu", time(NULL));
+	result = _set_uda_on_file(File, "/hpss/user/cksum/lastupdate", buf);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	result = _set_uda_on_file(File, "/hpss/user/cksum/errors",     "0");
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	result = _set_uda_on_file(File, "/hpss/user/cksum/state",      "Valid");
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	result = _set_uda_on_file(File, "/hpss/user/cksum/app",        "GridFTP");
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	snprintf(buf, sizeof(buf), "%lu", filesize);
+	result = _set_uda_on_file(File, "/hpss/user/cksum/filesize",   buf);
+
+cleanup:
+	if (result != GLOBUS_SUCCESS)
+		checksum_clear_file_sum(File);
+
+	return result;
+}
+
+globus_result_t
+checksum_get_file_sum(char * File, char ** ChecksumString)
+{
+	char value[64];
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	memset(value, 0, sizeof(value));
+	result = _get_uda_on_file(File, "/hpss/user/cksum/state", value);
+	if (result)
+		return result;
+	if (strcmp(value, "Valid") != 0)
+		return GLOBUS_SUCCESS;
+
+	memset(value, 0, sizeof(value));
+	result = _get_uda_on_file(File, "/hpss/user/cksum/algorithm", value);
+	if (result)
+		return result;
+	if (strcmp(value, "md5") != 0)
+		return GLOBUS_SUCCESS;
+
+	memset(value, 0, sizeof(value));
+	result = _get_uda_on_file(File, "/hpss/user/cksum/checksum", value);
+	if (result)
+		return result;
+
+	*ChecksumString = strdup(value);
+	return GLOBUS_SUCCESS;
+}
+
+globus_result_t
+checksum_clear_file_sum(char * File)
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	result = _remove_uda_on_file(File, "/hpss/user/cksum/algorithm");
+	if (result != GLOBUS_SUCCESS)
+		return result;
+
+	result = _remove_uda_on_file(File, "/hpss/user/cksum/checksum");
+	if (result != GLOBUS_SUCCESS)
+		return result;
+
+	result = _remove_uda_on_file(File, "/hpss/user/cksum/lastupdate");
+	if (result != GLOBUS_SUCCESS)
+		return result;
+
+	result = _remove_uda_on_file(File, "/hpss/user/cksum/errors");
+	if (result != GLOBUS_SUCCESS)
+		return result;
+
+	result = _remove_uda_on_file(File, "/hpss/user/cksum/state");
+	if (result != GLOBUS_SUCCESS)
+		return result;
+
+	result = _remove_uda_on_file(File, "/hpss/user/cksum/app");
+	if (result != GLOBUS_SUCCESS)
+		return result;
+
+	return _remove_uda_on_file(File, "/hpss/user/cksum/filesize");
+}
+

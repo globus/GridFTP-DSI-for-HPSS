@@ -67,6 +67,7 @@
 #include "version.h"
 #include "gridftp_dsi_hpss_transfer_control.h"
 #include "gridftp_dsi_hpss_transfer_data.h"
+#include "gridftp_dsi_hpss_checksum.h"
 #include "gridftp_dsi_hpss_pio_data.h"
 #include "gridftp_dsi_hpss_session.h"
 #include "gridftp_dsi_hpss_gridftp.h"
@@ -315,6 +316,11 @@ local_stor(globus_gfs_operation_t       Operation,
 
 	/* Initialize the monitor */
 	local_monitor_init(Operation, TransferInfo, &monitor);
+
+	/* Clear our any old checksum information. */
+	result = checksum_clear_file_sum(TransferInfo->pathname);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
 
 	/* Get the message handle. */
 	msg_handle = session_cache_lookup_object(session,

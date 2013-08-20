@@ -103,4 +103,13 @@ checksum_stop(checksum_t * Checksum);
 globus_result_t
 checksum_get_sum(checksum_t * Checksum, char ** ChecksumString);
 
+globus_result_t
+checksum_set_file_sum(char * File, char * ChecksumString);
+
+globus_result_t
+checksum_get_file_sum(char * File, char ** ChecksumString);
+
+globus_result_t
+checksum_clear_file_sum(char * File);
+
 #endif /* GRIDFTP_DSI_HPSS_CHECKSUM_H */
