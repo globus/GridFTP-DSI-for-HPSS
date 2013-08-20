@@ -103,7 +103,7 @@ misc_copy_basename(char * Path, char ** BaseName)
 	return GLOBUS_SUCCESS;
 }
 
-static globus_result_t
+globus_result_t
 misc_translate_stat(char              * Name,
                     hpss_stat_t       * HpssStat,
                     globus_gfs_stat_t * GlobusStat)
@@ -174,209 +174,60 @@ cleanup:
 }
 
 globus_result_t
-misc_gfs_stat(char              *  Path,
-              globus_bool_t        FileOnly,
-              globus_bool_t        UseSymlinkInfo,
-              globus_bool_t        IncludePathStat,
-              globus_gfs_stat_t ** GfsStatArray,
-              int               *  GfsStatCount)
+misc_gfs_stat(char              * Pathname,
+              globus_bool_t       UseSymlinkInfo,
+              globus_gfs_stat_t * GfsStatPtr)
 {
-	int               dir_fd     = -1;
-	int               index      = 0;
-	int               retval     = 0;
-	char            * entry_path = NULL;
-	globus_result_t   result     = GLOBUS_SUCCESS;
-	hpss_dirent_t     dirent;
-	hpss_stat_t       hpss_stat_buf;
+    int             retval = 0;
+    globus_result_t result = GLOBUS_SUCCESS;
+    hpss_stat_t     hpss_stat_buf;
 
+    GlobusGFSName(__func__);
+    GlobusGFSHpssDebugEnter();
+
+    /* lstat() the object. */
+    retval = hpss_Lstat(Pathname, &hpss_stat_buf);
+    if (retval != 0)
+    {
+        result = GlobusGFSErrorSystemError("hpss_Lstat", -retval);
+        goto cleanup;
+    }
+
+    if (S_ISLNK(hpss_stat_buf.st_mode) && !UseSymlinkInfo)
+    {
+        /*
+         * If this fails, technically it's an error. But I think that is
+         * very confusing to the user. So, instead, we will return the symlink
+         * stat on error until we find a reason to do otherwise.
+         */
+        hpss_Stat(Pathname, &hpss_stat_buf);
+    }
+
+    result = misc_translate_stat(Pathname, &hpss_stat_buf, GfsStatPtr);
+    if (result != GLOBUS_SUCCESS)
+        goto cleanup;
+
+    GlobusGFSHpssDebugExit();
+    return GLOBUS_SUCCESS;
+
+cleanup:
+    GlobusGFSHpssDebugExitWithError();
+    return result;
+}
+
+void
+misc_destroy_gfs_stat(globus_gfs_stat_t * GfsStat)
+{
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	/* Initialize the returned array information. */
-	*GfsStatCount = 0;
-	*GfsStatArray = NULL;
-
-	/*
-	 * Start by statting the target object.
-	 */
-	if (UseSymlinkInfo == GLOBUS_TRUE)
-	{
-		retval = hpss_Lstat(Path, &hpss_stat_buf);
-		if (retval != 0)
-		{
-			result = GlobusGFSErrorSystemError("hpss_Lstat", -retval);
-			goto cleanup;
-		}
-	} else
-	{
-		retval = hpss_Stat(Path, &hpss_stat_buf);
-		if (retval < 0)
-		{
-			result = GlobusGFSErrorSystemError("hpss_Stat", -retval);
-			goto cleanup;
-		}
-	}
-
-	/*
-	 * If we only wanted the target info or if this is not a directory,
-	 * then we can translate the stat info and we are done. 
-	 */
-	if (FileOnly == GLOBUS_TRUE || !S_ISDIR(hpss_stat_buf.st_mode))
-	{
-		/* Allocate the statbuf array of length 1. */
-		*GfsStatCount = 1;
-		*GfsStatArray = (globus_gfs_stat_t *) globus_calloc(1, sizeof(globus_gfs_stat_t));
-		if (*GfsStatArray == NULL)
-		{
-			result = GlobusGFSErrorMemory("GfsStatArray");
-			goto cleanup;
-		}
-
-		/* Translate from hpss stat to globus stat. */
-		result = misc_translate_stat(Path, &hpss_stat_buf, *GfsStatArray);
-
-		goto cleanup;
-	}
-
-	/*
-	 * We need to expand this directory. 
-	 */
-
-	/* Open the directory. */
-	dir_fd = hpss_Opendir(Path);
-	if (dir_fd < 0)
-	{
-		result = GlobusGFSErrorSystemError("hpss_Opendir", -dir_fd);
-		goto cleanup;
-	}
-
-	/* Count the entries.  */
-	while (TRUE)
-	{
-		/* Read the next entry. */
-		retval = hpss_Readdir(dir_fd, &dirent);
-		if (retval != 0)
-		{
-			result = GlobusGFSErrorSystemError("hpss_Readdir", -retval);
-			goto cleanup;
-		}
-
-		/* Check if we are done. */
-		if (dirent.d_namelen == 0)
-			break;
-
-		(*GfsStatCount)++;
-	}
-
-	/* Increment GfsStatCount if we need to include the original path. */
-	if (IncludePathStat == GLOBUS_TRUE)
-		(*GfsStatCount)++;
-
-	/* Rewind. */
-	retval = hpss_Rewinddir(dir_fd);
-	if (retval != 0)
-	{
-		result = GlobusGFSErrorSystemError("hpss_Rewinddir", -retval);
-		goto cleanup;
-	}
-
-	/* Allocate the array. */
-	*GfsStatArray = globus_calloc(*GfsStatCount, sizeof(globus_gfs_stat_t));
-	if (*GfsStatArray == NULL)
-	{
-		result = GlobusGFSErrorMemory("GfsStatArray");
-		goto cleanup;
-	}
-
-	/* Include Path if we were supposed to. */
-	if (IncludePathStat == GLOBUS_TRUE)
-	{
-		/* Translate from hpss stat to globus stat. */
-		result = misc_translate_stat(Path,
-		                               &hpss_stat_buf,
-		                               &((*GfsStatArray)[index++]));
-	}
-
-	/*
-	 * Record the entries. If the directory should happen to grow, let's
-	 * be sure not to overflow the array.
-	 */
-	for (; index < *GfsStatCount; index++)
-	{
-		/* Read the next entry. */
-		retval = hpss_Readdir(dir_fd, &dirent);
-		if (retval != 0)
-		{
-			result = GlobusGFSErrorSystemError("hpss_Readdir", -retval);
-			goto cleanup;
-		}
-
-		/* Check if we are done. */
-		if (dirent.d_namelen == 0)
-			break;
-
-		/* Construct the entry name. */
-		entry_path = (char *) globus_malloc(strlen(Path) + strlen(dirent.d_name) + 2);
-		if (entry_path == NULL)
-		{
-			result = GlobusGFSErrorMemory("entry_path");
-			goto cleanup;
-		}
-
-		if (Path[strlen(Path) - 1] == '/')
-			sprintf(entry_path, "%s%s", Path, dirent.d_name);
-		else
-			sprintf(entry_path, "%s/%s", Path, dirent.d_name);
-
-		/* Now stat the object. XXX Should we obey UseSymlinkInfo here?*/
-		if (UseSymlinkInfo == GLOBUS_TRUE)
-			retval = hpss_Lstat(entry_path, &hpss_stat_buf);
-		else
-			retval = hpss_Stat(entry_path, &hpss_stat_buf);
-		if (retval < 0)
-		{
-			result = GlobusGFSErrorSystemError("hpss_Stat", -retval);
-			goto cleanup;
-		}
-
-		/* Translate from hpss stat to globus stat. */
-		result = misc_translate_stat(entry_path,
-		                               &hpss_stat_buf,
-		                               &((*GfsStatArray)[index]));
-
-		if (result != GLOBUS_SUCCESS)
-			goto cleanup;
-
-		/* Free up entry_path */
-		globus_free(entry_path);
-		/* Mark it as freed. */
-		entry_path = NULL;
-	}
-
-	/* Adjust GfsStatCount in case we didn't read enough entries for the array. */
-	*GfsStatCount = index;
-
-cleanup:
-	if (dir_fd >= 0)
-		hpss_Closedir(dir_fd);
-
-	if (entry_path != NULL)
-		globus_free(entry_path);
-
-	if (result != GLOBUS_SUCCESS)
-	{
-		/* Destroy the stat array. */
-		misc_destroy_gfs_stat_array(*GfsStatArray, *GfsStatCount);
-		*GfsStatArray = NULL;
-
-		GlobusGFSHpssDebugExitWithError();
-		return result;
-	}
+	if (GfsStat->name != NULL)
+		globus_free(GfsStat->name);
+	if (GfsStat->symlink_target != NULL)
+		globus_free(GfsStat->symlink_target);
 
 	GlobusGFSHpssDebugExit();
-	return GLOBUS_SUCCESS;
 }
-
 
 void
 misc_destroy_gfs_stat_array(globus_gfs_stat_t * GfsStatArray,
@@ -387,19 +238,35 @@ misc_destroy_gfs_stat_array(globus_gfs_stat_t * GfsStatArray,
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	if (GfsStatArray != NULL)
+	for (index = 0; index < GfsStatCount; index++)
 	{
-		for (index = 0; index < GfsStatCount; index++)
-		{
-			if (GfsStatArray[index].name != NULL)
-				globus_free(GfsStatArray[index].name);
-			if (GfsStatArray[index].symlink_target != NULL)
-				globus_free(GfsStatArray[index].symlink_target);
-		}
-		globus_free(GfsStatArray);
+		misc_destroy_gfs_stat(&(GfsStatArray[index]));
 	}
 
 	GlobusGFSHpssDebugExit();
+}
+
+globus_result_t
+misc_build_path(char * Directory, char * EntryName, char ** EntryPath)
+{
+    GlobusGFSName(__func__);
+    GlobusGFSHpssDebugEnter();
+
+    /* Construct the entry name. */
+    *EntryPath = (char *) globus_malloc(strlen(Directory) + strlen(EntryName) + 2);
+    if (*EntryPath == NULL)
+    {
+        GlobusGFSHpssDebugExitWithError();
+        return GlobusGFSErrorMemory("EntryPath");
+    }
+
+    if (Directory[strlen(Directory) - 1] == '/')
+        sprintf(*EntryPath, "%s%s", Directory, EntryName);
+    else
+        sprintf(*EntryPath, "%s/%s", Directory, EntryName);
+
+    GlobusGFSHpssDebugExit();
+    return GLOBUS_SUCCESS;
 }
 
 globus_result_t
@@ -494,24 +361,20 @@ cleanup:
 globus_result_t
 misc_get_file_size(char * Path, globus_off_t * FileSize)
 {
-	globus_result_t     result         = GLOBUS_SUCCESS;
-	globus_gfs_stat_t * gfs_stat_array = NULL;
-	int                 gfs_stat_count = 0;
+	globus_result_t   result = GLOBUS_SUCCESS;
+	globus_gfs_stat_t gfs_stat_buf;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Stat the file. */
-	result = misc_gfs_stat(Path,
-	                       GLOBUS_TRUE,
-	                       GLOBUS_FALSE,
-	                       GLOBUS_TRUE,
-	                       &gfs_stat_array,
-	                       &gfs_stat_count);
+	result = misc_gfs_stat(Path, GLOBUS_FALSE, &gfs_stat_buf);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
-	*FileSize = gfs_stat_array[0].size;
+	*FileSize = gfs_stat_buf.size;
+
+	misc_destroy_gfs_stat(&gfs_stat_buf);
 
 cleanup:
 	if (result != GLOBUS_SUCCESS)

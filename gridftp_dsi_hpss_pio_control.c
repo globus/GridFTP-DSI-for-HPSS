@@ -170,13 +170,15 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 	/* Handle the case of the file that already existed. */
 	if (Truncate == GLOBUS_TRUE)
 	{
+		hpss_cos_md_t cos_md;
+
 		retval = hpss_SetCOSByHints(PioControl->FileFD,
 		                            0,
 		                            &hints_in,
 		                            &priorities,
-		                            NULL);
+		                            &cos_md);
 
-		if (PioControl->FileFD < 0)
+		if (retval)
 		{
 			result = GlobusGFSErrorSystemError("hpss_SetCOSByHints", -(retval));
 			goto cleanup;

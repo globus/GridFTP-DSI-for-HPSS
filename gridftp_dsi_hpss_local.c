@@ -67,6 +67,7 @@
 #include "version.h"
 #include "gridftp_dsi_hpss_transfer_control.h"
 #include "gridftp_dsi_hpss_transfer_data.h"
+#include "gridftp_dsi_hpss_checksum.h"
 #include "gridftp_dsi_hpss_pio_data.h"
 #include "gridftp_dsi_hpss_session.h"
 #include "gridftp_dsi_hpss_gridftp.h"
@@ -316,6 +317,11 @@ local_stor(globus_gfs_operation_t       Operation,
 	/* Initialize the monitor */
 	local_monitor_init(Operation, TransferInfo, &monitor);
 
+	/* Clear our any old checksum information. */
+	result = checksum_clear_file_sum(TransferInfo->pathname);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
 	/* Get the message handle. */
 	msg_handle = session_cache_lookup_object(session,
 	                                         SESSION_CACHE_OBJECT_ID_MSG_HANDLE);
@@ -505,6 +511,7 @@ local_session_end(void * Arg)
 	GlobusGFSHpssDebugExitWithError();
 }
 
+#define STAT_ENTRIES_PER_REPLY 100
 
 /*
  * Stat just the one object pointed to by StatInfo.
@@ -514,35 +521,79 @@ local_stat(globus_gfs_operation_t   Operation,
            globus_gfs_stat_info_t * StatInfo,
            void                   * Arg)
 {
-	globus_result_t     result         = GLOBUS_SUCCESS;
-	globus_gfs_stat_t * gfs_stat_array = NULL;
+	int                 retval         = 0;
+	int                 dir_fd         = -1;
 	int                 gfs_stat_count = 0;
+	char              * entry_path     = NULL;
+	hpss_dirent_t       dirent;
+	globus_result_t     result = GLOBUS_SUCCESS;
+	globus_gfs_stat_t   gfs_stat_array[STAT_ENTRIES_PER_REPLY];
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	result = misc_gfs_stat(StatInfo->pathname,
-	                       StatInfo->file_only,
-	                       StatInfo->use_symlink_info,
-	                       StatInfo->include_path_stat,
-	                       &gfs_stat_array,
-	                       &gfs_stat_count);
+	result = misc_gfs_stat(StatInfo->pathname, StatInfo->use_symlink_info, gfs_stat_array);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
-	/* Inform the server that we are done. */
-	globus_gridftp_server_finished_stat(Operation, 
-	                                    result, 
-	                                    gfs_stat_array, 
-	                                    gfs_stat_count);
+	if (StatInfo->file_only || !S_ISDIR(gfs_stat_array[0].mode))
+	{
+		/* Inform the server that we are done. */
+		globus_gridftp_server_finished_stat(Operation, GLOBUS_SUCCESS, gfs_stat_array, 1);
 
-	/* Destroy the gfs_stat_array. */
-	misc_destroy_gfs_stat_array(gfs_stat_array, gfs_stat_count);
+		/* Destroy the gfs_stat_array. */
+		misc_destroy_gfs_stat(gfs_stat_array);
 
+		GlobusGFSHpssDebugExit();
+		return;
+	}
+
+	/* Open the directory. */
+	dir_fd = hpss_Opendir(StatInfo->pathname);
+	if (dir_fd < 0)
+	{
+		result = GlobusGFSErrorSystemError("hpss_Opendir", -dir_fd);
+		goto cleanup;
+	}
+
+	while (TRUE)
+	{
+		/* Read the next entry. */
+		retval = hpss_Readdir(dir_fd, &dirent);
+		if (retval != 0)
+		{
+			result = GlobusGFSErrorSystemError("hpss_Readdir", -retval);
+			goto cleanup;
+		}
+
+		/* Check if we are done. */
+		if (dirent.d_namelen == 0)
+			break;
+
+		result = misc_build_path(StatInfo->pathname, dirent.d_name, &entry_path);
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+
+		result = misc_gfs_stat(entry_path, StatInfo->use_symlink_info, &gfs_stat_array[gfs_stat_count++]);
+
+		free(entry_path);
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+
+		if (gfs_stat_count == STAT_ENTRIES_PER_REPLY)
+		{
+			globus_gridftp_server_finished_stat_partial(Operation, GLOBUS_SUCCESS, gfs_stat_array, gfs_stat_count);
+			misc_destroy_gfs_stat_array(gfs_stat_array, gfs_stat_count);
+			gfs_stat_count = 0;
+		}
+	}
+
+	globus_gridftp_server_finished_stat(Operation, GLOBUS_SUCCESS, gfs_stat_array, gfs_stat_count);
 	GlobusGFSHpssDebugExit();
 	return;
 
 cleanup:
+
 	/* Inform the server that we completed with an error. */
 	globus_gridftp_server_finished_stat(Operation, result, NULL, 0);
 

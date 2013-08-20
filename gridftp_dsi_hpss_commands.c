@@ -66,10 +66,12 @@
 #include "gridftp_dsi_hpss_transfer_data.h"
 #include "gridftp_dsi_hpss_data_ranges.h"
 #include "gridftp_dsi_hpss_commands.h"
+#include "gridftp_dsi_hpss_checksum.h"
 #include "gridftp_dsi_hpss_session.h"
 #include "gridftp_dsi_hpss_config.h"
 #include "gridftp_dsi_hpss_misc.h"
 #include "gridftp_dsi_hpss_msg.h"
+#include "config.h"
 
 #ifdef DMALLOC
 /*
@@ -227,22 +229,16 @@ cleanup:
 static globus_result_t
 commands_chgrp(char * Pathname, char * GroupName)
 {
-	int                 retval = 0;
-	gid_t               gid    = 0;
-	globus_result_t     result = GLOBUS_SUCCESS;
-	globus_gfs_stat_t * gfs_stat_array = NULL;
-	int                 gfs_stat_count = 0;
+	int               retval = 0;
+	gid_t             gid    = 0;
+	globus_result_t   result = GLOBUS_SUCCESS;
+	globus_gfs_stat_t gfs_stat_buf;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
 	/* Stat it, make sure it exists. */
-	result = misc_gfs_stat(Pathname,
-	                       GLOBUS_TRUE,  /* FileOnly        */
-	                       GLOBUS_FALSE, /* UseSymlinkInfo  */
-	                       GLOBUS_TRUE,  /* IncludePathStat */
-	                       &gfs_stat_array,
-	                       &gfs_stat_count);
+	result = misc_gfs_stat(Pathname, GLOBUS_FALSE, &gfs_stat_buf);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
@@ -260,7 +256,7 @@ commands_chgrp(char * Pathname, char * GroupName)
 	}
 
 	/* Now change the group. */
-	retval = hpss_Chown(Pathname, gfs_stat_array[0].uid, gid);
+	retval = hpss_Chown(Pathname, gfs_stat_buf.uid, gid);
 	if (retval != 0)
 	{
 		result = GlobusGFSErrorSystemError("hpss_Chgrp", -retval);
@@ -269,7 +265,7 @@ commands_chgrp(char * Pathname, char * GroupName)
 
 cleanup:
 	/* clean up the statbuf. */
-	misc_destroy_gfs_stat_array(gfs_stat_array, gfs_stat_count);
+	misc_destroy_gfs_stat(&gfs_stat_buf);
 
 	if (result != GLOBUS_SUCCESS)
 	{
@@ -287,49 +283,43 @@ commands_stage_file(char          * Path,
                     globus_bool_t * Staged,
                     globus_bool_t * TapeOnly)
 {
-    int                 retval     = 0;
-    time_t              start_time = time(NULL);
-    hpss_reqid_t        reqid      = 0;
-	globus_bool_t       archived   = GLOBUS_TRUE;
-    globus_result_t     result     = GLOBUS_SUCCESS;
-    globus_abstime_t    timeout;
-    globus_mutex_t      mutex;
-    globus_cond_t       cond;
-    hpssoid_t           bitfile_id;
-    u_signed64          size;
-	globus_gfs_stat_t * stat_array = NULL;
-	int                 stat_count = 0;
+	int               retval     = 0;
+	time_t            start_time = time(NULL);
+	hpss_reqid_t      reqid      = 0;
+	globus_bool_t     archived   = GLOBUS_TRUE;
+	globus_result_t   result     = GLOBUS_SUCCESS;
+	globus_abstime_t  timeout;
+	globus_mutex_t    mutex;
+	globus_cond_t     cond;
+	hpssoid_t         bitfile_id;
+	u_signed64        size;
+	globus_gfs_stat_t gfs_stat_buf;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-    /* Initialize the return value. */
-    *Staged = GLOBUS_FALSE;
+	/* Initialize the return value. */
+	*Staged = GLOBUS_FALSE;
 
-    globus_mutex_init(&mutex, NULL);
-    globus_cond_init(&cond, NULL);
+	globus_mutex_init(&mutex, NULL);
+	globus_cond_init(&cond, NULL);
 
-    /* Stat the object. */
-	result = misc_gfs_stat(Path,
-	                       GLOBUS_TRUE,
-	                       GLOBUS_FALSE,
-	                       GLOBUS_TRUE,
-	                       &stat_array,
-	                       &stat_count);
-    if (result != GLOBUS_SUCCESS)
-        goto cleanup;
+	/* Stat the object. */
+	result = misc_gfs_stat(Path, GLOBUS_FALSE, &gfs_stat_buf);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
 
-    /* Check if it is a file. */
-    if (!S_ISREG(stat_array[0].mode))
-    {
-        *Staged = GLOBUS_TRUE;
-        goto cleanup;
-    }
+	/* Check if it is a file. */
+	if (!S_ISREG(gfs_stat_buf.mode))
+	{
+		*Staged = GLOBUS_TRUE;
+		goto cleanup;
+	}
 
-    /* Check if it is archived. */
+	/* Check if it is archived. */
 	result = misc_file_archived(Path, &archived, TapeOnly);
-    if (result != GLOBUS_SUCCESS)
-        goto cleanup;
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
 
 	if (archived == GLOBUS_FALSE || *TapeOnly == GLOBUS_TRUE)
 		goto cleanup;
@@ -346,45 +336,44 @@ commands_stage_file(char          * Path,
 	 * will request the file stage every second until complete.
 	 */
 
-    CONVERT_LONGLONG_TO_U64(stat_array[0].size, size);
-    retval = hpss_StageCallBack(Path, cast64m(0), size, 0, NULL, BFS_STAGE_ALL, &reqid, &bitfile_id);
-    if (retval != 0)
-    {
-        result = GlobusGFSErrorSystemError("hpss_StageCallBack()", -retval);
-        goto cleanup;
-    }
+	CONVERT_LONGLONG_TO_U64(gfs_stat_buf.size, size);
+	retval = hpss_StageCallBack(Path, cast64m(0), size, 0, NULL, BFS_STAGE_ALL, &reqid, &bitfile_id);
+	if (retval != 0)
+	{
+		result = GlobusGFSErrorSystemError("hpss_StageCallBack()", -retval);
+		goto cleanup;
+	}
 
-    /* Now wait for the given about of time or the file staged. */
-    while ((time(NULL) - start_time) < Timeout && archived == GLOBUS_TRUE)
-    {
-        globus_mutex_lock(&mutex);
-        {
-            /* Set our timeout for 1 second in the future. */
-            GlobusTimeAbstimeSet(timeout, 1, 0);
+	/* Now wait for the given about of time or the file staged. */
+	while ((time(NULL) - start_time) < Timeout && archived == GLOBUS_TRUE)
+	{
+		globus_mutex_lock(&mutex);
+		{
+			/* Set our timeout for 1 second in the future. */
+			GlobusTimeAbstimeSet(timeout, 1, 0);
 
-            /* Now wait. */
-            globus_cond_timedwait(&cond, &mutex, &timeout);
-        }
-        globus_mutex_unlock(&mutex);
+			/* Now wait. */
+			globus_cond_timedwait(&cond, &mutex, &timeout);
+		}
+		globus_mutex_unlock(&mutex);
 
 		/* Check if it is archived. */
 		result = misc_file_archived(Path, &archived, TapeOnly);
 		if (result != GLOBUS_SUCCESS)
 			goto cleanup;
-    }
+	}
 
 cleanup:
 	*Staged = !archived;
 
-    globus_mutex_destroy(&mutex);
-    globus_cond_destroy(&cond);
+	globus_mutex_destroy(&mutex);
+	globus_cond_destroy(&cond);
 
-    /* Release the stat memory. */
-    misc_destroy_gfs_stat_array(stat_array, stat_count);
+	/* Release the stat memory. */
+	misc_destroy_gfs_stat(&gfs_stat_buf);
 
-    GlobusGFSHpssDebugExit();
-    return result;
-
+	GlobusGFSHpssDebugExit();
+	return result;
 }
  
 /*
@@ -802,10 +791,10 @@ commands_stop_markers(marker_handle_t * MarkerHandle)
 }
 
 globus_result_t
-commands_checksum(globus_gfs_operation_t       Operation,
-                  globus_gfs_command_info_t *  CommandInfo,
-                  session_handle_t          *  Session,
-                  char                      ** Checksum)
+commands_compute_checksum(globus_gfs_operation_t       Operation,
+                          globus_gfs_command_info_t *  CommandInfo,
+                          session_handle_t          *  Session,
+                          char                      ** Checksum)
 {
 	monitor_t            monitor;
 	globus_result_t      result           = GLOBUS_SUCCESS;
@@ -899,6 +888,49 @@ cleanup:
 	GlobusGFSHpssDebugExit();
 	return result;
 }
+
+globus_result_t
+commands_checksum(globus_gfs_operation_t       Operation,
+                  globus_gfs_command_info_t *  CommandInfo,
+                  session_handle_t          *  Session,
+                  char                      ** Checksum)
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	/* Partial checksums */
+	if (CommandInfo->cksm_offset != 0 || CommandInfo->cksm_length != -1)
+	{
+		/* Compute it. */
+		result = commands_compute_checksum(Operation, CommandInfo, Session, Checksum);
+		goto cleanup;
+	}
+
+	/* Full checksums. */
+
+	/* Check if the sum is already stored in UDA. */
+	result = checksum_get_file_sum(CommandInfo->pathname, Checksum);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	/* If the checksum wasn't previously stored... */
+	if (*Checksum == NULL)
+	{
+		/* Compute it. */
+		result = commands_compute_checksum(Operation, CommandInfo, Session, Checksum);
+
+		/* Try to store the checksum in UDA. Ignore errors on set. */
+		if (result == GLOBUS_SUCCESS)
+			checksum_set_file_sum(CommandInfo->pathname, *Checksum);
+	}
+
+cleanup:
+
+	GlobusGFSHpssDebugExit();
+	return result;
+}
                   
 void
 commands_handler(globus_gfs_operation_t      Operation,
@@ -948,12 +980,37 @@ commands_handler(globus_gfs_operation_t      Operation,
 		break;
 
 	case GLOBUS_GFS_CMD_RNTO:
+#ifdef MARK_RENAMED_FILES
+		{
+			hpss_userattr_list_t attr_list;
+
+			attr_list.len  = 1;
+			attr_list.Pair = malloc(sizeof(hpss_userattr_t));
+			if (!attr_list.Pair)
+			{
+				result = GlobusGFSErrorMemory("hpss_userattr_t");
+				break;
+			}
+
+			attr_list.Pair[0].Key = "/hpss/ncsa/quota/Renamed";
+			attr_list.Pair[0].Value = "1";
+
+			retval = hpss_UserAttrSetAttrs(CommandInfo->from_pathname, &attr_list, NULL);
+			free(attr_list.Pair);
+			if (retval)
+        		result = GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
+		}
+#endif /* MARK_RENAMED_FILES */
+
 		retval = hpss_Rename(CommandInfo->from_pathname, CommandInfo->pathname);
 		if (retval != 0)
         	result = GlobusGFSErrorSystemError("hpss_Rename", -retval);
 		break;
 
 	case GLOBUS_GFS_CMD_RNFR:
+		/*
+		 * XXX This is never called.
+		 */
 		break;
 
 	case GLOBUS_GFS_CMD_SITE_CHMOD:

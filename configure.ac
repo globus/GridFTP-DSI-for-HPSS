@@ -1,7 +1,7 @@
 dnl
 
 AC_REVISION($Revision: 1.8 $)
-AC_INIT([GridFTP HPSS DSI], [1.2])
+AC_INIT([GridFTP HPSS DSI], [1.3])
 
 AC_PROG_LIBTOOL
 
@@ -200,6 +200,13 @@ AC_ARG_WITH(krb5auth,
     [
         hpssauthlibs="$hpssauthlibs -lhpsskrb5auth -lhpssunixauth"
         AC_DEFINE(HPSS_KRB5_AUTH, 1, [Using Kerberos authentication])
+    ],
+    [])
+
+AC_ARG_WITH(quota_support, 
+    AC_HELP_STRING([--with-quota_support], [Mark renamed files for quota support.]),
+    [
+        AC_DEFINE(MARK_RENAMED_FILES, 1, [Mark renamed files for quota support.])
     ],
     [])
 
