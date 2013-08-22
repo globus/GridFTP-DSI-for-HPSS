@@ -312,7 +312,7 @@ commands_stage_file(char          * Path,
 	/* Check if it is a file. */
 	if (!S_ISREG(gfs_stat_buf.mode))
 	{
-		*Staged = GLOBUS_TRUE;
+		archived = GLOBUS_FALSE;
 		goto cleanup;
 	}
 

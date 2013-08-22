@@ -274,10 +274,11 @@ misc_file_archived(char          * Path,
                    globus_bool_t * Archived,
                    globus_bool_t * TapeOnly)
 {
-	int              retval        = 0;
-	int              storage_level = 0;
-	int              vv_index      = 0;
-	globus_result_t  result        = GLOBUS_SUCCESS;
+	int              retval            = 0;
+	int              storage_level     = 0;
+	int              vv_index          = 0;
+	u_signed64       max_bytes_on_disk = cast64(0);
+	globus_result_t  result            = GLOBUS_SUCCESS;
 	hpss_xfileattr_t xfileattr;
 
 	GlobusGFSName(__func__);
@@ -319,18 +320,28 @@ misc_file_archived(char          * Path,
 		goto cleanup;
 	}
 
-	/* Determine the archive status. */
+	/*
+	 * Determine the archive status. Due to holes, we can not expect xfileattr.Attrs.DataLength
+	 * bytes on disk. And we really don't know how much data is really in this file. So the
+	 * algorithm works like this: assume the file is staged unless you find a tape SC that
+	 * has more BytesAtLevel than the disk SCs before it.
+	 */
+
+	*Archived = GLOBUS_FALSE;
+
 	for (storage_level = 0; storage_level < HPSS_MAX_STORAGE_LEVELS; storage_level++)
 	{
 		if (xfileattr.SCAttrib[storage_level].Flags & BFS_BFATTRS_LEVEL_IS_DISK)
 		{
-			/* Check for the entire file on disk at this level. */
-			/* if (eq64m(xfileattr.SCAttrib[storage_level].BytesAtLevel, xfileattr.Attrs.DataLength)) */
-
-			/* Because of holes, we can not expect all bytes to be disk. */
-			if (neqz64m(xfileattr.SCAttrib[storage_level].BytesAtLevel))
+			/* Save the largest count of bytes on disk. */
+			if (gt64(xfileattr.SCAttrib[storage_level].BytesAtLevel, max_bytes_on_disk))
+				max_bytes_on_disk = xfileattr.SCAttrib[storage_level].BytesAtLevel;
+		} else if (xfileattr.SCAttrib[storage_level].Flags & BFS_BFATTRS_LEVEL_IS_TAPE)
+		{
+			/* File is purged if more bytes are on disk. */
+			if (gt64(xfileattr.SCAttrib[storage_level].BytesAtLevel, max_bytes_on_disk))
 			{
-				*Archived = GLOBUS_FALSE;
+				*Archived = GLOBUS_TRUE;
 				break;
 			}
 		}
