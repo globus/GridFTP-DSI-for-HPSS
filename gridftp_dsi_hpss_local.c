@@ -563,7 +563,7 @@ local_stat(globus_gfs_operation_t   Operation,
 		if (retval != 0)
 		{
 			result = GlobusGFSErrorSystemError("hpss_Readdir", -retval);
-			goto cleanup;
+			break;
 		}
 
 		/* Check if we are done. */
@@ -572,13 +572,13 @@ local_stat(globus_gfs_operation_t   Operation,
 
 		result = misc_build_path(StatInfo->pathname, dirent.d_name, &entry_path);
 		if (result != GLOBUS_SUCCESS)
-			goto cleanup;
+			break;
 
 		result = misc_gfs_stat(entry_path, StatInfo->use_symlink_info, &gfs_stat_array[gfs_stat_count++]);
 
 		free(entry_path);
 		if (result != GLOBUS_SUCCESS)
-			goto cleanup;
+			break;
 
 		if (gfs_stat_count == STAT_ENTRIES_PER_REPLY)
 		{
@@ -588,16 +588,20 @@ local_stat(globus_gfs_operation_t   Operation,
 		}
 	}
 
+	hpss_Closedir(dir_fd);
+
+cleanup:
+	if (result != GLOBUS_SUCCESS)
+	{
+		/* Inform the server that we completed with an error. */
+		globus_gridftp_server_finished_stat(Operation, result, NULL, 0);
+		GlobusGFSHpssDebugExitWithError();
+		return;
+	}
+
 	globus_gridftp_server_finished_stat(Operation, GLOBUS_SUCCESS, gfs_stat_array, gfs_stat_count);
 	GlobusGFSHpssDebugExit();
 	return;
-
-cleanup:
-
-	/* Inform the server that we completed with an error. */
-	globus_gridftp_server_finished_stat(Operation, result, NULL, 0);
-
-	GlobusGFSHpssDebugExitWithError();
 }
 
 
