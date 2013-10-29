@@ -1,4 +1,4 @@
-Version 1.4 Beta:
+Version 1.4: Oct 29, 2013
 	- Fix for staged files. Make sure tape SC does not have more bytes
 	  than disk SC.
 	- Fix for "System error in hpss_Opendir: Too many open files" while
