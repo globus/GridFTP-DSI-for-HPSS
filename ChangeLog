@@ -3,6 +3,10 @@ Version 1.4 Beta:
 	  than disk SC.
 	- Fix for "System error in hpss_Opendir: Too many open files" while
 	  doing recursive deletions.
+	- Added tape ID to MLST/MLSC/MLSD output are the first portion of
+	  the unique attribute. This can be used for intelligent ordering
+	  of stage requests.
+	- Prevent multiple stage requests for the same file
 
 Version 1.3: Aug 20, 2013
 	- Added --with-quota_support which will mark files with UDA so that the
