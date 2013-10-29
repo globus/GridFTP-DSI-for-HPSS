@@ -96,6 +96,7 @@ struct session_handle {
 
 	struct {
 		char * HardLinkFrom;
+		void * StageList;
 	} Cmd;
 
 	config_handle_t * ConfigHandle;
@@ -575,6 +576,25 @@ session_cmd_free_hardlinkfrom(session_handle_t * SessionHandle)
 	SessionHandle->Cmd.HardLinkFrom = NULL;
 
 	GlobusGFSHpssDebugExit();
+}
+
+void
+session_cmd_set_stagelist(session_handle_t * SessionHandle,
+                          void             * StageList)
+{
+	GlobusGFSName(session_cmd_set_stagelist);
+	GlobusGFSHpssDebugEnter();
+	SessionHandle->Cmd.StageList = StageList;
+	GlobusGFSHpssDebugExit();
+}
+
+void *
+session_cmd_get_stagelist(session_handle_t * SessionHandle)
+{
+	GlobusGFSName(session_cmd_get_stagelist);
+	GlobusGFSHpssDebugEnter();
+	GlobusGFSHpssDebugExit();
+	return SessionHandle->Cmd.StageList;
 }
 
 /*
