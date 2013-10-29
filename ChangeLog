@@ -1,3 +1,8 @@
+Version 1.5 Beta
+	- Translate HPSS EIO errors to hopefully more useful messages after
+	  calls to hpss_PIOExecute(), hpss_PIORegister(), hpss_SetCOSByHints()
+	  hpss_StageCallBack() and hpss_PIOEnd()
+
 Version 1.4: Oct 29, 2013
 	- Fix for staged files. Make sure tape SC does not have more bytes
 	  than disk SC.
