@@ -77,6 +77,146 @@
 #include <dmalloc.h>
 #endif /* DMALLOC */
 
+typedef void (* get_x_attr_callback) (const hpss_xfileattr_t * XFileAttr, void * CallbackArg);
+
+static globus_result_t
+misc_get_x_attr(char                * Path,
+                get_x_attr_callback   Callback,
+                void                * CallbackArg)
+{
+	int              retval            = 0;
+	int              storage_level     = 0;
+	int              vv_index          = 0;
+	globus_result_t  result            = GLOBUS_SUCCESS;
+	hpss_xfileattr_t xfileattr;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	memset(&xfileattr, 0, sizeof(hpss_xfileattr_t));
+
+	/*
+	 * Stat the object. Without API_GET_XATTRS_NO_BLOCK, this call would hang
+	 * on any file moving between levels in its hierarchy (ie staging).
+	 */
+	retval = hpss_FileGetXAttributes(Path,
+	                                 API_GET_STATS_FOR_ALL_LEVELS|API_GET_XATTRS_NO_BLOCK,
+	                                 0,
+	                                 &xfileattr);
+	if (retval != 0)
+	{
+		result = GlobusGFSErrorSystemError("hpss_FileGetXAttributes", -retval);
+		goto cleanup;
+	}
+
+	Callback(&xfileattr, CallbackArg);
+
+cleanup:
+	/* Free the extended information. */
+	for (storage_level = 0; storage_level < HPSS_MAX_STORAGE_LEVELS; storage_level++)
+	{
+		for(vv_index = 0; vv_index < xfileattr.SCAttrib[storage_level].NumberOfVVs; vv_index++)
+		{
+			if (xfileattr.SCAttrib[storage_level].VVAttrib[vv_index].PVList != NULL)
+			{
+				free(xfileattr.SCAttrib[storage_level].VVAttrib[vv_index].PVList);
+			}
+		}
+	}
+
+	if (result != GLOBUS_SUCCESS)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return result;
+	}
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+static void
+misc_get_min_tape_label(pv_list_t * PVList, char * MinTapeLabel)
+{
+	int index = 0;
+
+	/* Max tape ID. */
+	memset(MinTapeLabel, 'Z', HPSS_PV_NAME_SIZE);
+
+	for (index = 0; index < PVList->List.List_len; index++)
+	{
+		if (strncasecmp(PVList->List.List_val[index].Name, MinTapeLabel, HPSS_PV_NAME_SIZE) < 0)
+		{
+			strncpy(MinTapeLabel, PVList->List.List_val[index].Name, HPSS_PV_NAME_SIZE);
+		}
+	}
+}
+
+static unsigned
+misc_conv_tape_label_to_id(char * TapeLabel)
+{
+	int      index      = 0;
+	unsigned tape_id    = 0;
+	unsigned char_value = 0;
+
+	for (index = 0; index < 6; index++)
+	{
+		if (isdigit(TapeLabel[index]))
+			char_value = (int)TapeLabel[index] - (int)'0';
+		else char_value = (int)toupper(TapeLabel[index]) - (int)'A' + 10;
+
+		tape_id = (tape_id * 36) + char_value;
+	}
+
+	return tape_id;
+}
+
+static void
+misc_get_tape_id_callback(const hpss_xfileattr_t * XFileAttr,
+                          void                   * CallbackArg)
+{
+	unsigned * tape_id       = (unsigned *)CallbackArg;
+	int        storage_level = 0;
+	char       min_tape_label[HPSS_PV_NAME_SIZE];
+
+	for (storage_level = 0; storage_level < HPSS_MAX_STORAGE_LEVELS; storage_level++)
+	{
+		if (XFileAttr->SCAttrib[storage_level].Flags & BFS_BFATTRS_LEVEL_IS_TAPE)
+		{
+			if (neqz64m(XFileAttr->SCAttrib[storage_level].BytesAtLevel))
+			{
+				misc_get_min_tape_label(XFileAttr->SCAttrib[storage_level].VVAttrib[0].PVList, min_tape_label);
+				*tape_id = misc_conv_tape_label_to_id(min_tape_label);
+				break;
+			}
+		}
+	}
+}
+
+static globus_result_t
+misc_get_tape_id(char * Path, unsigned * TapeID)
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName("misc_get_tape_id");
+	GlobusGFSHpssDebugEnter();
+
+	*TapeID = 0;
+
+	result = misc_get_x_attr(Path, misc_get_tape_id_callback, TapeID);
+
+	if (result != GLOBUS_SUCCESS)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return result;
+	}
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+struct misc_file_archived_arg {
+	globus_bool_t * Archived;
+	globus_bool_t * TapeOnly;
+};
+
 static globus_result_t
 misc_copy_basename(char * Path, char ** BaseName)
 {
@@ -103,7 +243,7 @@ misc_copy_basename(char * Path, char ** BaseName)
 	return GLOBUS_SUCCESS;
 }
 
-globus_result_t
+static globus_result_t
 misc_translate_stat(char              * Name,
                     hpss_stat_t       * HpssStat,
                     globus_gfs_stat_t * GlobusStat)
@@ -123,7 +263,15 @@ misc_translate_stat(char              * Name,
 	GlobusStat->nlink = HpssStat->st_nlink;
 	GlobusStat->uid   = HpssStat->st_uid;
 	GlobusStat->gid   = HpssStat->st_gid;
- 	GlobusStat->dev   = 0;
+	GlobusStat->dev   = 0;
+
+	if (S_ISREG(GlobusStat->mode))
+	{
+		result = misc_get_tape_id(Name, (unsigned *)&GlobusStat->dev);
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+	}
+
 	GlobusStat->atime = HpssStat->hpss_st_atime;
 	GlobusStat->mtime = HpssStat->hpss_st_mtime;
 	GlobusStat->ctime = HpssStat->hpss_st_ctime;
@@ -269,85 +417,77 @@ misc_build_path(char * Directory, char * EntryName, char ** EntryPath)
     return GLOBUS_SUCCESS;
 }
 
+static void
+misc_file_archived_callback(const hpss_xfileattr_t * XFileAttr,
+                            void                   * CallbackArg)
+{
+	struct misc_file_archived_arg * callback_arg = (struct misc_file_archived_arg *)CallbackArg;
+	int        storage_level     = 0;
+	u_signed64 max_bytes_on_disk = cast64(0);
+
+	/* Check if the top level is tape. */
+	if (XFileAttr->SCAttrib[0].Flags & BFS_BFATTRS_LEVEL_IS_TAPE)
+	{
+		*callback_arg->Archived = GLOBUS_TRUE;
+		*callback_arg->TapeOnly = GLOBUS_TRUE;
+		return;
+	}
+
+	/* Handle zero length files. */
+	if (eqz64m(XFileAttr->Attrs.DataLength))
+	{
+		*callback_arg->Archived = GLOBUS_FALSE;
+		*callback_arg->TapeOnly = GLOBUS_FALSE;
+		return;
+	}
+
+	/*
+	 * Determine the archive status. Due to holes, we can not expect XFileAttr->Attrs.DataLength
+	 * bytes on disk. And we really don't know how much data is really in this file. So the
+	 * algorithm works like this: assume the file is staged unless you find a tape SC that
+	 * has more BytesAtLevel than the disk SCs before it.
+	 */
+
+	*callback_arg->Archived = GLOBUS_FALSE;
+
+	for (storage_level = 0; storage_level < HPSS_MAX_STORAGE_LEVELS; storage_level++)
+	{
+		if (XFileAttr->SCAttrib[storage_level].Flags & BFS_BFATTRS_LEVEL_IS_DISK)
+		{
+			/* Save the largest count of bytes on disk. */
+			if (gt64(XFileAttr->SCAttrib[storage_level].BytesAtLevel, max_bytes_on_disk))
+				max_bytes_on_disk = XFileAttr->SCAttrib[storage_level].BytesAtLevel;
+		} else if (XFileAttr->SCAttrib[storage_level].Flags & BFS_BFATTRS_LEVEL_IS_TAPE)
+		{
+			/* File is purged if more bytes are on disk. */
+			if (gt64(XFileAttr->SCAttrib[storage_level].BytesAtLevel, max_bytes_on_disk))
+			{
+				*callback_arg->Archived = GLOBUS_TRUE;
+				break;
+			}
+		}
+	}
+}
+
 globus_result_t
 misc_file_archived(char          * Path,
                    globus_bool_t * Archived,
                    globus_bool_t * TapeOnly)
 {
-	int              retval        = 0;
-	int              storage_level = 0;
-	int              vv_index      = 0;
-	globus_result_t  result        = GLOBUS_SUCCESS;
-	hpss_xfileattr_t xfileattr;
+	globus_result_t result = GLOBUS_SUCCESS;
+	struct misc_file_archived_arg callback_arg;
 
-	GlobusGFSName(__func__);
+	GlobusGFSName("misc_file_archived");
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
 	*Archived = GLOBUS_TRUE;
 	*TapeOnly = GLOBUS_FALSE;
 
-	memset(&xfileattr, 0, sizeof(hpss_xfileattr_t));
+	callback_arg.Archived = Archived;
+	callback_arg.TapeOnly = TapeOnly;
 
-	/*
-	 * Stat the object. Without API_GET_XATTRS_NO_BLOCK, this call would hang
-	 * on any file moving between levels in its hierarchy (ie staging).
-	 */
-	retval = hpss_FileGetXAttributes(Path,
-	                                 API_GET_STATS_FOR_ALL_LEVELS|API_GET_XATTRS_NO_BLOCK,
-	                                 0,
-	                                 &xfileattr);
-	if (retval != 0)
-	{
-		result = GlobusGFSErrorSystemError("hpss_FileGetXAttributes", -retval);
-		goto cleanup;
-	}
-
-	/* Check if the top level is tape. */
-	if (xfileattr.SCAttrib[0].Flags & BFS_BFATTRS_LEVEL_IS_TAPE)
-	{
-		*Archived = GLOBUS_TRUE;
-		*TapeOnly = GLOBUS_TRUE;
-		goto cleanup;
-	}
-
-	/* Handle zero length files. */
-	if (eqz64m(xfileattr.Attrs.DataLength))
-	{
-		*Archived = GLOBUS_FALSE;
-		*TapeOnly = GLOBUS_FALSE;
-		goto cleanup;
-	}
-
-	/* Determine the archive status. */
-	for (storage_level = 0; storage_level < HPSS_MAX_STORAGE_LEVELS; storage_level++)
-	{
-		if (xfileattr.SCAttrib[storage_level].Flags & BFS_BFATTRS_LEVEL_IS_DISK)
-		{
-			/* Check for the entire file on disk at this level. */
-			/* if (eq64m(xfileattr.SCAttrib[storage_level].BytesAtLevel, xfileattr.Attrs.DataLength)) */
-
-			/* Because of holes, we can not expect all bytes to be disk. */
-			if (neqz64m(xfileattr.SCAttrib[storage_level].BytesAtLevel))
-			{
-				*Archived = GLOBUS_FALSE;
-				break;
-			}
-		}
-	}
-
-cleanup:
-	/* Free the extended information. */
-	for (storage_level = 0; storage_level < HPSS_MAX_STORAGE_LEVELS; storage_level++)
-	{
-		for(vv_index = 0; vv_index < xfileattr.SCAttrib[storage_level].NumberOfVVs; vv_index++)
-		{
-			if (xfileattr.SCAttrib[storage_level].VVAttrib[vv_index].PVList != NULL)
-			{
-				free(xfileattr.SCAttrib[storage_level].VVAttrib[vv_index].PVList);
-			}
-		}
-	}
+	result = misc_get_x_attr(Path, misc_file_archived_callback, &callback_arg);
 
 	if (result != GLOBUS_SUCCESS)
 	{
@@ -377,6 +517,34 @@ misc_get_file_size(char * Path, globus_off_t * FileSize)
 	misc_destroy_gfs_stat(&gfs_stat_buf);
 
 cleanup:
+	if (result != GLOBUS_SUCCESS)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return result;
+	}
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+static void
+misc_get_file_bfid_callback(const hpss_xfileattr_t * XFileAttr,
+                            void                   * CallbackArg)
+{
+	hpssoid_t * bitfile_id = (hpssoid_t *) CallbackArg;
+
+	memcpy(bitfile_id, &XFileAttr->Attrs.BitfileId, sizeof(hpssoid_t));
+}
+
+globus_result_t
+misc_get_file_bfid(char * Path, hpssoid_t * BitfileID)
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName("misc_get_file_bfid");
+	GlobusGFSHpssDebugEnter();
+
+	result = misc_get_x_attr(Path, misc_get_file_bfid_callback, BitfileID);
+
 	if (result != GLOBUS_SUCCESS)
 	{
 		GlobusGFSHpssDebugExitWithError();

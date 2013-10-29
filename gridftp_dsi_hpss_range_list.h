@@ -73,6 +73,13 @@ range_list_delete(range_list_t * RangeList,
                   globus_off_t   Offset,
                   globus_off_t   Length);
 
+/*
+ * Intersect two range lists. Result is returned in RangeList2.
+ */
+globus_result_t
+range_list_intersect(const range_list_t * RangeList1,
+                     range_list_t       * RangeList2);
+
 void
 range_list_peek(range_list_t * RangeList,
                 globus_off_t * Offset,
@@ -102,5 +109,12 @@ range_list_fill_retr_range(range_list_t               * RangeList,
 globus_result_t
 range_list_fill_cksm_range(range_list_t              * RangeList,
                            globus_gfs_command_info_t * CommandInfo);
+
+/* StripeIndex goes from 0 to (StripeCount-1) */
+globus_result_t
+range_list_filter_stripe(range_list_t * RangeList,
+                         globus_off_t   StripeBlockSize,
+                         int            StripeCount,
+                         int            StripeIndex);
 
 #endif /* GRIDFTP_DSI_HPSS_RANGE_LIST_H */

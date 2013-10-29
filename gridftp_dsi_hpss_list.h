@@ -52,6 +52,7 @@ typedef struct list list_t;
 typedef enum {
 	LIST_ITERATE_CONTINUE = 1,
 	LIST_ITERATE_DONE = 2,
+	LIST_ITERATE_REMOVE = 4,
 } list_iterate_t;
 
 typedef list_iterate_t (*iterate_func_t) (void * Data, void * CallbackArg);
@@ -86,6 +87,9 @@ list_move_before(list_t * List,
 
 void *
 list_remove_head(list_t  * List);
+
+void *
+list_peek_head(list_t * List);
 
 void
 list_iterate(list_t         * List,

@@ -99,6 +99,12 @@ typedef struct marker_handle {
 	msg_handle_t             * MsgHandle;
 } marker_handle_t;
 
+typedef struct stage_entry {
+	hpssoid_t            BitfileID;
+	struct stage_entry * Next;
+	struct stage_entry * Prev;
+} stage_entry_t;
+
 globus_result_t
 commands_init(globus_gfs_operation_t    Operation)
 {
@@ -277,23 +283,107 @@ cleanup:
 	return GLOBUS_SUCCESS;
 }
 
-static globus_result_t
-commands_stage_file(char          * Path,
-                    int             Timeout,
-                    globus_bool_t * Staged,
-                    globus_bool_t * TapeOnly)
+static int
+commands_bfid_in_list(stage_entry_t * StageList,
+                      hpssoid_t     * BitfileID)
 {
-	int               retval     = 0;
-	time_t            start_time = time(NULL);
-	hpss_reqid_t      reqid      = 0;
-	globus_bool_t     archived   = GLOBUS_TRUE;
-	globus_result_t   result     = GLOBUS_SUCCESS;
-	globus_abstime_t  timeout;
-	globus_mutex_t    mutex;
-	globus_cond_t     cond;
-	hpssoid_t         bitfile_id;
-	u_signed64        size;
-	globus_gfs_stat_t gfs_stat_buf;
+	GlobusGFSName(commands_bfid_in_list);
+	GlobusGFSHpssDebugEnter();
+
+	for (; StageList; StageList = StageList->Next)
+	{
+		if (memcmp(&StageList->BitfileID, BitfileID, sizeof(hpssoid_t)) == 0)
+			break;
+	}
+
+	GlobusGFSHpssDebugExit();
+
+	return (StageList != NULL);
+}
+
+static globus_result_t
+commands_add_bfid_to_list(stage_entry_t ** StageList,
+                          hpssoid_t     *  BitfileID)
+{
+	globus_result_t   result = GLOBUS_SUCCESS;
+	stage_entry_t   * stage_entry = NULL;
+
+	GlobusGFSName(commands_add_bfid_to_list);
+	GlobusGFSHpssDebugEnter();
+
+	stage_entry = (stage_entry_t *) globus_calloc(1, sizeof(stage_entry_t));
+	if (stage_entry == NULL)
+	{
+		result = GlobusGFSErrorMemory("stage_entry_t");
+		goto cleanup;
+	}
+
+	memcpy(&stage_entry->BitfileID, BitfileID, sizeof(stage_entry->BitfileID));
+
+	stage_entry->Next = *StageList;
+	*StageList        = stage_entry;
+
+	if (stage_entry->Next)
+		stage_entry->Next->Prev = stage_entry;
+
+cleanup:
+	GlobusGFSHpssDebugExit();
+	return result;
+}
+
+static void
+commands_rm_bfid_from_list(stage_entry_t ** StageList,
+                           hpssoid_t     *  BitfileID)
+{
+	stage_entry_t * stage_entry = NULL;
+	void          * ptr         = NULL;
+
+	GlobusGFSName(commands_rm_bfid_from_list);
+	GlobusGFSHpssDebugEnter();
+
+	stage_entry = *StageList;
+	while (stage_entry != NULL)
+	{
+		if (memcmp(&stage_entry->BitfileID, BitfileID, sizeof(hpssoid_t)))
+		{
+			stage_entry = stage_entry->Next;
+			continue;
+		}
+
+		if (stage_entry->Next)
+			stage_entry->Next->Prev = stage_entry->Prev;
+		if (stage_entry->Prev)
+			stage_entry->Prev->Next = stage_entry->Next;
+		else
+			*StageList = stage_entry->Next;
+
+		ptr = stage_entry;
+		stage_entry = stage_entry->Next;
+		globus_free(ptr);
+	}
+
+	GlobusGFSHpssDebugExit();
+}
+
+static globus_result_t
+commands_stage_file(session_handle_t * Session,
+                    char             * Path,
+                    int                Timeout,
+                    globus_bool_t    * Staged,
+                    globus_bool_t    * TapeOnly)
+{
+	int                 retval     = 0;
+	time_t              start_time = time(NULL);
+	hpss_reqid_t        reqid      = 0;
+	globus_bool_t       archived   = GLOBUS_TRUE;
+	globus_result_t     result     = GLOBUS_SUCCESS;
+	globus_abstime_t    timeout;
+	globus_mutex_t      mutex;
+	globus_cond_t       cond;
+	hpssoid_t           bitfile_id;
+	u_signed64          size;
+	globus_gfs_stat_t   gfs_stat_buf;
+	stage_entry_t     * stage_list;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -304,6 +394,9 @@ commands_stage_file(char          * Path,
 	globus_mutex_init(&mutex, NULL);
 	globus_cond_init(&cond, NULL);
 
+	/* Get the stage list. */
+	stage_list = session_cmd_get_stagelist(Session);
+
 	/* Stat the object. */
 	result = misc_gfs_stat(Path, GLOBUS_FALSE, &gfs_stat_buf);
 	if (result != GLOBUS_SUCCESS)
@@ -312,9 +405,14 @@ commands_stage_file(char          * Path,
 	/* Check if it is a file. */
 	if (!S_ISREG(gfs_stat_buf.mode))
 	{
-		*Staged = GLOBUS_TRUE;
+		archived = GLOBUS_FALSE;
 		goto cleanup;
 	}
+
+	/* Get it's bitfile ID. */
+	result = misc_get_file_bfid(Path, &bitfile_id);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
 
 	/* Check if it is archived. */
 	result = misc_file_archived(Path, &archived, TapeOnly);
@@ -322,26 +420,31 @@ commands_stage_file(char          * Path,
 		goto cleanup;
 
 	if (archived == GLOBUS_FALSE || *TapeOnly == GLOBUS_TRUE)
-		goto cleanup;
-
-	/*
-	 * We use hpss_StageCallBack() so that we do not block while the
-	 * stage completes. We could use hpss_Open(O_NONBLOCK) and then
-	 * hpss_Stage(BFS_ASYNCH_CALL) but then we block in hpss_Close().
-	 */
-
-	/*
-	 * We could optimize by saving these requests in a list and checking it
-	 * before we issue another request. This helps clients (uberftp) that
-	 * will request the file stage every second until complete.
-	 */
-
-	CONVERT_LONGLONG_TO_U64(gfs_stat_buf.size, size);
-	retval = hpss_StageCallBack(Path, cast64m(0), size, 0, NULL, BFS_STAGE_ALL, &reqid, &bitfile_id);
-	if (retval != 0)
 	{
-		result = GlobusGFSErrorSystemError("hpss_StageCallBack()", -retval);
+		commands_rm_bfid_from_list(&stage_list, &bitfile_id);
 		goto cleanup;
+	}
+
+	/* Only stage if we haven't requested it already. */
+	if (!commands_bfid_in_list(stage_list, &bitfile_id))
+	{
+		result = commands_add_bfid_to_list(&stage_list, &bitfile_id);
+		if (result != GLOBUS_SUCCESS)
+			goto cleanup;
+
+		/*
+		 * We use hpss_StageCallBack() so that we do not block while the
+		 * stage completes. We could use hpss_Open(O_NONBLOCK) and then
+		 * hpss_Stage(BFS_ASYNCH_CALL) but then we block in hpss_Close().
+		 */
+		CONVERT_LONGLONG_TO_U64(gfs_stat_buf.size, size);
+		retval = hpss_StageCallBack(Path, cast64m(0), size, 0, NULL, BFS_STAGE_ALL, &reqid, &bitfile_id);
+		if (retval != 0)
+		{
+			commands_rm_bfid_from_list(&stage_list, &bitfile_id);
+			result = GlobusGFSErrorSystemError("hpss_StageCallBack()", -retval);
+			goto cleanup;
+		}
 	}
 
 	/* Now wait for the given about of time or the file staged. */
@@ -363,8 +466,14 @@ commands_stage_file(char          * Path,
 			goto cleanup;
 	}
 
+	if (!archived)
+		commands_rm_bfid_from_list(&stage_list, &bitfile_id);
+
 cleanup:
 	*Staged = !archived;
+
+	/* Set the stage list. */
+	session_cmd_set_stagelist(Session, stage_list);
 
 	globus_mutex_destroy(&mutex);
 	globus_cond_destroy(&cond);
@@ -1106,7 +1215,8 @@ commands_handler(globus_gfs_operation_t      Operation,
 		}
 
 		/* Stage the file. */
-		result = commands_stage_file(CommandInfo->pathname,
+		result = commands_stage_file(session,
+		                             CommandInfo->pathname,
                                      timeout,
                                      &staged,
                                      &tape_only);

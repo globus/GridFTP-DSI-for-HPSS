@@ -88,11 +88,6 @@ misc_gfs_stat(char              * Path,
               globus_bool_t       UseSymlinkInfo,
               globus_gfs_stat_t * GfsStatArray);
 
-globus_result_t
-misc_translate_stat(char              * Name,
-                    hpss_stat_t       * HpssStat,
-                    globus_gfs_stat_t * GlobusStat);
-
 void
 misc_destroy_gfs_stat(globus_gfs_stat_t * GfsStat);
 
@@ -111,6 +106,8 @@ misc_file_archived(char          * Path,
 globus_result_t
 misc_get_file_size(char * Path, globus_off_t * FileSize);
 
+globus_result_t
+misc_get_file_bfid(char * Path, hpssoid_t * BitfileID);
 
 /*
  * Passwd file translations.

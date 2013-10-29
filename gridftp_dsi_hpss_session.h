@@ -122,6 +122,13 @@ session_cmd_get_hardlinkfrom(session_handle_t * SessionHandle);
 void
 session_cmd_free_hardlinkfrom(session_handle_t * SessionHandle);
 
+void
+session_cmd_set_stagelist(session_handle_t * SessionHandle,
+                          void             * StageList);
+
+void *
+session_cmd_get_stagelist(session_handle_t * SessionHandle);
+
 /*
  * Translates Cos to the id. Cos can be the name or the id.
  * Returns SESSION_NO_COS_ID if cos is not found.
