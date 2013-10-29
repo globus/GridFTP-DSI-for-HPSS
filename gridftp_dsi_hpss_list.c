@@ -399,12 +399,36 @@ cleanup:
 	return data;
 }
 
+void *
+list_peek_head(list_t * List)
+{
+	void * data = NULL;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	if (List == NULL)
+		goto cleanup;
+
+	globus_mutex_lock(&List->Lock);
+	{
+		if (List->Head != NULL)
+			data = List->Head->Data;
+	}
+	globus_mutex_unlock(&List->Lock);
+
+cleanup:
+	GlobusGFSHpssDebugExit();
+	return data;
+}
+
 void
 list_iterate(list_t         * List,
              iterate_func_t   SearchFunc,
              void           * CallbackArg)
 {
-	entry_t      * entry = NULL;
+	entry_t      * entry         = NULL;
+	entry_t      * next_entry    = NULL;
 	list_iterate_t iterate_value = 0;
 
 	GlobusGFSName(__func__);
@@ -412,10 +436,38 @@ list_iterate(list_t         * List,
 
 	globus_mutex_lock(&List->Lock);
 	{
-		for (entry = List->Head; entry != NULL; entry = entry->Next)
+		entry = List->Head;
+		while (entry != NULL)
 		{
 			iterate_value = SearchFunc(entry->Data, CallbackArg);
-			if (iterate_value == LIST_ITERATE_DONE)
+
+			if (iterate_value & LIST_ITERATE_REMOVE)
+			{
+/*
+* Remove the entry from the list.
+ */
+				if (entry->Prev != NULL)
+					entry->Prev->Next = entry->Next;
+				else
+					List->Head = entry->Next;
+
+				if (entry->Next != NULL)
+					entry->Next->Prev = entry->Prev;
+				else
+					List->Tail = entry->Prev;
+
+				/* Save the next entry. */
+				next_entry = entry->Next;
+
+				/* Deallocate the entry. */
+				globus_free(entry);
+
+				/* Now use the next entry. */
+				entry = next_entry;
+			} else
+				entry = entry->Next;
+
+			if (iterate_value & LIST_ITERATE_DONE)
 				break;
 		}
 	}
