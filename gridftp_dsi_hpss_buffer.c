@@ -535,46 +535,6 @@ buffer_get_ready_buffer(buffer_handle_t  *  BufferHandle,
 	GlobusGFSHpssDebugExit();
 }
 
-void
-buffer_get_next_ready_buffer(buffer_handle_t  *  BufferHandle,
-                             buffer_priv_id_t    PrivateID,
-                             char             ** Buffer,
-                             globus_off_t     *  Offset,
-                             globus_off_t     *  Length)
-{
-	search_arg_t search_arg;
-
-	GlobusGFSName(__func__);
-	GlobusGFSHpssDebugEnter();
-
-	/* Initialize the return value. */
-	*Buffer = NULL;
-
-	memset(&search_arg, 0, sizeof(search_arg_t));
-	search_arg.Type      = SEARCH_TYPE_NEXT_READY;
-	search_arg.ID        = PrivateID;
-	search_arg.Offset    = 0;
-
-	globus_mutex_lock(&BufferHandle->Lock);
-	{
-		list_iterate(BufferHandle->List, list_search_func, &search_arg);
-
-		if (search_arg.Entry != NULL)
-		{
-			/* Indicate that this buffer is in use. */
-			search_arg.Entry->InUse = GLOBUS_TRUE;
-
-			/* Save the return values. */
-			*Buffer = ENTRY_TO_BUFFER(search_arg.Entry);
-			*Length = search_arg.Entry->Length;
-			*Offset = search_arg.Entry->Offset;
-		}
-	}
-	globus_mutex_unlock(&BufferHandle->Lock);
-
-	GlobusGFSHpssDebugExit();
-}
-
 /* Mark not inuse. */
 void
 buffer_store_ready_buffer(buffer_handle_t  * BufferHandle,
