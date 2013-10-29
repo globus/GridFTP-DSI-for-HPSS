@@ -132,10 +132,10 @@ range_list_destroy(range_list_t * RangeList)
 /*
  * Ignore lengths of 0.
  */
-globus_result_t
-range_list_insert(range_list_t * RangeList,
-                  globus_off_t   Offset,
-                  globus_off_t   Length)
+static globus_result_t
+range_list_insert_locked(range_list_t * RangeList,
+                         globus_off_t   Offset,
+                         globus_off_t   Length)
 {
 	range_t         * new_range     = NULL;
 	range_t         * next_range    = NULL;
@@ -149,104 +149,133 @@ range_list_insert(range_list_t * RangeList,
 	if (Length == 0)
 		goto cleanup;
 
-	globus_mutex_lock(&RangeList->Lock);
+	/* Find the range we extend or come before. */
+	for (current_range  = RangeList->Head; 
+	     current_range != NULL; 
+	     current_range  = current_range->Next)
 	{
-		/* Find the range we extend or come before. */
-		for (current_range  = RangeList->Head; 
-		     current_range != NULL; 
-		     current_range  = current_range->Next)
+		/* If we go before current_range... */
+		if (Offset < current_range->Offset)
 		{
-			/* If we go before current_range... */
-			if (Offset < current_range->Offset)
-			{
-				/* There should never be overlap. */
-				globus_assert((Offset + Length) <= current_range->Offset);
+			/* There should never be overlap. */
+			globus_assert((Offset + Length) <= current_range->Offset);
 
-				break;
-			}
-
-			/* There should never be a collision. */
-			globus_assert(Offset != current_range->Offset);
-			/* Make sure there's no overlap. */
-			globus_assert(Offset >= (current_range->Offset + current_range->Length));
-
-			/* See if we extend the back of current_range. */
-			if (Offset == (current_range->Offset + current_range->Length))
-				break;
+			break;
 		}
 
-		if (current_range && (Offset + Length) == current_range->Offset)
-		{
-			/* Extend the front. */
-			current_range->Offset  = Offset;
-			current_range->Length += Length;
-		} else if (current_range && (current_range->Offset + current_range->Length) == Offset)
-		{
-			/* Extend the back. */
-			current_range->Length += Length;
+		/* There should never be a collision. */
+		globus_assert(Offset != current_range->Offset);
+		/* Make sure there's no overlap. */
+		globus_assert(Offset >= (current_range->Offset + current_range->Length));
 
-			/* Do we reach the next range? */
-			if (current_range->Next != NULL)
+		/* See if we extend the back of current_range. */
+		if (Offset == (current_range->Offset + current_range->Length))
+			break;
+	}
+
+	if (current_range && (Offset + Length) == current_range->Offset)
+	{
+		/* Extend the front. */
+		current_range->Offset  = Offset;
+		current_range->Length += Length;
+	} else if (current_range && (current_range->Offset + current_range->Length) == Offset)
+	{
+		/* Extend the back. */
+		current_range->Length += Length;
+
+		/* Do we reach the next range? */
+		if (current_range->Next != NULL)
+		{
+			next_range = current_range->Next;
+
+			if ((current_range->Length + current_range->Offset) == next_range->Offset)
 			{
-				next_range = current_range->Next;
+				/* Merge in the next range. */
+				current_range->Length += next_range->Length;
 
-				if ((current_range->Length + current_range->Offset) == next_range->Offset)
-				{
-					/* Merge in the next range. */
-					current_range->Length += next_range->Length;
-
-					/* Unlink the next range. */
-					current_range->Next = next_range->Next;
-					if (next_range->Next != NULL)
-						next_range->Next->Prev = current_range;
-					else
-						RangeList->Tail = current_range;
-					/* Deallocate the unlinked range. */
-					globus_free(next_range);
-				}
+				/* Unlink the next range. */
+				current_range->Next = next_range->Next;
+				if (next_range->Next != NULL)
+					next_range->Next->Prev = current_range;
+				else
+					RangeList->Tail = current_range;
+				/* Deallocate the unlinked range. */
+				globus_free(next_range);
 			}
+		}
+	} else
+	{
+		/* Allocate a new entry. */
+		new_range = (range_t *) globus_calloc(1, sizeof(range_t));
+		if (new_range == NULL)
+		{
+			result = GlobusGFSErrorMemory("range_t");
+			goto cleanup;
+		}
+
+		new_range->Offset = Offset;
+		new_range->Length = Length;
+
+		/* Put it on the list. */
+		if (current_range != NULL)
+		{
+			/* Put it before current_range. */
+			new_range->Next = current_range;
+			new_range->Prev = current_range->Prev;
+			if (current_range->Prev != NULL)
+				current_range->Prev->Next = new_range;
+			else
+				RangeList->Head = new_range;
+
+			current_range->Prev = new_range;
 		} else
 		{
-			/* Allocate a new entry. */
-			new_range = (range_t *) globus_calloc(1, sizeof(range_t));
-			if (new_range == NULL)
+			/* Put it on the tail. */
+			if (RangeList->Tail != NULL)
 			{
-				result = GlobusGFSErrorMemory("range_t");
-				goto unlock;
-			}
-
-			new_range->Offset = Offset;
-			new_range->Length = Length;
-
-			/* Put it on the list. */
-			if (current_range != NULL)
-			{
-				/* Put it before current_range. */
-				new_range->Next = current_range;
-				new_range->Prev = current_range->Prev;
-				if (current_range->Prev != NULL)
-					current_range->Prev->Next = new_range;
-				else
-					RangeList->Head = new_range;
-
-				current_range->Prev = new_range;
+				RangeList->Tail->Next = new_range;
+				new_range->Prev = RangeList->Tail;
+				RangeList->Tail = new_range;
 			} else
 			{
-				/* Put it on the tail. */
-				if (RangeList->Tail != NULL)
-				{
-					RangeList->Tail->Next = new_range;
-					new_range->Prev = RangeList->Tail;
-					RangeList->Tail = new_range;
-				} else
-				{
-					RangeList->Head = new_range;
-					RangeList->Tail = new_range;
-				}
+				RangeList->Head = new_range;
+				RangeList->Tail = new_range;
 			}
 		}
 	}
-unlock:
+
+cleanup:
+	if (result != GLOBUS_SUCCESS)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return result;
+	}
+
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+/*
+ * Ignore lengths of 0.
+ */
+globus_result_t
+range_list_insert(range_list_t * RangeList,
+                  globus_off_t   Offset,
+                  globus_off_t   Length)
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	/* Ignore 0 lengths. */
+	if (Length == 0)
+		goto cleanup;
+
+	globus_mutex_lock(&RangeList->Lock);
+	{
+		result = range_list_insert_locked(RangeList, Offset, Length);
+	}
 	globus_mutex_unlock(&RangeList->Lock);
 
 cleanup:
@@ -278,10 +307,10 @@ range_list_empty(range_list_t * RangeList)
 	return empty;
 }
 
-void
-range_list_delete(range_list_t * RangeList,
-                  globus_off_t   Offset,
-                  globus_off_t   Length)
+static void
+range_list_delete_locked(range_list_t * RangeList,
+                         globus_off_t   Offset,
+                         globus_off_t   Length)
 {
 	range_t * range     = NULL;
 	range_t * tmp_range = NULL;
@@ -289,113 +318,179 @@ range_list_delete(range_list_t * RangeList,
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
 
-	globus_mutex_lock(&RangeList->Lock);
+	/* For each range. */
+	for (range = RangeList->Head; range != NULL && Length > 0; )
 	{
-		/* For each range. */
-		for (range = RangeList->Head; range != NULL && Length > 0; )
+		/* If our offset starts before the next range... */
+		if (Offset < range->Offset)
 		{
-			/* If our offset starts before the next range... */
-			if (Offset < range->Offset)
+			/* If our range completes before this range... */
+			if ((Offset + Length) <= range->Offset)
+				break;
+
+			/* Truncate our range. */
+			Length -= range->Offset - Offset;
+			Offset  = range->Offset;
+
+			continue;
+		}
+
+		/* If this range doesn't extend to the end of the file... */
+		if (range->Length != RANGE_LIST_MAX_LENGTH)
+		{
+			/* And our range is after this range... */
+			if (Offset > (range->Offset + range->Length))
 			{
-				/* If our range completes before this range... */
-				if ((Offset + Length) <= range->Offset)
-					break;
-
-				/* Truncate our range. */
-				Length -= range->Offset - Offset;
-				Offset  = range->Offset;
-
+				range = range->Next;
 				continue;
 			}
+		}
 
-			/* If this range doesn't extend to the end of the file... */
-			if (range->Length != RANGE_LIST_MAX_LENGTH)
-			{
-				/* And our range is after this range... */
-				if (Offset > (range->Offset + range->Length))
-				{
-					range = range->Next;
-					continue;
-				}
-			}
-
+		/*
+		 * Our range is in this range.
+		 */
+		if (range->Offset == Offset)
+		{
 			/*
-			 * Our range is in this range.
+			 * The ranges start on the same offset.
 			 */
-			if (range->Offset == Offset)
+			if (Length >= range->Length)
 			{
 				/*
-				 * The ranges start on the same offset.
-				 */
-				if (Length >= range->Length)
-				{
-					/*
-					 * We are larger than this range.
-					 */
-
-					/* Update our range. */
-					Offset += range->Length;
-					Length -= range->Length;
-
-					/* Remove this range. */
-					tmp_range = range;
-					range = range->Next;
-					if (range == NULL)
-						RangeList->Tail = tmp_range->Prev;
-					else
-						range->Prev = tmp_range->Prev;
-
-					if (tmp_range->Prev == NULL)
-						RangeList->Head  = range;
-					else
-						tmp_range->Prev->Next = range;
-
-					/* Deallocate the range. */
-					globus_free(tmp_range);
-				} else
-				{
-					/*
-					 * We are shorter than this range.
-					 */
-
-					/* Shorten that range. */
-					range->Offset += Length;
-					if (range->Length != RANGE_LIST_MAX_LENGTH)
-						range->Length -= Length;
-
-					/* Update our range. */
-					Offset += Length;
-					Length  = 0;
-				}
-			} else
-			{
-				/* 
-				 * Our range starts after theirs.
+				 * We are larger than this range.
 				 */
 
-				/* Split this range. */
-				tmp_range = (range_t *) globus_calloc(1, sizeof(range_t));
+				/* Update our range. */
+				Offset += range->Length;
+				Length -= range->Length;
 
-				tmp_range->Offset = range->Offset;
-				tmp_range->Length = Offset - tmp_range->Offset;
-
-				range->Offset  = Offset;
-				range->Length -= tmp_range->Length;
-
-				tmp_range->Next = range;
-				tmp_range->Prev = range->Prev;
-				range->Prev     = tmp_range;
+				/* Remove this range. */
+				tmp_range = range;
+				range = range->Next;
+				if (range == NULL)
+					RangeList->Tail = tmp_range->Prev;
+				else
+					range->Prev = tmp_range->Prev;
 
 				if (tmp_range->Prev == NULL)
-					RangeList->Head = tmp_range;
+					RangeList->Head  = range;
 				else
-					tmp_range->Prev->Next = tmp_range;
+					tmp_range->Prev->Next = range;
+
+				/* Deallocate the range. */
+				globus_free(tmp_range);
+			} else
+			{
+				/*
+				 * We are shorter than this range.
+				 */
+
+				/* Shorten that range. */
+				range->Offset += Length;
+				if (range->Length != RANGE_LIST_MAX_LENGTH)
+					range->Length -= Length;
+
+				/* Update our range. */
+				Offset += Length;
+				Length  = 0;
 			}
+		} else
+		{
+			/* 
+			 * Our range starts after theirs.
+			 */
+
+			/* Split this range. */
+			tmp_range = (range_t *) globus_calloc(1, sizeof(range_t));
+
+			tmp_range->Offset = range->Offset;
+			tmp_range->Length = Offset - tmp_range->Offset;
+
+			range->Offset  = Offset;
+			range->Length -= tmp_range->Length;
+
+			tmp_range->Next = range;
+			tmp_range->Prev = range->Prev;
+			range->Prev     = tmp_range;
+
+			if (tmp_range->Prev == NULL)
+				RangeList->Head = tmp_range;
+			else
+				tmp_range->Prev->Next = tmp_range;
 		}
+	}
+
+	GlobusGFSHpssDebugExit();
+}
+
+void
+range_list_delete(range_list_t * RangeList,
+                  globus_off_t   Offset,
+                  globus_off_t   Length)
+{
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	globus_mutex_lock(&RangeList->Lock);
+	{
+		range_list_delete_locked(RangeList, Offset, Length);
 	}
 	globus_mutex_unlock(&RangeList->Lock);
 
 	GlobusGFSHpssDebugExit();
+}
+
+globus_result_t
+range_list_intersect(const range_list_t * RangeList1,
+                     range_list_t       * RangeList2)
+{
+	range_t         * range  = NULL;
+	range_list_t    * tmp_range_list = NULL;
+	globus_result_t   result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	/* Allocate the tmp range list. */
+	result = range_list_init(&tmp_range_list);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	globus_mutex_lock(&RangeList1->Lock);
+	globus_mutex_lock(&RangeList2->Lock);
+	{
+		/* Duplicate RangeList2 in tmp_range_list */
+		for (range = RangeList2->Head; range != NULL; range = range->Next)
+		{
+			result = range_list_insert(tmp_range_list,
+			                           range->Offset,
+			                           range->Length);
+			if (result != GLOBUS_SUCCESS)
+				goto unlock;
+		}
+
+		/* Subtract RangeList1 from tmp_range_list */
+		for (range = RangeList1->Head; range != NULL; range = range->Next)
+		{
+			range_list_delete_locked(tmp_range_list, range->Offset, range->Length);
+		}
+
+		/* Subtract tmp_range_list from RangeList2. */
+		for (range = tmp_range_list->Head; range != NULL; range = range->Next)
+		{
+			range_list_delete_locked(RangeList2, range->Offset, range->Length);
+		}
+	}
+unlock:
+	globus_mutex_unlock(&RangeList1->Lock);
+	globus_mutex_unlock(&RangeList2->Lock);
+
+cleanup:
+	/* Deallocate the tmp range list. */
+	range_list_destroy(tmp_range_list);
+
+	GlobusGFSHpssDebugExit();
+	return result;
 }
 
 void
@@ -779,6 +874,71 @@ range_list_fill_cksm_range(range_list_t              * RangeList,
 		goto cleanup;
 
 cleanup:
+	if (result != GLOBUS_SUCCESS)
+	{
+		GlobusGFSHpssDebugExitWithError();
+		return result;
+	}
+
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
+}
+
+/*
+ * For each range, because of PIO, the transfer will restart
+ * on node zero.
+ * StripeIndex goes from 0 to (StripeCount-1)
+ */
+globus_result_t
+range_list_filter_stripe(range_list_t * RangeList,
+                         globus_off_t   StripeBlockSize,
+                         int            StripeCount,
+                         int            StripeIndex)
+{
+	range_t         * range          = NULL;
+	range_list_t    * tmp_range_list = NULL;
+	globus_off_t      offset         = 0;
+	globus_off_t      length         = 0;
+	globus_result_t   result         = GLOBUS_SUCCESS;
+
+	GlobusGFSName(__func__);
+	GlobusGFSHpssDebugEnter();
+
+	/* Allocate our tmp range list. */
+	result = range_list_init(&tmp_range_list);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	globus_mutex_lock(&RangeList->Lock);
+	{
+		/* Move the contents of RangeList to tmp_range_list. */
+		tmp_range_list->Head = RangeList->Head;
+		RangeList->Head      = NULL;
+		RangeList->Tail      = NULL;
+
+		for (range = tmp_range_list->Head; range != NULL; range = range->Next)
+		{
+			for (offset = range->Offset + (StripeIndex * StripeBlockSize);
+			     offset < (range->Offset + range->Length);
+			     offset += StripeBlockSize)
+			{
+				length = StripeBlockSize;
+				if ((offset + length) > (range->Offset + range->Length))
+					length = (range->Offset + range->Length) - offset;
+
+				result = range_list_insert_locked(RangeList, offset, length);
+				if (result != GLOBUS_SUCCESS)
+					goto unlock;
+			}
+		}
+	}
+unlock:
+	globus_mutex_unlock(&RangeList->Lock);
+
+cleanup:
+	/* Destroy our tmp range list. */
+	range_list_destroy(tmp_range_list);
+
 	if (result != GLOBUS_SUCCESS)
 	{
 		GlobusGFSHpssDebugExitWithError();
