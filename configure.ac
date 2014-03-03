@@ -1,226 +1,166 @@
 dnl
+dnl  University of Illinois/NCSA Open Source License
+dnl
+dnl  Copyright © 2012-2014, NCSA.  All rights reserved.
+dnl
+dnl  Developed by:
+dnl
+dnl  Storage Enabling Technologies (SET)
+dnl
+dnl  Nation Center for Supercomputing Applications (NCSA)
+dnl
+dnl  http://dims.ncsa.uiuc.edu/set/uberftp
+dnl
+dnl  Permission is hereby granted, free of charge, to any person obtaining a
+dnl  copy of this software and associated documentation files (the .Software.),
+dnl  to deal with the Software without restriction, including without limitation
+dnl  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+dnl  and/or sell copies of the Software, and to permit persons to whom the
+dnl  Software is furnished to do so, subject to the following conditions:
+dnl
+dnl     + Redistributions of source code must retain the above copyright notice,
+dnl       this list of conditions and the following disclaimers.
+dnl
+dnl     + Redistributions in binary form must reproduce the above copyright
+dnl       notice, this list of conditions and the following disclaimers in the
+dnl       documentation and/or other materials provided with the distribution.
+dnl
+dnl     + Neither the names of SET, NCSA
+dnl       nor the names of its contributors may be used to endorse or promote
+dnl       products derived from this Software without specific prior written
+dnl       permission.
+dnl
+dnl  THE SOFTWARE IS PROVIDED .AS IS., WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+dnl  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+dnl  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+dnl  THE CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+dnl  OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+dnl  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+dnl  DEALINGS WITH THE SOFTWARE.
+dnl
 
 AC_REVISION($Revision: 1.8 $)
-AC_INIT([GridFTP HPSS DSI], [1.4])
-
-AC_PROG_LIBTOOL
-
+AC_INIT([GridFTP HPSS DSI], [2.0_BETA], [Jason Alt <jalt@ncsa.illinois.edu>])
 AM_INIT_AUTOMAKE
+AC_PROG_LIBTOOL
+AC_PROG_CXX
+AC_PROG_CC
+AC_CONFIG_MACRO_DIR([m4])
 
-dnl
-dnl Find Globus installation
-dnl
-globus_location="no"
+AC_ARG_ENABLE(quota_support,
+    AC_HELP_STRING([--enable-quota_support], [mark renamed files for quota support.]),
+    [
+        AC_DEFINE(MARK_RENAMED_FILES, 1, [mark renamed files for quota support.])
+    ],
+    [])
+
+#
+# For checksums
+#
+AC_CHECK_HEADERS([openssl/md5.h], [MD5_HEADER="yes"], [AC_MSG_ERROR(Missing openssl/md5.h)])
+
+#
+# Globus Setup
+#
 AC_ARG_WITH(globus,
-	[  --with-globus=PATH      Location of Globus Installation],
-	[
-		globus_location="$withval"
-	]
+	[  --with-globus=value     location of Globus installation, defaults to /usr],
+	[  globus_location="$withval" ],
+	[  globus_location="/usr" ]
 )
 
-if test "x$globus_location" = "xyes" ; then
-	AC_MSG_ERROR(--with-globus=PATH must specify a path)
-elif test "x$globus_location" = "xno" ; then
-	if test "x$GLOBUS_LOCATION" = "x" ; then
-		AC_MSG_ERROR(--with-globus=PATH must specify a path)
-	else
-		globus_location="$GLOBUS_LOCATION"
+#
+# globus_common.h depends on globus_config.h, so do it first
+#
+if test "x$globus_location" == "x/usr" ; then
+	# RPM installation
+	CPPFLAGS=-I$globus_location/lib64/globus/include
+	AC_CHECK_HEADERS([globus_config.h],
+	                 [GLOBUS_CONFIG_CPPFLAGS="$CPPFLAGS"],
+	                 [AC_MSG_ERROR(globus_config.h not found, install globus-core)])
+else
+	# Source installation
+	CPPFLAGS=-I$globus_location/include/globus/gcc64dbg
+	AC_CHECK_HEADERS([globus_config.h],
+                 	 [GLOBUS_CONFIG_CPPFLAGS="$CPPFLAGS"],
+                 	 [AC_MSG_ERROR(globus_config.h not found in $globus_location)])
+fi
+
+#
+# Now check for globus_common.h using globus_config.h's location
+#
+CPPFLAGS="-I$globus_location/include/globus $GLOBUS_CONFIG_CPPFLAGS"
+AC_CHECK_HEADERS([globus_common.h], 
+                 [GLOBUS_COMMON_CPPFLAGS="-I$globus_location/include/globus"], 
+                 [AC_MSG_ERROR(globus_config.h not found)])
+
+
+#
+# Now check for globus_gridftp_server.h using globus_config.h's location
+#
+CPPFLAGS="-I$globus_location/include/globus"
+AC_CHECK_HEADERS([globus_common.h], 
+                 [GLOBUS_GRIDFTP_CPPFLAGS="-I$globus_location/include/globus"], 
+                 [AC_MSG_ERROR(globus_gridftp_server.h not found)])
+
+#
+# Sum up all the Globus CPPFLAGS
+#
+GLOBUS_CPPFLAGS=$GLOBUS_CONFIG_CPPFLAGS
+if test "${GLOBUS_CONFIG_CPPFLAGS}" != "${GLOBUS_COMMON_CPPFLAGS}"; then
+	GLOBUS_CPPFLAGS="$GLOBUS_CPPFLAGS $GLOBUS_COMMON_CPPFLAGS"
+fi
+
+if test "${GLOBUS_CONFIG_CPPFLAGS}" != "${GLOBUS_GRIDFTP_CPPFLAGS}"; then
+	if test "${GLOBUS_GRIDFTP_CPPFLAGS}" != "${GLOBUS_GRIDFTP_CPPFLAGS}"; then
+		GLOBUS_CPPFLAGS="$GLOBUS_CPPFLAGS $GLOBUS_GRIDFTP_CPPFLAGS"
 	fi
 fi
 
-if test ! -d "$globus_location" ; then
-	AC_MSG_ERROR(--with-globus=PATH must specify a valid path)
-fi
-export GLOBUS_LOCATION=$globus_location
-AC_SUBST(GLOBUS_LOCATION)
-
-dnl
-dnl Determine which flavor to use
-dnl
-globus_flavor="no"
-AC_ARG_WITH(globus-flavor,
-	[  --with-globus-flavor=TYPE       Describe Globus flavor type (ex: gcc32dbg)],
-	[ globus_flavor="$withval" ]
-)
-
-if test "x$globus_flavor" = "xyes" ; then
-	AC_MSG_ERROR(--with-globus-flavor=TYPE must specify a flavor)
-fi
-if test "x$globus_flavor" = "xno" ; then
-	AC_MSG_ERROR(--with-globus-flavor=TYPE must specify a flavor)
-fi
-AC_SUBST(GLOBUS_FLAVOR_NAME, $globus_flavor)
-
-#
-# Find globus-makefile-header so we can build our cflags, ldflags, compiler choice, etc
-#
-AC_MSG_CHECKING(for globus-makefile-header)
-if test -x $globus_location/bin/globus-makefile-header ; then
-	globus_makefile_header="$globus_location/bin/globus-makefile-header"
-else
-	AC_MSG_ERROR(Cannot find globus-makefile-header: GPT installation is incomplete)
-fi
-AC_MSG_RESULT(yes)
-
-dnl
-dnl Run globus-makefile-header to get the build variables
-dnl
-${globus_makefile_header} --flavor=${globus_flavor} $linkflag globus_gssapi_gsi 2>/dev/null | sed 's/ = \(.*\)/="\1"/' > ./.globus_makefile_header.output
-. ./.globus_makefile_header.output
-rm -f ./.globus_makefile_header.output
-
-AC_MSG_CHECKING(for Globus compiler choice)
-if test -z "$GLOBUS_CC" ; then
-	AC_MSG_ERROR(GLOBUS_CC missing)
-fi
-AC_MSG_RESULT(yes)
-CC=$GLOBUS_CC
-AC_PROG_CC()
-
-AC_MSG_CHECKING(for GLOBUS_CFLAGS)
-if test -z "$GLOBUS_CFLAGS" ; then
-	AC_MSG_ERROR(GLOBUS_CFLAGS missing)
-fi
-AC_MSG_RESULT(yes)
-AC_SUBST(GLOBUS_CFLAGS)
-
-AC_MSG_CHECKING(for GLOBUS_CPPFLAGS)
-if test -z "$GLOBUS_CPPFLAGS" ; then
-	AC_MSG_ERROR(GLOBUS_CPPFLAGS missing)
-fi
-AC_MSG_RESULT(yes)
 AC_SUBST(GLOBUS_CPPFLAGS)
 
-AC_MSG_CHECKING(for GLOBUS_PKG_LIBS)
-if test -z "$GLOBUS_PKG_LIBS" ; then
-	AC_MSG_ERROR(GLOBUS_PKG_LIBS missing)
-fi
-AC_MSG_RESULT(yes)
-AC_SUBST(GLOBUS_LIBS, $GLOBUS_PKG_LIBS)
 
-AC_MSG_CHECKING(for GLOBUS_LDFLAGS)
-if test -z "$GLOBUS_LDFLAGS" ; then
-	AC_MSG_ERROR(GLOBUS_LDFLAGS missing)
-fi
-AC_MSG_RESULT(yes)
+#
+# Find the needed Globus libraries
+#
+LDFLAGS="-L$globus_location/lib64/"
+AC_CHECK_LIB([globus_gridftp_server],
+             [globus_gridftp_server_begin_transfer],
+             [GLOBUS_LDFLAGS=-L$globus_location/lib64],
+             [AC_MSG_ERROR(libglobus_gridftp_server.so not found)])
+
 AC_SUBST(GLOBUS_LDFLAGS)
-
 
 dnl
 dnl Find the HPSS installation
 dnl
-hpssdir=/opt/hpss
-AC_ARG_WITH(hpssdir, AC_HELP_STRING([--with-hpssdir=dir],\
-   [Look for the HPSS library and headers in <dir>/lib and <dir>/include.  Default dir is /opt/hpss.]),
-   [hpssdir=$withval], [])
-AC_SUBST(HPSS_DIR, $hpssdir)
+hpss_location=/opt/hpss
+AC_ARG_WITH(hpss, AC_HELP_STRING([--with-hpss=dir],\
+   [location of HPSS installation, defaults to /opt/hpss]),
+   [hpss_location=$withval],
+   [])
+AC_SUBST(HPSS_LOCATION, $hpss_location)
 
-#hpsslibdir=$hpssdir
-#AC_ARG_WITH(hpsslibdir, AC_HELP_STRING([--with-hpsslibdir=dir],\
-#   [Look for the HPSS library in <dir>/lib/.  Default is the --with-hpssdir value.]),
-#   [hpsslibdir=$withval], [])
-#AC_SUBST(HPSS_LIB_DIR, $hpsslibdir)
-
-#hpssincludedir=$hpssdir
-#AC_ARG_WITH(hpssincludedir, AC_HELP_STRING([--with-hpssincludedir=dir],\
-#   [Look for the HPSS headers in <dir>/include/.  Default is the --with-hpssdir value.]),
-#   [hpssincludedir=$withval], [])
-#AC_SUBST(HPSS_INCLUDE_DIR, $hpssincludedir)
-
-rpathopt='-Wl,-rpath,$(HPSS_DIR)/lib'
-AC_ARG_WITH(rpath, AC_HELP_STRING([--without-rpath],\
-    [Build without rpath configured.]),
-    [rpathopt=''], [])
-AC_SUBST(RPATHOPT, $rpathopt)
-
-#
-# Note from Damian Hazen of LBL:
-# The auth libraries are mechanism plugins and we shouldn't be linking
-# against them directly.  I tried removing this, and instead just
-# linking against libhpss but it doesn't work because the mechanisms need
-# symbols defined in libhpssgss.so.  This is normally fine since
-# libhpssgss.so is a dependency of libhpss.so which we link against.
-# But, since the DSI is dlopen'd itself, and w/o the RTLD_GLOBAL flag
-# to make the symbols globally visable, it doesn't work here.  The
-# right fix I think is to be able to specify RTLD_GLOBAL to dlopen for
-# the DSI plugin.  That's a change to globus, so I've just left for
-# now.  If the ability to pass RTLD_GLOBAL when mapping in the DSI is
-# added, then the --with-unixauth and --with-krb5auth options should be
-# removed from configure, and the sec. plugins could function as
-# intended.  You would then add a configuration option for
-# authentication type, and make the following calls:
-#
-# authenticator_str = config_get_keytab_file(SessionHandle->ConfigHandle);
-# authn_mech_str = config_get_authn_mech(SessionHandle->ConfigHandle);
-#
-# hpss_AuthnMechTypeFromString(authn_mech_str, &authn_mech);
-# hpss_ParseAuthString(authenticator_str,
-#                      &authn_mech,
-#                      &authenticator_type,
-#                      &authenticator);
-#
-# hpss_GetConfiguration(&api_config);
-# api_config.AuthnMech = authn_mech;
-#
-# hpss_SetLoginCred(login_name,
-#	            authn_mech,
-#	            hpss_rpc_cred_client,
-#	            authenticator_type,
-#	            authenticator);
-#
-# This would let you change the authentication mechanism
-# w/o a recompile -- woohoo!
-#
-#
-# Also, the symbol issue is the same for the authz mechanisms.  For
-# example, if a site is using kerberos for authentication and unix for
-# authorization, then they need to link against both the kerberos and
-# unix mechanisms (the unix sec library has both auth and authz
-# interfaces).  Because of this, I've made linking against the unix
-# library unconditional.  We should also add an option for sites using
-# LDAP for authz.
-#
-
-
-hpssauthlibs=''
-#AC_ARG_WITH(hpss-auth-libs, AC_HELP_STRING([--with-hpss-auth-libs],\
-#    [Link against libhpsskrb5auth and libhpssunixauth.]),
-#    [hpssauthlibs="$hpssauthlibs -lhpsskrb5auth -lhpssunixauth"], [])
-
-AC_ARG_WITH(unixauth, 
-    AC_HELP_STRING([--with-unixauth], [Link against libhpssunixauth.]),
+AC_ARG_ENABLE(ncsa_features, 
+    AC_HELP_STRING([--enable-ncsa_features], [shortcut to enable quota and UDA support.]),
     [
-        hpssauthlibs="$hpssauthlibs -lhpssunixauth"
-        AC_DEFINE(HPSS_UNIX_AUTH, 1, [Using Unix authentication])
-    ], 
-    [])
-
-AC_ARG_WITH(krb5auth, 
-    AC_HELP_STRING([--with-krb5auth], [Link against libhpsskrb5auth.]),
-    [
-        hpssauthlibs="$hpssauthlibs -lhpsskrb5auth -lhpssunixauth"
-        AC_DEFINE(HPSS_KRB5_AUTH, 1, [Using Kerberos authentication])
+        AC_DEFINE(MARK_RENAMED_FILES, 1, [mark renamed files for quota support.])
+        AC_DEFINE(UDA_CHECKSUM_SUPPORT, 1, [Store checksums in UDA.])
     ],
     [])
 
-AC_ARG_WITH(quota_support, 
-    AC_HELP_STRING([--with-quota_support], [Mark renamed files for quota support.]),
+AC_ARG_ENABLE(quota_support, 
+    AC_HELP_STRING([--enable-quota_support], [mark renamed files for quota support.]),
     [
-        AC_DEFINE(MARK_RENAMED_FILES, 1, [Mark renamed files for quota support.])
+        AC_DEFINE(MARK_RENAMED_FILES, 1, [mark renamed files for quota support.])
     ],
     [])
 
-if test "${hpssauthlibs+set}" != set; then
-	echo "Must specifiy one of --with-unixauth or --with-krb5auth"
-	exit
-fi
-
-AC_SUBST(HPSS_AUTH_LIBS, $hpssauthlibs)
-
-AC_CHECK_HEADER(openssl/md5.h, [MD5_HEADER=yes])
-if test x"$MD5_HEADER" != x"yes"; then
-	AC_MSG_ERROR([Missing openssl/md5.h])
-fi
+AC_ARG_ENABLE(uda_checksum_support, 
+    AC_HELP_STRING([--enable-uda_checksum_support], [store checksums in UDA.]),
+    [
+        AC_DEFINE(UDA_CHECKSUM_SUPPORT, 1, [Store checksums in UDA.])
+    ],
+    [])
 
 dnl
 dnl These values are hardcoded for now, until I can get the packaging stuff working again
@@ -231,14 +171,13 @@ DIRT_BRANCH_ID=99999
 AC_CONFIG_HEADERS([config.h])
 
 AC_SUBST(GPT_MAJOR_VERSION, 1)
-AC_SUBST(GPT_MINOR_VERSION, 4)
+AC_SUBST(GPT_MINOR_VERSION, 1)
 AC_SUBST(DIRT_TIMESTAMP)
 AC_SUBST(DIRT_BRANCH_ID)
+AC_SUBST(REAL_CC, CC)
 
-prefix='$(GLOBUS_LOCATION)'
-exec_prefix='$(GLOBUS_LOCATION)'
-
-AC_OUTPUT(
-    Makefile
-    version.h
-)
+AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([loaders/Makefile])
+AC_CONFIG_FILES([module/Makefile])
+AC_CONFIG_FILES([loaders/version.h])
+AC_OUTPUT
