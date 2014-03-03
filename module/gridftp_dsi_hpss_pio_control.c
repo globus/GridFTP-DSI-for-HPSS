@@ -172,7 +172,6 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 	{
 		hpss_cos_md_t cos_md;
 
-		hpss_ClearLastHPSSErrno();
 		retval = hpss_SetCOSByHints(PioControl->FileFD,
 		                            0,
 		                            &hints_in,
@@ -181,7 +180,7 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 
 		if (retval)
 		{
-			result = misc_build_error("hpss_SetCOSByHints", retval);
+			result = GlobusGFSErrorSystemError("hpss_SetCOSByHints", -(retval));
 			goto cleanup;
 		}
 	}
@@ -530,8 +529,6 @@ pio_control_execute_thread(void * Arg)
 			bytes_moved = cast64(0);
 			memset(&gap_info, 0, sizeof(gap_info));
 
-			hpss_ClearLastHPSSErrno();
-
 			/* Call pio execute. */
 			retval = hpss_PIOExecute(pio_control->FileFD,
 			                         u_offset,
@@ -556,17 +553,16 @@ pio_control_execute_thread(void * Arg)
 
 		if (retval != 0)
 		{
-			result = misc_build_error("hpss_PIOExecute", retval);
+			result = GlobusGFSErrorSystemError("hpss_PIOExecute", -retval);
 			break;
 		}
 	}
 
 
 	/* Stop PIO */
-	hpss_ClearLastHPSSErrno();
 	retval = hpss_PIOEnd(pio_control->PioExecute.StripeGroup);
 	if (retval != 0 && result == GLOBUS_SUCCESS)
-		result = misc_build_error("hpss_PIOEnd()", retval);
+		result = GlobusGFSErrorSystemError("hpss_PIOEnd", -retval);
 
 	/* Report back to the caller that we are done. */
 	pio_control->PioExecute.Callback(pio_control->PioExecute.CallbackArg, result);

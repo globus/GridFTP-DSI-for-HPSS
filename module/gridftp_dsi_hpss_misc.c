@@ -60,7 +60,6 @@
 #include <hpss_env_defs.h>
 #include <hpss_Getenv.h>
 #include <hpss_limits.h>
-#include <hpss_String.h>
 #include <u_signed64.h>
 #include <hpss_stat.h>
 #include <hpss_api.h>
@@ -900,29 +899,3 @@ misc_strndup(char * String, int Length)
 
 	return new_string;
 }
-
-globus_result_t
-misc_build_error(char * Function, int ErrorCode)
-{
-	char * error_string = NULL;
-	globus_result_t result = GLOBUS_SUCCESS;
-	hpss_errno_state_t last_hpss_error;
-
-	GlobusGFSName(misc_build_error);
-	GlobusGFSHpssDebugEnter();
-
-	last_hpss_error = hpss_GetLastHPSSErrno();
-
-	if (ErrorCode != -EIO || last_hpss_error.hpss_errno == 0)
-		return GlobusGFSErrorSystemError(Function, -ErrorCode);
-
-	error_string = globus_common_create_string("%s() : %s",
-	                                           last_hpss_error.func,
-	                                           hpss_ErrnoString(last_hpss_error.hpss_errno));
-
-	result = GlobusGFSErrorGeneric(error_string);
-	globus_free(error_string);
-
-	return GlobusGFSErrorWrapFailed(Function, result);
-}
-

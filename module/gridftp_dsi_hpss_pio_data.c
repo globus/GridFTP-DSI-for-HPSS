@@ -51,11 +51,6 @@
 #include <globus_gridftp_server.h>
 
 /*
- * HPSS includes.
- */
-#include <hpss_api.h>
-
-/*
  * Local includes.
  */
 #include "gridftp_dsi_hpss_transfer_data.h"
@@ -555,7 +550,6 @@ pio_data_register_thread(void * Arg)
 	 */
 
 	/* Call PIO register. */
-	hpss_ClearLastHPSSErrno();
 	retval = hpss_PIORegister(pio_data->StripeIndex,
 	                          NULL, /* DataNetSockAddr */
 	                          buffer,
@@ -570,12 +564,11 @@ pio_data_register_thread(void * Arg)
 	result = pio_data->Result;
 
 	if (retval != 0 && result == GLOBUS_SUCCESS)
-		result = misc_build_error("hpss_PIORegister", retval);
+		result = GlobusGFSErrorSystemError("hpss_PIORegister", -retval);
 
-	hpss_ClearLastHPSSErrno();
 	retval = hpss_PIOEnd(pio_data->StripeGroup);
 	if (retval != 0 && result == GLOBUS_SUCCESS)
-		result = misc_build_error("hpss_PIOEnd", retval);
+		result = GlobusGFSErrorSystemError("hpss_PIOEnd", -retval);
 
 cleanup:
 	/* Release our buffer. */

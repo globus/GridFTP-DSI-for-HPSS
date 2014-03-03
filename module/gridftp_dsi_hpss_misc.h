@@ -142,7 +142,4 @@ misc_destroy_result(globus_result_t Result);
 char *
 misc_strndup(char * String, int Length);
 
-globus_result_t
-misc_build_error(char * Function, int ErrorCode);
-
 #endif /* GRIDFTP_DSI_HPSS_MISC_H */
