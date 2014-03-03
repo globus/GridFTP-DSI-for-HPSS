@@ -103,7 +103,8 @@ struct config_handle {
 
 	struct {
 		char       * LoginName;
-		char       * KeytabFile;
+		char       * AuthenticationMech;
+		char       * Authenticator;
 		char       * FamilyFile;
 		char       * CosFile;
 		acl_list_t * AdminList;
@@ -604,9 +605,13 @@ config_parse_config_file(config_handle_t * ConfigHandle)
 		if (key_length == strlen("LoginName") && strncasecmp(key, "LoginName", key_length) == 0)
 		{
 			ConfigHandle->Config.LoginName = misc_strndup(value, value_length);
-		} else if (key_length == strlen("KeytabFile") && strncasecmp(key, "KeytabFile", key_length) == 0)
+		} else if (key_length == strlen("AuthenticationMech") && 
+		           strncasecmp(key, "AuthenticationMech", key_length) == 0)
 		{
-			ConfigHandle->Config.KeytabFile = misc_strndup(value, value_length);
+			ConfigHandle->Config.AuthenticationMech = misc_strndup(value, value_length);
+		} else if (key_length == strlen("Authenticator") && strncasecmp(key, "Authenticator", key_length) == 0)
+		{
+			ConfigHandle->Config.Authenticator = misc_strndup(value, value_length);
 		} else if (key_length == strlen("FamilyFile") && strncasecmp(key, "FamilyFile", key_length) == 0)
 		{
 			ConfigHandle->Config.FamilyFile = misc_strndup(value, value_length);
@@ -651,8 +656,10 @@ config_destroy(config_handle_t * ConfigHandle)
 	{
 		if (ConfigHandle->Config.LoginName != NULL)
 			globus_free(ConfigHandle->Config.LoginName);
-		if (ConfigHandle->Config.KeytabFile != NULL)
-			globus_free(ConfigHandle->Config.KeytabFile);
+		if (ConfigHandle->Config.AuthenticationMech != NULL)
+			globus_free(ConfigHandle->Config.AuthenticationMech);
+		if (ConfigHandle->Config.Authenticator != NULL)
+			globus_free(ConfigHandle->Config.Authenticator);
 		if (ConfigHandle->Config.FamilyFile != NULL)
 			globus_free(ConfigHandle->Config.FamilyFile);
 		if (ConfigHandle->Config.CosFile != NULL)
@@ -821,13 +828,16 @@ config_get_login_name(config_handle_t * ConfigHandle)
 	return ConfigHandle->Config.LoginName;
 }
 
-char *
-config_get_keytab_file(config_handle_t * ConfigHandle)
+char * 
+config_get_authentication_mech(config_handle_t * ConfigHandle)
 {
-	GlobusGFSName(__func__);
-	GlobusGFSHpssDebugEnter();
-	GlobusGFSHpssDebugExit();
-	return ConfigHandle->Config.KeytabFile;
+	return ConfigHandle->Config.AuthenticationMech;
+}
+
+char *
+config_get_authenticator(config_handle_t * ConfigHandle)
+{
+	return ConfigHandle->Config.Authenticator;
 }
 
 /*
