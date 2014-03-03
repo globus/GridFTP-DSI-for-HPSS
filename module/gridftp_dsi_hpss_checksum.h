@@ -55,6 +55,7 @@
  * Local includes.
  */
 #include "gridftp_dsi_hpss_buffer.h"
+#include "../config.h"
 
 
 
@@ -103,6 +104,7 @@ checksum_stop(checksum_t * Checksum);
 globus_result_t
 checksum_get_sum(checksum_t * Checksum, char ** ChecksumString);
 
+#ifdef UDA_CHECKSUM_SUPPORT
 globus_result_t
 checksum_set_file_sum(char * File, char * ChecksumString);
 
@@ -111,5 +113,6 @@ checksum_get_file_sum(char * File, char ** ChecksumString);
 
 globus_result_t
 checksum_clear_file_sum(char * File);
+#endif /* UDA_CHECKSUM_SUPPORT */
 
 #endif /* GRIDFTP_DSI_HPSS_CHECKSUM_H */

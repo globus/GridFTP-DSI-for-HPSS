@@ -438,13 +438,11 @@ commands_stage_file(session_handle_t * Session,
 		 * hpss_Stage(BFS_ASYNCH_CALL) but then we block in hpss_Close().
 		 */
 		CONVERT_LONGLONG_TO_U64(gfs_stat_buf.size, size);
-
-		hpss_ClearLastHPSSErrno();
 		retval = hpss_StageCallBack(Path, cast64m(0), size, 0, NULL, BFS_STAGE_ALL, &reqid, &bitfile_id);
 		if (retval != 0)
 		{
-			result = misc_build_error("hpss_StageCallBack", retval);
 			commands_rm_bfid_from_list(&stage_list, &bitfile_id);
+			result = GlobusGFSErrorSystemError("hpss_StageCallBack()", -retval);
 			goto cleanup;
 		}
 	}
@@ -1021,10 +1019,12 @@ commands_checksum(globus_gfs_operation_t       Operation,
 
 	/* Full checksums. */
 
+#ifdef UDA_CHECKSUM_SUPPORT
 	/* Check if the sum is already stored in UDA. */
 	result = checksum_get_file_sum(CommandInfo->pathname, Checksum);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
+#endif /* UDA_CHECKSUM_SUPPORT */
 
 	/* If the checksum wasn't previously stored... */
 	if (*Checksum == NULL)
@@ -1032,9 +1032,11 @@ commands_checksum(globus_gfs_operation_t       Operation,
 		/* Compute it. */
 		result = commands_compute_checksum(Operation, CommandInfo, Session, Checksum);
 
+#ifdef UDA_CHECKSUM_SUPPORT
 		/* Try to store the checksum in UDA. Ignore errors on set. */
 		if (result == GLOBUS_SUCCESS)
 			checksum_set_file_sum(CommandInfo->pathname, *Checksum);
+#endif /* UDA_CHECKSUM_SUPPORT */
 	}
 
 cleanup:

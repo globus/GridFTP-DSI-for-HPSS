@@ -64,7 +64,6 @@
 /*
  * Local includes.
  */
-#include "version.h"
 #include "gridftp_dsi_hpss_transfer_control.h"
 #include "gridftp_dsi_hpss_transfer_data.h"
 #include "gridftp_dsi_hpss_checksum.h"
@@ -73,6 +72,7 @@
 #include "gridftp_dsi_hpss_gridftp.h"
 #include "gridftp_dsi_hpss_misc.h"
 #include "gridftp_dsi_hpss_msg.h"
+#include "../config.h"
 
 #ifdef DMALLOC
 /*
@@ -317,10 +317,12 @@ local_stor(globus_gfs_operation_t       Operation,
 	/* Initialize the monitor */
 	local_monitor_init(Operation, TransferInfo, &monitor);
 
+#ifdef UDA_CHECKSUM_SUPPORT
 	/* Clear our any old checksum information. */
 	result = checksum_clear_file_sum(TransferInfo->pathname);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
+#endif /* UDA_CHECKSUM_SUPPORT */
 
 	/* Get the message handle. */
 	msg_handle = session_cache_lookup_object(session,
@@ -604,11 +606,7 @@ cleanup:
 	return;
 }
 
-
-static int local_activate(void);
-static int local_deactivate(void);
-
-static globus_gfs_storage_iface_t dsi_iface = 
+globus_gfs_storage_iface_t local_dsi_iface = 
 {
 	0,                   /* Descriptor       */
 	local_session_start, /* init_func        */
@@ -626,49 +624,3 @@ static globus_gfs_storage_iface_t dsi_iface =
 	NULL,                /* buffer_send_func */
 	NULL,                /* realpath_func    */
 };
-
-GlobusExtensionDefineModule(globus_gridftp_server_hpss_local) =
-{
-	"globus_gridftp_server_hpss_local",
-	local_activate,
-	local_deactivate,
-	GLOBUS_NULL,
-	GLOBUS_NULL,
-	&local_version
-};
-
-static int
-local_activate(void)
-{
-	int rc;
-    
-	rc = globus_module_activate(GLOBUS_COMMON_MODULE);
-	if(rc != GLOBUS_SUCCESS)
-	{
-		goto error;
-	}
-    
-	globus_extension_registry_add(
-	    GLOBUS_GFS_DSI_REGISTRY,
-	    "hpss_local",
-	    GlobusExtensionMyModule(globus_gridftp_server_hpss_local),
-	    &dsi_iface);
-
-	GlobusDebugInit(GLOBUS_GRIDFTP_SERVER_HPSS,
-	    ERROR WARNING TRACE INTERNAL_TRACE INFO STATE INFO_VERBOSE);
-    
-	return GLOBUS_SUCCESS;
-
-error:
-    return rc;
-}
-
-static int
-local_deactivate(void)
-{
-	globus_extension_registry_remove(GLOBUS_GFS_DSI_REGISTRY, "hpss_local");
-        
-	globus_module_deactivate(GLOBUS_COMMON_MODULE);
-    
-	return GLOBUS_SUCCESS;
-}
