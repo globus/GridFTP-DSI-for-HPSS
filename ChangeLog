@@ -1,7 +1,15 @@
-Version 1.5 Beta
-	- Translate HPSS EIO errors to hopefully more useful messages after
-	  calls to hpss_PIOExecute(), hpss_PIORegister(), hpss_SetCOSByHints()
-	  hpss_StageCallBack() and hpss_PIOEnd()
+Version 1.5: Beta
+	- 'Fixed' build to not use globus-makefile-header.
+	- Build now expects a 64bit installation
+	- Worked around the XDR issue with HPSS 7.4.2, now the DSI only works
+	  on Linux (See README.xdr)
+	- Separated the source into loaders and module subdirectories (part of
+	  the XDR fix)
+	- Thanks to the XDR fix, we can now load libhpssunixauth.so and 
+	  libhpsskrb5auth.so dynamically. The configure options --with-unixauth
+	  and --with-krb5 have been removed.
+	- Added --enable-uda_checksum_support to store checksums in UDA for use
+	  with HPSS admin tools. Before now, this was not optional.
 
 Version 1.4: Oct 29, 2013
 	- Fix for staged files. Make sure tape SC does not have more bytes
