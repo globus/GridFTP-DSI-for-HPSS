@@ -52,6 +52,9 @@
 /*
  * HPSS includes.
  */
+#include <hpss_String.h>
+#include <hpss_errno.h>
+#include <hpss_mech.h>
 #include <hpss_api.h>
 
 /*
@@ -213,12 +216,15 @@ cleanup:
 static globus_result_t
 session_auth_to_hpss(session_handle_t * SessionHandle)
 {
-	int                 uid         = -1;
-	int                 retval      = 0;
-	char              * login_name  = NULL;
-	char              * keytab_file = NULL;
-	globus_result_t     result      = GLOBUS_SUCCESS;
-	api_config_t        api_config;
+	int                  uid                      = -1;
+	int                  retval                   = 0;
+	char               * login_name               = NULL;
+	char               * authn_mech               = NULL;
+	char               * config_authenticator_str = NULL;
+	char               * actual_authenticator_val = NULL;
+	globus_result_t      result                   = GLOBUS_SUCCESS;
+	hpss_rpc_auth_type_t auth_type;
+	api_config_t         api_config;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -231,11 +237,19 @@ session_auth_to_hpss(session_handle_t * SessionHandle)
 		goto cleanup;
 	}
 
-	/* Get the keytab file to use for authentication. */
-	keytab_file = config_get_keytab_file(SessionHandle->ConfigHandle);
-	if (keytab_file == NULL)
+	/* Get the authentication mechanism (unix, krb5, etc) */
+	authn_mech = config_get_authentication_mech(SessionHandle->ConfigHandle);
+	if (!authn_mech)
 	{
-		result = GlobusGFSErrorGeneric("Keytab missing from config file");
+		result = GlobusGFSErrorGeneric("AuthenticationMech missing from config file");
+		goto cleanup;
+	}
+
+	/* Get the authenticator. */
+	config_authenticator_str = config_get_authenticator(SessionHandle->ConfigHandle);
+	if (!config_authenticator_str)
+	{
+		result = GlobusGFSErrorGeneric("Authenticator missing from config file");
 		goto cleanup;
 	}
 
@@ -249,17 +263,28 @@ session_auth_to_hpss(session_handle_t * SessionHandle)
 		goto cleanup;
 	}
 
-	/* Indicate that we are doing unix authentication. */
-	api_config.Flags     =  API_USE_CONFIG;
-#ifdef HPSS_KRB5_AUTH
-	api_config.AuthnMech =  hpss_authn_mech_krb5;
-#elif defined HPSS_UNIX_AUTH
-	api_config.AuthnMech =  hpss_authn_mech_unix;
-#else
-#error MUST BE CONFIGURED TO USE KRB5 OR UNIX AUTHENTICATION
-#endif
+	/* Translate the authentication mechanism. */
+	retval = hpss_AuthnMechTypeFromString(authn_mech, &api_config.AuthnMech);
+	if (retval != HPSS_E_NOERROR)
+	{
+		result = GlobusGFSErrorGeneric("Bad value for config value AuthenticationMech");
+		goto cleanup;
+	}
+
+	/* Parse the authenticator. */
+	retval = hpss_ParseAuthString(config_authenticator_str, 
+	                              &api_config.AuthnMech, 
+	                              &auth_type, 
+	                              (void **)&actual_authenticator_val);
+	if (retval != HPSS_E_NOERROR)
+	{
+		actual_authenticator_val = NULL;
+		result = GlobusGFSErrorGeneric("Bad value for config value Authenticator");
+		goto cleanup;
+	}
 
 	/* Now set the current HPSS client configuration. */
+	api_config.Flags  =  API_USE_CONFIG;
 	retval = hpss_SetConfiguration(&api_config);
 	if (retval != 0)
 	{
@@ -271,8 +296,8 @@ session_auth_to_hpss(session_handle_t * SessionHandle)
 	retval = hpss_SetLoginCred(login_name,
 	                           api_config.AuthnMech,
 	                           hpss_rpc_cred_client,
-	                           hpss_rpc_auth_type_keytab,
-	                           keytab_file);
+	                           auth_type,
+	                           actual_authenticator_val);
 	if (retval != 0)
 	{
 		result = GlobusGFSErrorSystemError("hpss_SetLoginCred", -retval);
@@ -301,6 +326,9 @@ session_auth_to_hpss(session_handle_t * SessionHandle)
 	}
 
 cleanup:
+	if (actual_authenticator_val)
+		free(actual_authenticator_val);
+
 	if (result != GLOBUS_SUCCESS)
 	{
 		GlobusGFSHpssDebugExitWithError();

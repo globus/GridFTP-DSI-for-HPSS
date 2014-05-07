@@ -73,7 +73,13 @@ config_get_login_name(config_handle_t * ConfigHandle);
  * The returned value is not a dup.
  */
 char *
-config_get_keytab_file(config_handle_t * ConfigHandle);
+config_get_authentication_mech(config_handle_t * ConfigHandle);
+
+/*
+ * The returned value is not a dup.
+ */
+char *
+config_get_authenticator(config_handle_t * ConfigHandle);
 
 /*
  * Cos is the name.

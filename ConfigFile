@@ -6,8 +6,18 @@
 # server will use to authenticate to HPSS
 LoginName gridftp
 
-# (required) Keytab file containing the user's credentials
-KeytabFile keytab
+# (required) AuthenticationMech
+# Defines the type of authentication that the DSI will perform when logging 
+# into HPSS. Note that this is not the authentication mechanism the GridFTP
+# users will use; they always use GSI. Valid options are "unix", "krb5", "gsi"
+# and "spkm".
+AuthenticationMech unix
+
+# (required) Authenticator
+# used with AuthenticationMech to perform the authentication to HPSS. Format is:
+#   <auth_type>:<auth_file>
+#   where <auth_type> = auth_keytab, auth_keyfile, auth_key, auth_passwd, auth_none
+Authenticator auth_keytab:/var/hpss/etc/gridftp.keytab
 
 # CURRENTLY NOT SUPPORTED
 # (optional) Path to file that defines which projects each user belongs to.

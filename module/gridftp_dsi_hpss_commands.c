@@ -1019,10 +1019,12 @@ commands_checksum(globus_gfs_operation_t       Operation,
 
 	/* Full checksums. */
 
+#ifdef UDA_CHECKSUM_SUPPORT
 	/* Check if the sum is already stored in UDA. */
 	result = checksum_get_file_sum(CommandInfo->pathname, Checksum);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
+#endif /* UDA_CHECKSUM_SUPPORT */
 
 	/* If the checksum wasn't previously stored... */
 	if (*Checksum == NULL)
@@ -1030,9 +1032,11 @@ commands_checksum(globus_gfs_operation_t       Operation,
 		/* Compute it. */
 		result = commands_compute_checksum(Operation, CommandInfo, Session, Checksum);
 
+#ifdef UDA_CHECKSUM_SUPPORT
 		/* Try to store the checksum in UDA. Ignore errors on set. */
 		if (result == GLOBUS_SUCCESS)
 			checksum_set_file_sum(CommandInfo->pathname, *Checksum);
+#endif /* UDA_CHECKSUM_SUPPORT */
 	}
 
 cleanup:

@@ -374,6 +374,7 @@ globus_assert(retval == 1);
 }
 
 
+#ifdef UDA_CHECKSUM_SUPPORT
 /*
  * /hpss/user/cksum/algorithm                                  md5
  * /hpss/user/cksum/checksum               93b885adfe0da089cdf634904fd59f71
@@ -596,4 +597,4 @@ checksum_clear_file_sum(char * File)
 
 	return _remove_uda_on_file(File, "/hpss/user/cksum/filesize");
 }
-
+#endif /* UDA_CHECKSUM_SUPPORT */

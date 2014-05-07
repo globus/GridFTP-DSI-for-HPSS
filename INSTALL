@@ -1,14 +1,35 @@
-For the latest build instructions, see 
-https://github.com/JasonAlt/GridFTP-DSI-for-HPSS/wiki/Installation-of-Version-1.0
 
 BUILD AND INSTALL HPSS
 ======================
 
 Building HPSS is beyond the scope of this guide but you should have a working 
-HPSS installation. This version of the DSI was tested against HPSS 7.3.3p7. The
+HPSS installation. This version of the DSI was tested against HPSS 7.4.2. The
 DSI requires either a full HPSS build or a 'clnt' HPSS build. Note whether the
 HPSS build is 32bit or 64bit; you'll need to build GridFTP and the DSI that same
 way.
+
+POINTS OF INTEREST ON THIS VERSION
+==================================
+* This DSI is likely to have 64bit-ism and so 64bit is recommended. 
+* This DSI requires UDA support in HPSS for checksums and quotas.
+* The format of the stored checksums are compatible with 7.4.2 but
+  not necessarily with earlier versions.
+* BZ2487 is a show stopper; you must have it
+* The GridFTP client you choose must use ALLO (always and corretly)
+* Checkout the README.xdr if you want to understand why the DSI
+  loading sequence is setup as it is
+* Because of the XDR issue, this DSI most likely only works on Linux
+* Restarts are not supported until Globus supplies a way to decouple
+  restart from performance markers. See http://jira.globus.org/browse/GT-517.
+
+
+CONFIGURATION OPTIONS
+=====================
+* --enable-quota_support puts a special UDA mark on files that are renamed. This
+  funtionality is part of the NCSA HPSS quota system. There are other parts of
+  the quota system that are not distributed publically that make this funciton.
+  If you would like to have that code, you can contact me. Otherwise, do not
+  enable this feature.
 
 REQUIRED HPSS PATCHES
 =====================
@@ -38,6 +59,9 @@ BZ2146 - PIO with HPSS_PIO_HANDLE_GAP does not properly handle 32 IOD SrcSink
          performance) then this bug is not encountered because the segment
          count remains low (4).
 
+         This DSI is currently not affected by this bug because it does not use
+         HPSS_PIO_HANDLE_GAP.
+
 BZ2819 - PIO 60 second delay impacts small file performance. There is a small
          percentage chance that, after a transfer completes, HPSS PIO will
          wait 60 seconds before informing the client that the transfer has
@@ -57,6 +81,9 @@ BZ1660 - PIO callback buffer switching does not persist across calls to
          swapped, the callback will receive a buffer that may be currently
          used else where. The fix is to avoid buffer swapping.
 
+         IBM HPSS has decided that this is intended behavior and so the DSI works
+         around the issue.
+
 BZ2856 - Enabling HPSS_API_REUSE_CONNECTIONS returns address already in use.
          This one sets a limit on how many active connections we can have.
          GridFTP and HPSS are both socket hogs. Quick, successive file transfers
@@ -67,117 +94,108 @@ BZ2856 - Enabling HPSS_API_REUSE_CONNECTIONS returns address already in use.
 
 PERFORMANCE
 ===========
-Mention something about fixed length classic. Variable length is bad mojo.
+(Short version) GridFTP installations benefit from and take full advantage of
+classes of service that use fixed length classic style allocation. In short,
+you'll get the best performance from the GridFTP interface (actually any HPSS
+interface) if the segment count is below 32.
+
+(Longer version) HPSS has multple disk/tape allocation algorithms used to
+allocate space for incoming data. Fixed length allocation gives you equal size
+chunks to store data in. This was deemed wasteful because the last block was
+most certainly never filled. Variable length allocation was created to solve this
+problem; it will give you increasingly larger segments as data is stored and
+truncates the last block. This is a win for most situations when HPSS is unsure
+how much data is to be stored for the given file.
+
+Using either of these allocation mechanisms (any variable length allocation or
+fixed w/o knowing the file size), HPSS is free to continue to allocate segments
+until all the data is stored. This has a definite performance impact because
+internally HPSS retrieves data in 32-segment chunks. This means when you request
+a file from HPSS, internally it breaks it up into multiple transfers, each of which
+is <= 32 segments. Functionally, this is transparent to the client. In terms of 
+performance, the client will see a high load followed by a pause followed by a
+high load, etc.
+
+In order to avoid the performance hit, you can use fixed length allocation with
+segment counts < 32 and take advantage of the fact that any WELL-BEHAVED GridFTP
+client will inform HPSS of the size of the incoming file before the transfer
+begins. In fact, the DSI is designed to require this. If a GridFTP client is
+not well behavad, the DSI will act as though a zero length transfer is about to 
+occur and will handle it as such. So you'll know if the client is not doing the 
+right thing.
 
 GRIDFTP PATCHES
 ===============
 These are fixed in Globus Toolkit 5.2.4:
-  GT-296 globus_ftp_control_data_read() race condition
   GT-297 globus_ftp_control_data_query_channels() SIGSEGV on proxy expiration
+
+Still believed to exist in GT 5.2.5:
+  GT-296 globus_ftp_control_data_read() race condition
+  GT-376 globus_ftp_control_data_query_channels() SIGSEGV on ABRT
+  GT-377 abort() in globus_ftp_control_handle_destroy() -> globus_list_remove()
+  GT-378 abort() in globus_i_gfs_data_session_stop()
+  GT-379 Abort() in globus_i_gfs_data_request_recv()
+  GT-380 Abort in globus_l_gfs_new_server_cb()
 
 BUILD GRIDFTP
 =============
 
-You'll need to download and build Globus Toolkit 5.2.4 or later. Follow the
-instructions in the Globus Toolkit INSTALL file to build gridftp. The following
-example assumes you are building against 32bit HPSS. If you are building against
-64bit HPSS, replace 'gcc32dbg' with 'gcc64dbg'.
+You'll need to download and install Globus Toolkit 5.2.5 or later. RPMs are preferred
+but source should work. 64bit builds should be fine. You may need to tinker with
+the build scripts to get 32 bit to build.
 
-globus$ ./configure --prefix=/usr/local/globus-5.2.x --with-flavor=gcc32dbg
-globus$ make gridftp
-globus$ make install
+http://toolkit.globus.org/toolkit/docs/5.2/5.2.5/admin/quickstart
 
 BUILD AND INSTALL THE DSI
 =========================
 
 Build the HPSS DSI with the following options. If your HPSS installation uses
-Kerberos, replace '--with-unixauth' with '--with_krb5auth' below. If you are
-building against 64bit HPSS, change 'gcc32dbg' to 'gcc64dbg'. Set the value of
-'--libdir' to the directory where you want to place the DSI. For your sanity, I
-recommend putting it in a new directory with the version information stored in
-the name. Ex. /usr/local/gridftp_hpss_dsi-1.0. You can then set the environment
-variable LD_LIBRARY_PATH to this location so that the GridFTP server can find
-the DSI.
+Kerberos, replace '--with-unixauth' with '--with_krb5auth' below. 
+Set the value of '--libdir' to the directory where you want to place the DSI.
+For your sanity, I recommend putting it in a new directory with the version
+information stored in the name. Ex. /usr/local/gridftp_hpss_dsi-1.0. You can
+then set the environment variable LD_LIBRARY_PATH to this location so that the
+GridFTP server can find the DSI.
 
-./configure --with-globus=/usr/local/globus-5.2.x --with-globus-flavor=gcc32dbg --with-hpssdir=/opt/hpss --with-unixauth -libdir=/usr/local/gridftp_hpss_dsi-<version>.
+If you use Globus RPMs, you shoudn't need to specify --with-globus because it 
+defaults to /usr/
+
+./configure --with-hpssdir=/opt/hpss --with-unixauth -libdir=/usr/local/gridftp_hpss_dsi-<version>.
 
 Install the DSI into libdir:
 
 make install
 
-ADD A GRIDFTP USER FOR HPSS
-===========================
+USE USER HPSSFTP FOR GRIDFTP
+============================
+GridFTP requires a privileged user with control permission on the core server's
+client interface  in order to log into HPSS and then it changes its credentials
+to that of the actual user (you). Think of it as a type of setuid process that
+logs in, does what it must, then changes the process owner to you.
 
-The HPSS user 'gridftp' is a special user; his only purpose is to allow the DSI
-to authenticate to HPSS. When a user logs into the GridFTP server, the DSI will
-authenticate to HPSS as the special user 'gridftp' and then immediately change
-it's credentials to the user that just logged into the GridFTP server.
+In the past, we recommended creating a new HPSS user named 'gridftp' for this
+purpose. However, it was discovered that HPSS allows any connection with control
+permission on the core server's client interface to bypass Gate Keeper site hooks.
+That little tidbit breaks site specific accounting and quota deployments. 
 
-Add the new user 'gridftp' to the password file used by HPSS. You can determine
-which password file is in use by checking the value of
-HPSS_UNIX_USE_SYSTEM_COMMANDS in /var/hpss/etc/env.conf. If it is set to TRUE
-(or if it is not present in the file), HPSS is using /etc/passwd. Otherwise,
-look for /var/hpss/etc/passwd. Whichever file you use, your entry should look
+HPSS has a special privileged user named 'hpssftp' which has the necessary permissions
+and special code within HPSS to not allow it to bypass the Gate Keeper callouts. Thus
+we recommend that you use the 'hpssftp' user in gridftp.conf.
+
+You will however want the GridFTP process to run as a non privileged user. For this
+reasons, we run the GridFTP server as local UNIX user 'gridftp' but configure it to
+use hpssftp's credentials to log into HPSS.
+
+Add the new user 'gridftp' to the system password file. Your entry should look
 something like the following:
 
 gridftp:x:316:316:GridFTP Server:/home/gridftp:/bin/bash
-
-If your site uses kerberos authentication with HPSS, create a 'gridftp'
-kerberos principal and password also.
-
-Next, you must give this new user 'control' permission to the core server's
-client interface:
-
-[root@hpss gridftp_hpss_dsi_0_1]# /opt/hpss/bin/hpss_server_acl
-hsa> acl -m
-1) Mover (blynken)
-2) Log Daemon
-3) Mover (wynken)
-4) SCSI PVR
-5) Mover (nod)
-6) Log Client (hpss)
-7) Migration/Purge Server
-8) Core Server
-9) SSM System Manager
-10) Location Server
-11) PVL
-12) Mover (ahab)
-13) Startup Daemon (hpss)
-Select a server
-Choose an item by number (RET to cancel):
-8
-1) PVL Mount Notification Interface (v1) 007ff347-e533-1cc6-b22d-02608c2cedf4
-2) Realtime Monitor Interface (v1) 80c9a256-2f13-11d3-a0c8-000001341966
-3) Client Interface (v1) 32ba9692-4667-11d6-aa3a-0004ac49692b
-4) Account Validation Interface (v1) 647f22a8-a1e9-11d3-a739-000001341966
-Select an interface
-Choose an item by number (RET to cancel):
-3
-hsa> add user gridftp c
-hsa> show
-
-perms - type - ID (name) - realm ID (realm)
-rw-c-d- - user - 304 (hpssssm) - 81000 (hpss.ncsa.illinois.edu)
-
-hsa> quit
-rw-c-dt - user - 308 (hpssmps) - 81000 (hpss.ncsa.illinois.edu)
-rw-c--- - user - 309 (hpssfs) - 81000 (hpss.ncsa.illinois.edu)
-r--c--- - user - 315 (hpssftp) - 81000 (hpss.ncsa.illinois.edu)
----c--- - user - 316 (gridftp) - 81000 (hpss.ncsa.illinois.edu)
-------t - any_other
-
-Once the ACL has been created, restart the HPSS core server so that the new
-ACL takes effect (otherwise, GridFTP will not be able to change its
-credentials to the actual user and will attempt to perform operations as the
-'gridftp' user).
-
-.... set a password for user gridftp ...
 
 Now you'll need to create a keytab file for the gridftp user. This will be used
 by the DSI in order to authenticate to HPSS. For sites using unix
 authentication with HPSS (rather than kerberos):
 
-[root@hpss gridftp_hpss_dsi_0_1]# /opt/hpss/bin/hpss_unix_keytab -f /var/hpss/etc/gridftp.keytab add gridftp
+[root@hpss gridftp_hpss_dsi_0_1]# /opt/hpss/bin/hpss_unix_keytab -f /var/hpss/etc/gridftp.keytab add hpssftp
 
 For sites using kerberos authentication with HPSS, you'll need to create
 and use a kerberos keytab file (rather than a unix keytab). The kerberos
@@ -218,7 +236,7 @@ service gsiftp
 	#  1 - Authorize identity
 	#  2 - Authorize all file/resource accesses (Default for fronend)
 	#  4 - Disable changing process uid to authenticated user
-	server_args = -inetd -threads 2 -auth-level 7 -dsi hpss_local -disable-command-list SCKS,APPE
+	server_args = -inetd -threads 2 -auth-level 7 -dsi hpss_local -disable-command-list SCKS,APPE,REST
 	env         = GRIDMAP=/etc/grid-security/grid-mapfile
 	env         = LD_LIBRARY_PATH=/opt/hpss/lib:/usr/local/gridftp_hpss_dsi-<version>
 	socket_type = stream

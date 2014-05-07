@@ -1,7 +1,7 @@
 ##########################################################################
 # University of Illinois/NCSA Open Source License
 #
-# Copyright © 2014, NCSA.  All rights reserved.
+# Copyright © 2012, NCSA.  All rights reserved.
 #
 # Developed by:
 #
@@ -39,7 +39,26 @@
 # DEALINGS WITH THE SOFTWARE.
 ############################################################################
 
+
 # SUBDIRS is an automake macro which contains
 # the list of subdirectories that have Makefile.am's
-SUBDIRS=loaders module
+SUBDIRS=
+
+# Build targets of the form <dir>_<primary> where dir is where to install it:
+#   Ex. bin, man, lib, pkglib, include
+# and primary is what type of target it is:
+#   Ex. PROGRAMS, MANS, LTLIBRARIES, SCRIPTS, DATA, LIBRARIES, HEADERS
+# Note: LTLIBRARIES is a libtool library
+# Note: The names of these libraries are important, the gridftp server appends
+# our dsi name (hpss_control or hpss_data) onto libglobus_gridftp_server_ when loading 
+# our DSI.
+lib_LTLIBRARIES = libglobus_gridftp_server_hpss_local.la   
+CPPFLAGS= -Wall $(GLOBUS_LIBS) -I/usr/lib64/globus/include -I/usr/include/globus
+
+libglobus_gridftp_server_hpss_local_la_SOURCES = hpss_local.c
+libglobus_gridftp_server_hpss_local_la_LIBADD = -ldl
+
+# Uncommeting this line would cause libtool to use gcc to link the libraries
+# instead of g++ when at least one file ends in .cc
+#CXXLINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CCFLAGS) $(CCFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 

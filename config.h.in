@@ -3,11 +3,20 @@
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
+/* Define to 1 if you have the <globus_common.h> header file. */
+#undef HAVE_GLOBUS_COMMON_H
+
+/* Define to 1 if you have the <globus_config.h> header file. */
+#undef HAVE_GLOBUS_CONFIG_H
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
+
+/* Define to 1 if you have the <openssl/md5.h> header file. */
+#undef HAVE_OPENSSL_MD5_H
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
@@ -30,17 +39,11 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
-/* Using Kerberos authentication */
-#undef HPSS_KRB5_AUTH
-
-/* Using Unix authentication */
-#undef HPSS_UNIX_AUTH
-
 /* Define to the sub-directory in which libtool stores uninstalled libraries.
    */
 #undef LT_OBJDIR
 
-/* Mark renamed files for quota support. */
+/* mark renamed files for quota support. */
 #undef MARK_RENAMED_FILES
 
 /* Name of package */
@@ -63,6 +66,9 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
+
+/* Store checksums in UDA. */
+#undef UDA_CHECKSUM_SUPPORT
 
 /* Version number of package */
 #undef VERSION

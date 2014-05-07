@@ -295,6 +295,12 @@ pio_data_destroy(pio_data_t * PioData)
 		/* Unregister to receive messages. */
 		msg_unregister(PioData->MsgHandle, PioData->MsgRegisterID);
 
+		/*
+		 * Make sure we are not running. This eliminates a race condition
+		 * on quick startup / quick shutdown.
+		 */
+		pio_data_stop(PioData);
+
 		/* Destroy our range list. */
 		range_list_destroy(PioData->RangeList);
 
