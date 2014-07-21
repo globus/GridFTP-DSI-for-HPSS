@@ -149,18 +149,16 @@ http://toolkit.globus.org/toolkit/docs/5.2/5.2.5/admin/quickstart
 BUILD AND INSTALL THE DSI
 =========================
 
-Build the HPSS DSI with the following options. If your HPSS installation uses
-Kerberos, replace '--with-unixauth' with '--with_krb5auth' below. 
-Set the value of '--libdir' to the directory where you want to place the DSI.
-For your sanity, I recommend putting it in a new directory with the version
-information stored in the name. Ex. /usr/local/gridftp_hpss_dsi-1.0. You can
-then set the environment variable LD_LIBRARY_PATH to this location so that the
-GridFTP server can find the DSI.
+Build the HPSS DSI with the following options. Set the value of '--libdir' to the
+directory where you want to place the DSI. For your sanity, I recommend putting it
+in a new directory with the version information stored in the name. 
+Ex. /usr/local/gridftp_hpss_dsi-1.0. You can then set the environment variable
+LD_LIBRARY_PATH to this location so that the GridFTP server can find the DSI.
 
 If you use Globus RPMs, you shoudn't need to specify --with-globus because it 
 defaults to /usr/
 
-./configure --with-hpssdir=/opt/hpss --with-unixauth -libdir=/usr/local/gridftp_hpss_dsi-<version>.
+./configure --with-hpss=/opt/hpss -libdir=/usr/local/gridftp_hpss_dsi-<version>.
 
 Install the DSI into libdir:
 
