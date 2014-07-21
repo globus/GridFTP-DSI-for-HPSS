@@ -16723,21 +16723,28 @@ as_val=`eval 'as_val=${'$as_ac_Header'}
 _ACEOF
  GLOBUS_COMMON_CPPFLAGS="-I$globus_location/include/globus"
 else
-  { { $as_echo "$as_me:$LINENO: error: globus_config.h not found" >&5
-$as_echo "$as_me: error: globus_config.h not found" >&2;}
+  { { $as_echo "$as_me:$LINENO: error: globus_common.h not found" >&5
+$as_echo "$as_me: error: globus_common.h not found" >&2;}
    { (exit 1); exit 1; }; }
 fi
 
 done
 
 
+#
+# Sum up all the Globus CPPFLAGS
+#
+GLOBUS_CPPFLAGS=$GLOBUS_CONFIG_CPPFLAGS
+if test "${GLOBUS_CONFIG_CPPFLAGS}" != "${GLOBUS_COMMON_CPPFLAGS}"; then
+	GLOBUS_CPPFLAGS="$GLOBUS_CPPFLAGS $GLOBUS_COMMON_CPPFLAGS"
+fi
 
 #
-# Now check for globus_gridftp_server.h using globus_config.h's location
+# Now check for globus_gridftp_server.h
 #
-CPPFLAGS="-I$globus_location/include/globus"
+CPPFLAGS="${GLOBUS_CPPFLAGS}"
 
-for ac_header in globus_common.h
+for ac_header in globus_gridftp_server.h
 do
 as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
 if { as_var=$as_ac_Header; eval "test \"\${$as_var+set}\" = set"; }; then
@@ -16882,7 +16889,7 @@ as_val=`eval 'as_val=${'$as_ac_Header'}
   cat >>confdefs.h <<_ACEOF
 #define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
 _ACEOF
- GLOBUS_GRIDFTP_CPPFLAGS="-I$globus_location/include/globus"
+
 else
   { { $as_echo "$as_me:$LINENO: error: globus_gridftp_server.h not found" >&5
 $as_echo "$as_me: error: globus_gridftp_server.h not found" >&2;}
@@ -16891,20 +16898,6 @@ fi
 
 done
 
-
-#
-# Sum up all the Globus CPPFLAGS
-#
-GLOBUS_CPPFLAGS=$GLOBUS_CONFIG_CPPFLAGS
-if test "${GLOBUS_CONFIG_CPPFLAGS}" != "${GLOBUS_COMMON_CPPFLAGS}"; then
-	GLOBUS_CPPFLAGS="$GLOBUS_CPPFLAGS $GLOBUS_COMMON_CPPFLAGS"
-fi
-
-if test "${GLOBUS_CONFIG_CPPFLAGS}" != "${GLOBUS_GRIDFTP_CPPFLAGS}"; then
-	if test "${GLOBUS_GRIDFTP_CPPFLAGS}" != "${GLOBUS_GRIDFTP_CPPFLAGS}"; then
-		GLOBUS_CPPFLAGS="$GLOBUS_CPPFLAGS $GLOBUS_GRIDFTP_CPPFLAGS"
-	fi
-fi
 
 
 

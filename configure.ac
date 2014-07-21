@@ -91,16 +91,7 @@ fi
 CPPFLAGS="-I$globus_location/include/globus $GLOBUS_CONFIG_CPPFLAGS"
 AC_CHECK_HEADERS([globus_common.h], 
                  [GLOBUS_COMMON_CPPFLAGS="-I$globus_location/include/globus"], 
-                 [AC_MSG_ERROR(globus_config.h not found)])
-
-
-#
-# Now check for globus_gridftp_server.h using globus_config.h's location
-#
-CPPFLAGS="-I$globus_location/include/globus"
-AC_CHECK_HEADERS([globus_common.h], 
-                 [GLOBUS_GRIDFTP_CPPFLAGS="-I$globus_location/include/globus"], 
-                 [AC_MSG_ERROR(globus_gridftp_server.h not found)])
+                 [AC_MSG_ERROR(globus_common.h not found)])
 
 #
 # Sum up all the Globus CPPFLAGS
@@ -110,14 +101,16 @@ if test "${GLOBUS_CONFIG_CPPFLAGS}" != "${GLOBUS_COMMON_CPPFLAGS}"; then
 	GLOBUS_CPPFLAGS="$GLOBUS_CPPFLAGS $GLOBUS_COMMON_CPPFLAGS"
 fi
 
-if test "${GLOBUS_CONFIG_CPPFLAGS}" != "${GLOBUS_GRIDFTP_CPPFLAGS}"; then
-	if test "${GLOBUS_GRIDFTP_CPPFLAGS}" != "${GLOBUS_GRIDFTP_CPPFLAGS}"; then
-		GLOBUS_CPPFLAGS="$GLOBUS_CPPFLAGS $GLOBUS_GRIDFTP_CPPFLAGS"
-	fi
-fi
+#
+# Now check for globus_gridftp_server.h
+#
+CPPFLAGS="${GLOBUS_CPPFLAGS}"
+AC_CHECK_HEADERS([globus_gridftp_server.h], 
+                 [], 
+                 [AC_MSG_ERROR(globus_gridftp_server.h not found)])
+
 
 AC_SUBST(GLOBUS_CPPFLAGS)
-
 
 #
 # Find the needed Globus libraries
