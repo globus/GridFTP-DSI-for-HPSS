@@ -326,41 +326,44 @@ misc_gfs_stat(char              * Pathname,
               globus_bool_t       UseSymlinkInfo,
               globus_gfs_stat_t * GfsStatPtr)
 {
-    int             retval = 0;
-    globus_result_t result = GLOBUS_SUCCESS;
-    hpss_stat_t     hpss_stat_buf;
+	int             retval = 0;
+	globus_result_t result = GLOBUS_SUCCESS;
+	hpss_stat_t     hpss_stat_buf;
 
-    GlobusGFSName(__func__);
-    GlobusGFSHpssDebugEnter();
+	GlobusGFSName(misc_gfs_stat);
+	GlobusGFSHpssDebugEnter();
 
-    /* lstat() the object. */
-    retval = hpss_Lstat(Pathname, &hpss_stat_buf);
-    if (retval != 0)
-    {
-        result = GlobusGFSErrorSystemError("hpss_Lstat", -retval);
-        goto cleanup;
-    }
+	/* Initialize the returned value. */
+	memset(GfsStatPtr, 0, sizeof(globus_gfs_stat_t));
 
-    if (S_ISLNK(hpss_stat_buf.st_mode) && !UseSymlinkInfo)
-    {
-        /*
-         * If this fails, technically it's an error. But I think that is
-         * very confusing to the user. So, instead, we will return the symlink
-         * stat on error until we find a reason to do otherwise.
-         */
-        hpss_Stat(Pathname, &hpss_stat_buf);
-    }
+	/* lstat() the object. */
+	retval = hpss_Lstat(Pathname, &hpss_stat_buf);
+	if (retval != 0)
+	{
+		result = GlobusGFSErrorSystemError("hpss_Lstat", -retval);
+		goto cleanup;
+	}
 
-    result = misc_translate_stat(Pathname, &hpss_stat_buf, GfsStatPtr);
-    if (result != GLOBUS_SUCCESS)
-        goto cleanup;
+	if (S_ISLNK(hpss_stat_buf.st_mode) && !UseSymlinkInfo)
+	{
+		/*
+		 * If this fails, technically it's an error. But I think that is
+		 * very confusing to the user. So, instead, we will return the symlink
+		 * stat on error until we find a reason to do otherwise.
+		 */
+		hpss_Stat(Pathname, &hpss_stat_buf);
+	}
 
-    GlobusGFSHpssDebugExit();
-    return GLOBUS_SUCCESS;
+	result = misc_translate_stat(Pathname, &hpss_stat_buf, GfsStatPtr);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	GlobusGFSHpssDebugExit();
+	return GLOBUS_SUCCESS;
 
 cleanup:
-    GlobusGFSHpssDebugExitWithError();
-    return result;
+	GlobusGFSHpssDebugExitWithError();
+	return result;
 }
 
 void
