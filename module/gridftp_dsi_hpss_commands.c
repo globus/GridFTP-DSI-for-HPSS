@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2012 NCSA.  All rights reserved.
+ * Copyright © 2014 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -214,7 +214,7 @@ commands_init(globus_gfs_operation_t    Operation)
 	                 4,
 	                 "SITE STAGE <sp> timeout <sp> path",
 	                 GLOBUS_TRUE,
-	                 0);
+	                 GFS_ACL_ACTION_READ);
 	if (result != GLOBUS_SUCCESS)
 	{
 		result = GlobusGFSErrorWrapFailed("Failed to add custom 'SITE STAGE' command", result);

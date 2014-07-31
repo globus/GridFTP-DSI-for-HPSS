@@ -4,6 +4,8 @@ Version 1.6: Beta
 	  exist
 	- Updated install guide. Removed references to --with-unixauth and --with_krb5auth.
 	  Corrected --with-hpssdir to --with-hpss.
+	- Changed access type for "SITE STAGE" to READ so that RETR on readonly sharing
+	  works as expected.
 
 Version 1.5: Wed May  7 09:39:13 CDT 2014
 	- Fixed PIO race condition for transfers that are stopped prematurely.
