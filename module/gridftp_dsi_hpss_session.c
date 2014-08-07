@@ -225,6 +225,7 @@ session_auth_to_hpss(session_handle_t * SessionHandle)
 	globus_result_t      result                   = GLOBUS_SUCCESS;
 	hpss_rpc_auth_type_t auth_type;
 	api_config_t         api_config;
+	mode_t               old_mask;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -314,11 +315,17 @@ session_auth_to_hpss(session_handle_t * SessionHandle)
 		goto cleanup;
 
 	/*
+	 * Deterine the current umask.
+	 */
+	old_mask = hpss_Umask(0);
+	hpss_Umask(old_mask);
+
+	/*
 	 * Now masquerade as this user. This will lookup uid in our realm and
 	 * set our credential to that user. The lookup is determined by the
 	 * /var/hpss/etc/auth.conf, authz.conf files.
 	 */
-	retval = hpss_LoadDefaultThreadState(uid, 0022, NULL);
+	retval = hpss_LoadDefaultThreadState(uid, old_mask, NULL);
 	if(retval != 0)
 	{
 		result = GlobusGFSErrorSystemError("hpss_LoadDefaultThreadState", -retval);

@@ -6,6 +6,9 @@ Version 1.6: Beta
 	  Corrected --with-hpssdir to --with-hpss.
 	- Changed access type for "SITE STAGE" to READ so that RETR on readonly sharing
 	  works as expected.
+	- Fixed permissions on newly created files and directories. Now by default files are
+	  created 644 and directories are created 755 but these are also subject
+	  to the process's umask setting which can be altered via xinetd.conf.
 
 Version 1.5: Wed May  7 09:39:13 CDT 2014
 	- Fixed PIO race condition for transfers that are stopped prematurely.

@@ -1081,7 +1081,7 @@ commands_handler(globus_gfs_operation_t      Operation,
 		break;
 
 	case GLOBUS_GFS_CMD_MKD:
-		retval = hpss_Mkdir(CommandInfo->pathname, S_IRWXU);
+		retval = hpss_Mkdir(CommandInfo->pathname, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH);
 		if (retval != 0)
         	result = GlobusGFSErrorSystemError("hpss_Mkdir", -retval);
 		break;

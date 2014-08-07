@@ -157,7 +157,7 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 	/* Open the HPSS file. */
 	PioControl->FileFD = hpss_Open(Pathname,
                     	           oflags,
-                    	           S_IRUSR|S_IWUSR,
+                    	           S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH,
                     	           &hints_in,
                     	           &priorities,
                     	           &hints_out);
