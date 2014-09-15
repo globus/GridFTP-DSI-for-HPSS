@@ -243,6 +243,23 @@ service gsiftp
 	per_source  = 100
 }
 
+CONFIGURING WITHOUT XINETD
+==========================
+
+If you are launching GridFTP without xinetd (for example, a Globus Connect Server install),
+you can configure the server as follows.
+
+Add these lines to /etc/gridftp.d/extra:
+	auth_level 7
+	load_dsi_module hpss_local
+	disable_command_list SCKS,APPE,REST
+
+Also, in order for the GridFTP server to find the HPSS DSI, you must edit your start script
+to include: LD_LIBRARY_PATH="<path to DSI install dir>". For example, if you launch GridFTP
+from /etc/init.d/globus-gridftp-server and the DSI is installed in /usr/local/hpss_dsi, then
+add the following line to /etc/init.d/globus-gridftp-server:
+  export LD_LIBRARY_PATH=/usr/local/hpss_dsi
+
 SETUP THE DSI CONFIG FILE
 =========================
 
