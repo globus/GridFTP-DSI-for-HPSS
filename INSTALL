@@ -137,14 +137,16 @@ Still believed to exist in GT 5.2.5:
   GT-379 Abort() in globus_i_gfs_data_request_recv()
   GT-380 Abort in globus_l_gfs_new_server_cb()
 
-BUILD GRIDFTP
-=============
+INSTALL GRIDFTP
+===============
 
-You'll need to download and install Globus Toolkit 5.2.5 or later. RPMs are preferred
-but source should work. 64bit builds should be fine. You may need to tinker with
-the build scripts to get 32 bit to build.
+In order to build the module, you'll need to install the globus-gridftp-server-devel
+and libgssglue-devel rpms. In order to run the HPSS GridFTP server, you'll need to
+install the globus-gridftp-server RPM. This DSI is only tested against 64 bit builds.
 
-http://toolkit.globus.org/toolkit/docs/5.2/5.2.5/admin/quickstart
+See the GT documentation for installing from RPM.
+
+http://toolkit.globus.org/toolkit/docs/5.2/5.2.5/admin/install/#install-bininst
 
 BUILD AND INSTALL THE DSI
 =========================
