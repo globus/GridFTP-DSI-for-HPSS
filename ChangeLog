@@ -1,4 +1,4 @@
-Version 1.6: Beta
+Version 1.6: Tue Sep 23 11:30:00 CDT 2014
 	- Reduced UDA call overhead for checksums
 	- Fixed free() of unallocated memory when staging a file that does not
 	  exist
