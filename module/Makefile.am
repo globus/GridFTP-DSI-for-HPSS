@@ -97,7 +97,13 @@ libglobus_gridftp_server_hpss_real_local_la_SOURCES=$(SOURCES)
 CPPFLAGS=-Wall -DLINUX $(GLOBUS_CPPFLAGS) -I$(HPSS_ROOT)/include
 LDFLAGS=-L$(HPSS_ROOT)/lib -Wl,-rpath,$(HPSS_ROOT)/lib $(GLOBUS_LDFLAGS)
 
-libglobus_gridftp_server_hpss_real_local_la_LIBADD=-lglobus_gridftp_server -lhpss
+#
+# IU and NERSC report that using krb fails because libhpssgss.so doesn't link against
+# libhpsskrbauth.so. NERSC reported that libhpssunixauth.so was necessary in their
+# environment. It is necessary to link these here; the XDR/libtirpc issue causes the
+# runtime dynamic linking to fail without this.
+#
+libglobus_gridftp_server_hpss_real_local_la_LIBADD=-lglobus_gridftp_server -lhpss -lhpsskrb5auth -lhpssunixauth
 
 # Uncommeting this line would cause libtool to use gcc to link the libraries
 # instead of g++ when at least one file ends in .cc
