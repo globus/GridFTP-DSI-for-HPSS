@@ -78,6 +78,38 @@ static void *
 pio_control_execute_thread(void * Arg);
 
 static globus_result_t
+pio_control_can_change_cos(char * Pathname, int * can_change_cos)
+{
+	int retval;
+	hpss_fileattr_t fileattr;
+	ns_FilesetAttrBits_t fileset_attr_bits;
+	ns_FilesetAttrs_t    fileset_attr;
+
+	GlobusGFSName(pio_control_can_change_cos);
+
+	memset(&fileattr, 0, sizeof(hpss_fileattr_t));
+	retval = hpss_FileGetAttributes(Pathname, &fileattr);
+	if (retval)
+		return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
+
+	fileset_attr_bits = orbit64m(0, NS_FS_ATTRINDEX_COS);
+	memset(&fileset_attr, 0, sizeof(ns_FilesetAttrs_t));
+	retval = hpss_FilesetGetAttributes(NULL,
+	                                   &fileattr.Attrs.FilesetId,
+	                                   NULL,
+	                                   NULL,
+	                                   fileset_attr_bits,
+	                                   &fileset_attr);
+	if (retval)
+		return GlobusGFSErrorSystemError("hpss_FilesetGetAttributes", -retval);
+
+
+	*can_change_cos = !fileset_attr.ClassOfService;
+
+	return GLOBUS_SUCCESS;
+}
+
+static globus_result_t
 pio_control_open_file_for_writing(pio_control_t * PioControl,
                                   char          * Pathname,
                                   globus_off_t    AllocSize,
@@ -87,6 +119,7 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 {
 	int                     oflags      = 0;
 	int                     retval      = 0;
+	int                     can_change_cos = 0;
 	globus_off_t            file_length = 0;
 	globus_result_t         result      = GLOBUS_SUCCESS;
 	hpss_cos_hints_t        hints_in;
@@ -167,8 +200,12 @@ pio_control_open_file_for_writing(pio_control_t * PioControl,
 		goto cleanup;
 	}
 
+	result = pio_control_can_change_cos(Pathname, &can_change_cos);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
 	/* Handle the case of the file that already existed. */
-	if (Truncate == GLOBUS_TRUE)
+	if (Truncate == GLOBUS_TRUE && can_change_cos)
 	{
 		hpss_cos_md_t cos_md;
 
