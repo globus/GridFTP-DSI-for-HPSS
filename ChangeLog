@@ -1,4 +1,4 @@
-Version 1.7 Beta: 
+Version 1.7: Tue Dec 23 13:30:45 CST 2014
 	- Always link against libhpsskrb5auth and libhpssunixauth to support krb
 	  sites
 	- Fix for sites that are configured to require a specific COS for a
