@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2012 NCSA.  All rights reserved.
+ * Copyright © 2012-2014 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -85,6 +85,12 @@
  * This is used to define the debug print statements.
  */
 GlobusDebugDefine(GLOBUS_GRIDFTP_SERVER_HPSS);
+
+typedef struct {
+	msg_handle_t     * Msg;
+	commands_t       * Commands;
+	session_handle_t * Session;
+} module_t;
 
 typedef struct monitor {
 	globus_gfs_operation_t   Operation;
@@ -202,29 +208,22 @@ local_retr(globus_gfs_operation_t       Operation,
 {
 	monitor_t            monitor;
 	globus_result_t      result            = GLOBUS_SUCCESS;
-	session_handle_t   * session           = NULL;
+	module_t           * module            = UserArg;
 	transfer_data_t    * transfer_data     = NULL;
 	transfer_control_t * transfer_control  = NULL;
-	msg_handle_t       * msg_handle        = NULL;
 	msg_register_id_t    msg_register_id   = MSG_REGISTER_ID_NONE;
 
-	GlobusGFSName(__func__);
+	GlobusGFSName(local_retr);
 	GlobusGFSHpssDebugEnter();
 
 	/* Make sure we got our UserArg. */
-	globus_assert(UserArg != NULL);
-	/* Cast to our session handle. */
-	session = (session_handle_t *)UserArg;
+	globus_assert(UserArg);
 
 	/* Initialize the monitor */
 	local_monitor_init(Operation, TransferInfo, &monitor);
 
-	/* Get the message handle. */
-	msg_handle = session_cache_lookup_object(session,
-	                                         SESSION_CACHE_OBJECT_ID_MSG_HANDLE);
-
 	/* Register to receive messages. */
-	result = msg_register(msg_handle,
+	result = msg_register(module->Msg,
 	                      MSG_COMP_ID_TRANSFER_DATA_PIO|MSG_COMP_ID_TRANSFER_CONTROL,
 	                      MSG_COMP_ID_NONE,
 	                      local_msg_recv,
@@ -234,7 +233,7 @@ local_retr(globus_gfs_operation_t       Operation,
 		goto cleanup;
 
 	/* Initialize the control side. */
-	result = transfer_control_retr_init(msg_handle,
+	result = transfer_control_retr_init(module->Msg,
 	                                    Operation,
 	                                    TransferInfo,
 	                                    &transfer_control);
@@ -242,7 +241,7 @@ local_retr(globus_gfs_operation_t       Operation,
 		goto cleanup;
 
 	/* Initialize the data side. */
-	result = transfer_data_retr_init(msg_handle,
+	result = transfer_data_retr_init(module->Msg,
 	                                 Operation,
 	                                 TransferInfo,
 	                                 &transfer_data);
@@ -271,7 +270,7 @@ local_retr(globus_gfs_operation_t       Operation,
 
 cleanup:
 	/* Unregister to receive messages. */
-	msg_unregister(msg_handle, msg_register_id);
+	msg_unregister(module->Msg, msg_register_id);
 
 	/* Destroy the data side. */
 	transfer_data_destroy(transfer_data);
@@ -300,19 +299,16 @@ local_stor(globus_gfs_operation_t       Operation,
 {
 	monitor_t            monitor;
 	globus_result_t      result            = GLOBUS_SUCCESS;
-	session_handle_t   * session           = NULL;
+	module_t           * module            = UserArg;
 	transfer_data_t    * transfer_data     = NULL;
 	transfer_control_t * transfer_control  = NULL;
-	msg_handle_t       * msg_handle        = NULL;
 	msg_register_id_t    msg_register_id   = MSG_REGISTER_ID_NONE;
 
-	GlobusGFSName(__func__);
+	GlobusGFSName(local_stro);
 	GlobusGFSHpssDebugEnter();
 
 	/* Make sure we got our UserArg. */
-	globus_assert(UserArg != NULL);
-	/* Cast to our session handle. */
-	session = (session_handle_t *)UserArg;
+	globus_assert(UserArg);
 
 	/* Initialize the monitor */
 	local_monitor_init(Operation, TransferInfo, &monitor);
@@ -324,12 +320,8 @@ local_stor(globus_gfs_operation_t       Operation,
 		goto cleanup;
 #endif /* UDA_CHECKSUM_SUPPORT */
 
-	/* Get the message handle. */
-	msg_handle = session_cache_lookup_object(session,
-	                                         SESSION_CACHE_OBJECT_ID_MSG_HANDLE);
-
 	/* Register to receive messages. */
-	result = msg_register(msg_handle,
+	result = msg_register(module->Msg,
 	                      MSG_COMP_ID_TRANSFER_DATA_PIO|MSG_COMP_ID_TRANSFER_CONTROL,
 	                      MSG_COMP_ID_NONE,
 	                      local_msg_recv,
@@ -339,8 +331,8 @@ local_stor(globus_gfs_operation_t       Operation,
 		goto cleanup;
 
 	/* Initialize the control side. */
-	result = transfer_control_stor_init(msg_handle,
-	                                    session,
+	result = transfer_control_stor_init(module->Msg,
+	                                    module->Session,
 	                                    Operation,
 	                                    TransferInfo,
 	                                    &transfer_control);
@@ -348,7 +340,7 @@ local_stor(globus_gfs_operation_t       Operation,
 		goto cleanup;
 
 	/* Initialize the data side. */
-	result = transfer_data_stor_init(msg_handle,
+	result = transfer_data_stor_init(module->Msg,
 	                                 Operation,
 	                                 TransferInfo,
 	                                 &transfer_data);
@@ -377,7 +369,7 @@ local_stor(globus_gfs_operation_t       Operation,
 
 cleanup:
 	/* Unregister to receive messages. */
-	msg_unregister(msg_handle, msg_register_id);
+	msg_unregister(module->Msg, msg_register_id);
 
 	/* Destroy the data side. */
 	transfer_data_destroy(transfer_data);
@@ -395,46 +387,69 @@ cleanup:
 }
 
 void
+local_session_end(void * Arg)
+{
+	module_t * module = Arg;
+
+	if (module)
+	{
+		/* Desstroy the sesion. */
+		session_destroy(module->Session);
+
+		/* Destroy the message handle. */
+		msg_destroy(module->Msg);
+
+		/* Destroy the commands handle. */
+		commands_destroy(module->Commands);
+
+		/* Destroy the module. */
+		globus_free(module);
+	}
+}
+
+void
 local_session_start(globus_gfs_operation_t      Operation,
                     globus_gfs_session_info_t * SessionInfo)
 {
 	char             * username       = NULL;
 	char             * home_directory = NULL;
 	globus_result_t    result         = GLOBUS_SUCCESS;
-	session_handle_t * session_handle = NULL;
-	msg_handle_t     * msg_handle     = NULL;
+	module_t         * module         = NULL;
 	sec_cred_t         user_cred;
 
-	GlobusGFSName(__func__);
+	GlobusGFSName(local_session_start);
 	GlobusGFSHpssDebugEnter();
 
+	/* Allocate the module handle. */
+	module = (module_t *)globus_calloc(1, sizeof(module_t));
+	if (!module)
+	{
+		result = GlobusGFSErrorMemory("module_t");
+		goto cleanup;
+	}
+
 	/* Initialize the session handle. */
-	result = session_init(SessionInfo, &session_handle);
+	result = session_init(SessionInfo, &module->Session);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
 	/* Authenticate this session to HPSS. */
-	result = session_authenticate(session_handle);
+	result = session_authenticate(module->Session);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
 	/* Initialize the locally implemented FTP commands. */
-	result = commands_init(Operation);
+	result = commands_init(Operation, &module->Commands);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
 	/* Initialize the message handle. */
-	result = msg_init(&msg_handle);
+	result = msg_init(&module->Msg);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
-	/* Cache it in the session handle. */
-	session_cache_insert_object(session_handle, 
-	                            SESSION_CACHE_OBJECT_ID_MSG_HANDLE, 
-	                            msg_handle);
-
 	/* Get the username. */
-	username = session_get_username(session_handle);
+	username = session_get_username(module->Session);
 
 	/*
 	 * Pulling the HPSS directory from the user's credential will support
@@ -455,11 +470,7 @@ local_session_start(globus_gfs_operation_t      Operation,
 cleanup:
 	if (result != GLOBUS_SUCCESS)
 	{
-		/* Destroy the session handle. */
-		session_destroy(session_handle);
-
-		/* Release our reference. */
-		session_handle = NULL;
+		local_session_end(module);
 
 		/* Free up home directory. */
 		if (home_directory != NULL)
@@ -478,7 +489,7 @@ cleanup:
 	 */
 	globus_gridftp_server_finished_session_start(Operation,
                                                  result,
-                                                 session_handle,
+                                                 module,
                                                  username,
                                                  home_directory);
 
@@ -486,31 +497,15 @@ cleanup:
 }
 
 void
-local_session_end(void * Arg)
+local_commands(globus_gfs_operation_t      Operation,
+               globus_gfs_command_info_t * CommandInfo,
+               void                      * UserArg)
 {
-	session_handle_t * session    = (session_handle_t *)Arg;
-	msg_handle_t     * msg_handle = NULL;
+	module_t * module = UserArg;
 
-	GlobusGFSName(__func__);
-	GlobusGFSHpssDebugEnter();
+	globus_assert(UserArg);
 
-	if (session != NULL)
-	{
-		/*
-		 * Destroy any objects we stored in the object cache.
-		 */
-
-		/* Message handle. */
-		msg_handle = session_cache_remove_object(session,
-		                                         SESSION_CACHE_OBJECT_ID_MSG_HANDLE);
-		if(msg_handle != NULL)
-			msg_destroy(msg_handle);
-
-		/* Destroy the session. */
-		session_destroy(session);
-	}
-
-	GlobusGFSHpssDebugExitWithError();
+	commands_handler(module->Commands, Operation, CommandInfo, module->Session, module->Msg);
 }
 
 #define STAT_ENTRIES_PER_REPLY 100
@@ -618,7 +613,7 @@ globus_gfs_storage_iface_t local_dsi_iface =
 	NULL,                /* active_func      */
 	NULL,                /* passive_func     */
 	NULL,                /* data_destroy     */
-	commands_handler,    /* command_func     */
+	local_commands,      /* command_func     */
 	local_stat,          /* stat_func        */
 	NULL,                /* set_cred_func    */
 	NULL,                /* buffer_send_func */

@@ -3,6 +3,7 @@ Version 1.7 Beta:
 	  sites
 	- Fix for sites that are configured to require a specific COS for a
 	  fileset
+	- Removed the session cache, added a commands handle
 
 Version 1.6: Tue Sep 23 11:30:00 CDT 2014
 	- Reduced UDA call overhead for checksums

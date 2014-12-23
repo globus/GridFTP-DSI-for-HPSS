@@ -83,13 +83,6 @@ struct session_handle {
 	globus_bool_t               Authenticated;
 
 	/*
-	 * Location for callers to store predefined objects.
-	 */
-	struct {
-		void * Object;
-	} ObjectCache[SESSION_CACHE_OBJECT_ID_MAX];
-
-	/*
 	 * Per session preferences.
 	 */
 	struct {
@@ -98,7 +91,6 @@ struct session_handle {
 	} Pref;
 
 	struct {
-		char * HardLinkFrom;
 		void * StageList;
 	} Cmd;
 
@@ -456,10 +448,6 @@ session_destroy(session_handle_t * Session)
 		/* Destroy the session info. */
 		session_destroy_session_info(&Session->SessionInfo);
 
-		/* Destroy the command data. */
-		if (Session->Cmd.HardLinkFrom != NULL)
-			globus_free(Session->Cmd.HardLinkFrom);
-
 		/* Destroy the config handle. */
 		config_destroy(Session->ConfigHandle);
 
@@ -547,89 +535,10 @@ session_pref_set_cos_id(session_handle_t * SessionHandle,
 int
 session_pref_get_cos_id(session_handle_t * SessionHandle)
 {
-	GlobusGFSName(__func__);
+	GlobusGFSName(session_pref_get_cos_id);
 	GlobusGFSHpssDebugEnter();
 	GlobusGFSHpssDebugExit();
 	return SessionHandle->Pref.CosID;
-}
-
-/*
- * HardLinkFrom string is dup'ed. Previous value is free'd. 
- */
-globus_result_t
-session_cmd_set_hardlinkfrom(session_handle_t * SessionHandle,
-                             char             * HardLinkFrom)
-{
-	globus_result_t result = GLOBUS_SUCCESS;
-
-	GlobusGFSName(__func__);
-	GlobusGFSHpssDebugEnter();
-
-	if (SessionHandle->Cmd.HardLinkFrom != NULL)
-		globus_free(SessionHandle->Cmd.HardLinkFrom);
-
-	/* Save the hardlinkfrom value. */
-	SessionHandle->Cmd.HardLinkFrom = globus_libc_strdup(HardLinkFrom);
-	if (SessionHandle->Cmd.HardLinkFrom == NULL)
-		result = GlobusGFSErrorMemory("HardLinkFrom");
-
-	if (result != GLOBUS_SUCCESS)
-	{
-		GlobusGFSHpssDebugExit();
-		return result;
-	}
-
-	GlobusGFSHpssDebugExit();
-	return GLOBUS_SUCCESS;
-}
-
-/*
- * Returned string is not a dup, original is sent.
- */
-char *
-session_cmd_get_hardlinkfrom(session_handle_t * SessionHandle)
-
-{
-	GlobusGFSName(__func__);
-	GlobusGFSHpssDebugEnter();
-	GlobusGFSHpssDebugExit();
-
-	return SessionHandle->Cmd.HardLinkFrom;
-}
-
-/*
- * Call free on the value and set it to NULL.
- */
-void
-session_cmd_free_hardlinkfrom(session_handle_t * SessionHandle)
-{
-	GlobusGFSName(__func__);
-	GlobusGFSHpssDebugEnter();
-
-	if (SessionHandle->Cmd.HardLinkFrom != NULL)
-		globus_free(SessionHandle->Cmd.HardLinkFrom);
-	SessionHandle->Cmd.HardLinkFrom = NULL;
-
-	GlobusGFSHpssDebugExit();
-}
-
-void
-session_cmd_set_stagelist(session_handle_t * SessionHandle,
-                          void             * StageList)
-{
-	GlobusGFSName(session_cmd_set_stagelist);
-	GlobusGFSHpssDebugEnter();
-	SessionHandle->Cmd.StageList = StageList;
-	GlobusGFSHpssDebugExit();
-}
-
-void *
-session_cmd_get_stagelist(session_handle_t * SessionHandle)
-{
-	GlobusGFSName(session_cmd_get_stagelist);
-	GlobusGFSHpssDebugEnter();
-	GlobusGFSHpssDebugExit();
-	return SessionHandle->Cmd.StageList;
 }
 
 /*
@@ -902,55 +811,3 @@ cleanup:
 	return GLOBUS_SUCCESS;
 }
 
-void
-session_cache_insert_object(session_handle_t          *  SessionHandle,
-                            session_cache_object_id_t    ObjectID,
-                            void                      *  Object)
-{
-	GlobusGFSName(__func__);
-	GlobusGFSHpssDebugEnter();
-
-	/* Make sure there are no collisions. */
-	globus_assert(SessionHandle->ObjectCache[ObjectID].Object == NULL);
-
-	/* Insert this object. */
-	SessionHandle->ObjectCache[ObjectID].Object = Object;
-
-	GlobusGFSHpssDebugExit();
-}
-
-void *
-session_cache_lookup_object(session_handle_t          * SessionHandle,
-                            session_cache_object_id_t   ObjectID)
-{
-	void * object = NULL;
-
-	GlobusGFSName(__func__);
-	GlobusGFSHpssDebugEnter();
-
-	/* Get the object. */
-	object = SessionHandle->ObjectCache[ObjectID].Object;
-
-	GlobusGFSHpssDebugExit();
-
-	return object;
-}
-
-void *
-session_cache_remove_object(session_handle_t          * SessionHandle,
-                            session_cache_object_id_t   ObjectID)
-{
-	void * object = NULL;
-
-	GlobusGFSName(__func__);
-	GlobusGFSHpssDebugEnter();
-
-	/* Get the object. */
-	object = SessionHandle->ObjectCache[ObjectID].Object;
-
-	/* Remove it from the cache. */
-	SessionHandle->ObjectCache[ObjectID].Object = NULL;
-
-	GlobusGFSHpssDebugExit();
-	return object;
-}

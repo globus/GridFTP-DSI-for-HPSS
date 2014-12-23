@@ -47,12 +47,25 @@
  */
 #include <globus_gridftp_server.h>
 
+/*
+ * Local includes.
+ */
+#include "gridftp_dsi_hpss_session.h"
+#include "gridftp_dsi_hpss_msg.h"
+
+typedef struct commands commands_t;
+
 globus_result_t
-commands_init(globus_gfs_operation_t Operation);
+commands_init(globus_gfs_operation_t Operation, commands_t ** Commands);
 
 void
-commands_handler(globus_gfs_operation_t      Operation,
+commands_destroy(commands_t * Commands);
+
+void
+commands_handler(commands_t                * Commands,
+                 globus_gfs_operation_t      Operation,
                  globus_gfs_command_info_t * CommandInfo,
-                 void                      * UserArg);
+                 session_handle_t          * Session,
+                 msg_handle_t              * Msg);
 
 #endif /* GRIDFTP_DSI_HPSS_COMMANDS_H */

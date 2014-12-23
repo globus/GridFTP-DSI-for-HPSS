@@ -105,12 +105,17 @@ typedef struct stage_entry {
 	struct stage_entry * Prev;
 } stage_entry_t;
 
+struct commands {
+	char          * HardLinkFrom;
+	stage_entry_t * StageList;
+};
+
 globus_result_t
-commands_init(globus_gfs_operation_t    Operation)
+commands_init(globus_gfs_operation_t Operation, commands_t ** commands)
 {
 	globus_result_t result = GLOBUS_SUCCESS;
  
-	GlobusGFSName(__func__);
+	GlobusGFSName(commands_init);
 	GlobusGFSHpssDebugEnter();
 
 	/*
@@ -230,6 +235,17 @@ cleanup:
 
 	GlobusGFSHpssDebugExit();
 	return result;
+}
+
+void
+commands_destroy(commands_t * Commands)
+{
+	if (Commands)
+	{
+		if (Commands->HardLinkFrom)
+			globus_free(Commands->HardLinkFrom);
+		globus_free(Commands);
+	}
 }
 
 static globus_result_t
@@ -366,7 +382,8 @@ commands_rm_bfid_from_list(stage_entry_t ** StageList,
 }
 
 static globus_result_t
-commands_stage_file(session_handle_t * Session,
+commands_stage_file(commands_t       * Commands,
+                    session_handle_t * Session,
                     char             * Path,
                     int                Timeout,
                     globus_bool_t    * Staged,
@@ -383,9 +400,8 @@ commands_stage_file(session_handle_t * Session,
 	hpssoid_t           bitfile_id;
 	u_signed64          size;
 	globus_gfs_stat_t   gfs_stat_buf;
-	stage_entry_t     * stage_list;
 
-	GlobusGFSName(__func__);
+	GlobusGFSName(commands_stage_file);
 	GlobusGFSHpssDebugEnter();
 
 	/* Initialize the return value. */
@@ -393,9 +409,6 @@ commands_stage_file(session_handle_t * Session,
 
 	globus_mutex_init(&mutex, NULL);
 	globus_cond_init(&cond, NULL);
-
-	/* Get the stage list. */
-	stage_list = session_cmd_get_stagelist(Session);
 
 	/* Stat the object. */
 	result = misc_gfs_stat(Path, GLOBUS_FALSE, &gfs_stat_buf);
@@ -421,14 +434,14 @@ commands_stage_file(session_handle_t * Session,
 
 	if (archived == GLOBUS_FALSE || *TapeOnly == GLOBUS_TRUE)
 	{
-		commands_rm_bfid_from_list(&stage_list, &bitfile_id);
+		commands_rm_bfid_from_list(&Commands->StageList, &bitfile_id);
 		goto cleanup;
 	}
 
 	/* Only stage if we haven't requested it already. */
-	if (!commands_bfid_in_list(stage_list, &bitfile_id))
+	if (!commands_bfid_in_list(Commands->StageList, &bitfile_id))
 	{
-		result = commands_add_bfid_to_list(&stage_list, &bitfile_id);
+		result = commands_add_bfid_to_list(&Commands->StageList, &bitfile_id);
 		if (result != GLOBUS_SUCCESS)
 			goto cleanup;
 
@@ -441,7 +454,7 @@ commands_stage_file(session_handle_t * Session,
 		retval = hpss_StageCallBack(Path, cast64m(0), size, 0, NULL, BFS_STAGE_ALL, &reqid, &bitfile_id);
 		if (retval != 0)
 		{
-			commands_rm_bfid_from_list(&stage_list, &bitfile_id);
+			commands_rm_bfid_from_list(&Commands->StageList, &bitfile_id);
 			result = GlobusGFSErrorSystemError("hpss_StageCallBack()", -retval);
 			goto cleanup;
 		}
@@ -467,13 +480,10 @@ commands_stage_file(session_handle_t * Session,
 	}
 
 	if (!archived)
-		commands_rm_bfid_from_list(&stage_list, &bitfile_id);
+		commands_rm_bfid_from_list(&Commands->StageList, &bitfile_id);
 
 cleanup:
 	*Staged = !archived;
-
-	/* Set the stage list. */
-	session_cmd_set_stagelist(Session, stage_list);
 
 	globus_mutex_destroy(&mutex);
 	globus_cond_destroy(&cond);
@@ -903,13 +913,13 @@ globus_result_t
 commands_compute_checksum(globus_gfs_operation_t       Operation,
                           globus_gfs_command_info_t *  CommandInfo,
                           session_handle_t          *  Session,
+                          msg_handle_t              *  Msg,
                           char                      ** Checksum)
 {
 	monitor_t            monitor;
 	globus_result_t      result           = GLOBUS_SUCCESS;
 	transfer_data_t    * transfer_data    = NULL;
 	transfer_control_t * transfer_control = NULL;
-	msg_handle_t       * msg_handle       = NULL;
 	marker_handle_t      marker_handle;
 	msg_register_id_t    msg_register_id  = MSG_REGISTER_ID_NONE;
 
@@ -919,12 +929,8 @@ commands_compute_checksum(globus_gfs_operation_t       Operation,
 	/* Initialize the monitor */
 	commands_monitor_init(&monitor);
 
-	/* Get the message handle. */
-	msg_handle = session_cache_lookup_object(Session,
-	                                         SESSION_CACHE_OBJECT_ID_MSG_HANDLE);
-
 	/* Register to receive messages. */
-	result = msg_register(msg_handle,
+	result = msg_register(Msg,
 	                      MSG_COMP_ID_TRANSFER_CONTROL,
 	                      MSG_COMP_ID_NONE,
 	                      commands_msg_recv,
@@ -934,12 +940,12 @@ commands_compute_checksum(globus_gfs_operation_t       Operation,
 		goto cleanup;
 
 	/* Setup perf markers. */
-	result = commands_start_markers(&marker_handle, msg_handle, Operation);
+	result = commands_start_markers(&marker_handle, Msg, Operation);
 	if (result != GLOBUS_SUCCESS)
 		goto cleanup;
 
 	/* Initialize the control side. */
-	result = transfer_control_cksm_init(msg_handle,
+	result = transfer_control_cksm_init(Msg,
 	                                    Operation,
 	                                    CommandInfo,
 	                                    &transfer_control);
@@ -950,7 +956,7 @@ commands_compute_checksum(globus_gfs_operation_t       Operation,
 	 * Initialize the data side. This will tell the control side
 	 * when it's ready.
 	 */
-	result = transfer_data_cksm_init(msg_handle,
+	result = transfer_data_cksm_init(Msg,
 	                                 Operation,
 	                                 CommandInfo,
 	                                 &transfer_data);
@@ -980,7 +986,7 @@ commands_compute_checksum(globus_gfs_operation_t       Operation,
 
 cleanup:
 	/* Unregister to receive messages. */
-	msg_unregister(msg_handle, msg_register_id);
+	msg_unregister(Msg, msg_register_id);
 
 	/* Stop perf markers. */
 	commands_stop_markers(&marker_handle);
@@ -1002,6 +1008,7 @@ globus_result_t
 commands_checksum(globus_gfs_operation_t       Operation,
                   globus_gfs_command_info_t *  CommandInfo,
                   session_handle_t          *  Session,
+                  msg_handle_t              *  Msg,
                   char                      ** Checksum)
 {
 	globus_result_t result = GLOBUS_SUCCESS;
@@ -1013,7 +1020,7 @@ commands_checksum(globus_gfs_operation_t       Operation,
 	if (CommandInfo->cksm_offset != 0 || CommandInfo->cksm_length != -1)
 	{
 		/* Compute it. */
-		result = commands_compute_checksum(Operation, CommandInfo, Session, Checksum);
+		result = commands_compute_checksum(Operation, CommandInfo, Session, Msg, Checksum);
 		goto cleanup;
 	}
 
@@ -1030,7 +1037,7 @@ commands_checksum(globus_gfs_operation_t       Operation,
 	if (*Checksum == NULL)
 	{
 		/* Compute it. */
-		result = commands_compute_checksum(Operation, CommandInfo, Session, Checksum);
+		result = commands_compute_checksum(Operation, CommandInfo, Session, Msg, Checksum);
 
 #ifdef UDA_CHECKSUM_SUPPORT
 		/* Try to store the checksum in UDA. Ignore errors on set. */
@@ -1046,31 +1053,25 @@ cleanup:
 }
                   
 void
-commands_handler(globus_gfs_operation_t      Operation,
+commands_handler(commands_t                * Commands,
+                 globus_gfs_operation_t      Operation,
                  globus_gfs_command_info_t * CommandInfo,
-                 void                      * UserArg)
+                 session_handle_t          * Session,
+                 msg_handle_t              * Msg)
 {
 	int                 timeout         = 0;
 	int                 argc            = 0;
 	int                 retval          = 0;
 	int                 staged          = 0;
-	char             *  hard_link_from  = NULL;
 	char             ** argv            = NULL;
 	char             *  command_output  = NULL;
 	globus_result_t     result          = GLOBUS_SUCCESS;
 	struct utimbuf      times;
-	session_handle_t *  session         = NULL;
 	globus_bool_t       tape_only       = GLOBUS_FALSE;
 	globus_bool_t       free_cmd_output = GLOBUS_FALSE;
 
-	GlobusGFSName(__func__);
+	GlobusGFSName(commands_handler);
 	GlobusGFSHpssDebugEnter();
-
-	/* Make sure we got our UserArg. */
-	globus_assert(UserArg != NULL);
-
-	/* Cast to our session handle. */
-	session = (session_handle_t *)UserArg;
 
 	switch (CommandInfo->command)
 	{
@@ -1152,49 +1153,53 @@ commands_handler(globus_gfs_operation_t      Operation,
 		break;
 
 	case GLOBUS_GFS_HPSS_CMD_SITE_SETCOS:
-		commands_setcos(session, 
+		commands_setcos(Session, 
 		                CommandInfo->pathname,  /* The COS */
 		                &command_output);
 		break;
 
 	case GLOBUS_GFS_HPSS_CMD_SITE_LSCOS:
-		result = commands_lscos(session, &command_output);
+		result = commands_lscos(Session, &command_output);
 		free_cmd_output = GLOBUS_TRUE;
 		break;
 
 	case GLOBUS_GFS_HPSS_CMD_SITE_SETFAM:
-		commands_setfam(session, 
+		commands_setfam(Session, 
 		                CommandInfo->pathname,  /* The family */
 		                &command_output);
 		break;
 
 	case GLOBUS_GFS_HPSS_CMD_SITE_LSFAM:
-		result = commands_lsfam(session, &command_output);
+		result = commands_lsfam(Session, &command_output);
 		free_cmd_output = GLOBUS_TRUE;
 		break;
 
 	case GLOBUS_GFS_HPSS_CMD_SITE_HARDLINKFROM:
-		result = session_cmd_set_hardlinkfrom(session, CommandInfo->pathname);
+		if (Commands->HardLinkFrom)
+			globus_free(Commands->HardLinkFrom);
+
+		Commands->HardLinkFrom = globus_libc_strdup(CommandInfo->pathname);
+		if (!Commands->HardLinkFrom)
+			result = GlobusGFSErrorMemory("HardLinkFrom");
 		break;
 
 	case GLOBUS_GFS_HPSS_CMD_SITE_HARDLINKTO:
-		/* Check if the client issued a HARDLINKFROM */
-		hard_link_from = session_cmd_get_hardlinkfrom(session);
-		if (hard_link_from == NULL)
+		if (!Commands->HardLinkFrom)
 		{
 			command_output = "501 Must specify HARDLINKFROM first\r\n";
 			break;
 		}
 
 		/* Now link the two paths. */
-		retval = hpss_Link(hard_link_from, CommandInfo->pathname);
+		retval = hpss_Link(Commands->HardLinkFrom, CommandInfo->pathname);
 		if (retval != 0)
 		{
 			result = GlobusGFSErrorSystemError("hpss_Link", -retval);
 		}
 
 		/* Release the hard link source. */
-		session_cmd_free_hardlinkfrom(session);
+		globus_free(Commands->HardLinkFrom);
+		Commands->HardLinkFrom = NULL;
 		break;
 
 	case GLOBUS_GFS_HPSS_CMD_SITE_STAGE:
@@ -1219,7 +1224,8 @@ commands_handler(globus_gfs_operation_t      Operation,
 		}
 
 		/* Stage the file. */
-		result = commands_stage_file(session,
+		result = commands_stage_file(Commands,
+		                             Session,
 		                             CommandInfo->pathname,
                                      timeout,
                                      &staged,
@@ -1244,7 +1250,7 @@ commands_handler(globus_gfs_operation_t      Operation,
         break;
 
 	case GLOBUS_GFS_CMD_CKSM:
-		result = commands_checksum(Operation, CommandInfo, session, &command_output);
+		result = commands_checksum(Operation, CommandInfo, Session, Msg, &command_output);
 		if (result == GLOBUS_SUCCESS)
 			free_cmd_output = GLOBUS_TRUE;
 		break;

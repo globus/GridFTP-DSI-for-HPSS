@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2012 NCSA.  All rights reserved.
+ * Copyright © 2012-2014 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -59,13 +59,6 @@ typedef struct session_handle session_handle_t;
 #define SESSION_NO_FAMILY_ID -1
 #define SESSION_NO_COS_ID    -1
 
-typedef enum {
-	SESSION_CACHE_OBJECT_ID_MSG_HANDLE,
-	SESSION_CACHE_OBJECT_ID_IPC_CONTROL_HANDLE,
-	SESSION_CACHE_OBJECT_ID_IPC_DATA_HANDLE,
-	SESSION_CACHE_OBJECT_ID_MAX,
-} session_cache_object_id_t;
-
 globus_result_t
 session_init(globus_gfs_session_info_t *  SessionInfo,
              session_handle_t          ** SessionHandle);
@@ -104,32 +97,6 @@ int
 session_pref_get_cos_id(session_handle_t * SessionHandle);
 
 /*
- * HardLinkFrom string is dup'ed. Previous value is free'd.
- */
-globus_result_t
-session_cmd_set_hardlinkfrom(session_handle_t * SessionHandle,
-                             char             * HardLinkFrom);
-
-/*
- * Returned string is not a dup, original is sent.
- */
-char *
-session_cmd_get_hardlinkfrom(session_handle_t * SessionHandle);
-
-/*
- * Call free on the value and set it to NULL.
- */
-void
-session_cmd_free_hardlinkfrom(session_handle_t * SessionHandle);
-
-void
-session_cmd_set_stagelist(session_handle_t * SessionHandle,
-                          void             * StageList);
-
-void *
-session_cmd_get_stagelist(session_handle_t * SessionHandle);
-
-/*
  * Translates Cos to the id. Cos can be the name or the id.
  * Returns SESSION_NO_COS_ID if cos is not found.
  */
@@ -164,19 +131,5 @@ session_can_user_use_family(session_handle_t * SessionHandle, int FamilyID);
 globus_result_t
 session_get_user_family_list(session_handle_t *  SessionHandle,
                              char             ** FamilyList);
-
-
-void
-session_cache_insert_object(session_handle_t          *  SessionHandle,
-                            session_cache_object_id_t    ObjectID,
-                            void                      *  Object);
-
-void *
-session_cache_lookup_object(session_handle_t          * SessionHandle,
-                            session_cache_object_id_t   ObjectID);
-
-void *
-session_cache_remove_object(session_handle_t          * SessionHandle,
-                            session_cache_object_id_t   ObjectID);
 
 #endif /* GRIDFTP_DSI_HPSS_SESSION_H */
