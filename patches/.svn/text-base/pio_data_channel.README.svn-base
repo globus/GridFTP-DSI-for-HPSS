@@ -1,0 +1,23 @@
+Updated : 1/6/2015
+
+Overview
+========
+The PIO Coordinator creates a listening socket in order to communicate with the Participant
+processess. This socket binds to all interfaces, public or private. If any traffic hits 
+this listening socket that is not from a participant (Ex. network scanner), PIO will
+close shop and report the transfer as an error. The same is true of RAIT engines and
+mover processes if their data hostname is a public interface.
+
+There is no security issue here except possibly a denial of service. All connects are
+authenticated before proceeded.
+
+The Participant calls hpss_PIORegister() which can take a address on which to bind for
+all Participant<->mover traffic. Without this address, the Participant listens on all
+interfaces.  The Coordinator has no such control in the call to hpss_PIOStart(). It will
+setup a socket listening on all interfaces and then pass back a socket address value
+equal to HPSS_API_HOSTNAME. This gives the appearance that the socket is on a configurable
+interface but it is not.
+
+The DSI does not yet make use of hpss_PIORegister() to restrict the address since the
+solution would not be complete. HPSS is aware of the problem and a request has been made
+to provide a solution.

@@ -531,15 +531,16 @@ static void *
 pio_control_execute_thread(void * Arg)
 {
 
-	int                  retval      = 0;
-	globus_result_t      result      = GLOBUS_SUCCESS;
-	pio_control_t      * pio_control = NULL;
-	hpss_pio_gapinfo_t   gap_info;
-	u_signed64           bytes_moved;
-	u_signed64           u_offset;
-	u_signed64           u_length;
-	globus_off_t         range_offset = 0;
-	globus_off_t         range_length = 0;
+	int                          retval      = 0;
+	globus_result_t              result      = GLOBUS_SUCCESS;
+	pio_control_t              * pio_control = NULL;
+	hpss_pio_gapinfo_t           gap_info;
+	u_signed64                   bytes_moved;
+	u_signed64                   u_offset;
+	u_signed64                   u_length;
+	globus_off_t                 range_offset = 0;
+	globus_off_t                 range_length = 0;
+	pio_control_restart_marker_t restart_marker;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -585,6 +586,19 @@ pio_control_execute_thread(void * Arg)
 			/* Add in any hole we may have found. */
 			if (neqz64m(gap_info.Length))
 				bytes_moved = add64m(gap_info.Offset, gap_info.Length);
+
+			if (pio_control->OperationType == HPSS_PIO_WRITE)
+			{
+				restart_marker.Offset = u_offset;
+				restart_marker.Length = u_offset + bytes_moved;
+
+				msg_send(pio_control->MsgHandle,
+				         MSG_COMP_ID_ANY,
+				         MSG_COMP_ID_TRANSFER_CONTROL_PIO,
+				         PIO_CONTROL_MSG_TYPE_RESTART_MARKER,
+				         sizeof(restart_marker),
+				         &restart_marker);
+			}
 
 		} while (retval == 0 && !eq64(bytes_moved, u_length));
 

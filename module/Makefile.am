@@ -88,6 +88,10 @@ SOURCES = gridftp_dsi_hpss_transfer_control.c \
 	      gridftp_dsi_hpss_misc.h             \
 	      gridftp_dsi_hpss_list.c             \
 	      gridftp_dsi_hpss_list.h             \
+	      gridftp_dsi_hpss_dl.c               \
+	      gridftp_dsi_hpss_dl.h               \
+	      gridftp_dsi_hpss_markers.c          \
+	      gridftp_dsi_hpss_markers.h          \
 	      gridftp_dsi_hpss_msg.c              \
 	      gridftp_dsi_hpss_msg.h
 

@@ -61,6 +61,11 @@
 
 typedef struct pio_control pio_control_t;
 
+typedef struct {
+	globus_off_t Offset;
+	globus_off_t Length;
+} pio_control_restart_marker_t;
+
 typedef enum {
     /*
      * PIO_CONTROL_MSG_TYPE_STRIPE_GROUP:
@@ -80,6 +85,15 @@ typedef enum {
      *   Msg: char buffer with index value
      */
 	PIO_CONTROL_MSG_TYPE_STRIPE_INDEX,
+
+	/*
+	 * PIO_CONTROL_MSG_TYPE_RESTART_MARKER:
+	 *   Sent to MSG_COMP_ID_ANY to indicate bytes successfully written to
+	 *   HPSS. This marker can be safely used for restarts.
+     *   MsgLen:sizeof(pio_control_restart_markers_t)
+     *   Msg:pio_control_restart_markers_t
+	 */
+	PIO_CONTROL_MSG_TYPE_RESTART_MARKER,
 } pio_control_msg_type_t;
 
 typedef void

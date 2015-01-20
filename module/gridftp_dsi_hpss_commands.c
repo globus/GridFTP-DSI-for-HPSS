@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2014 NCSA.  All rights reserved.
+ * Copyright © 2014-2015 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -111,12 +111,20 @@ struct commands {
 };
 
 globus_result_t
-commands_init(globus_gfs_operation_t Operation, commands_t ** commands)
+commands_init(globus_gfs_operation_t Operation, commands_t ** Commands)
 {
 	globus_result_t result = GLOBUS_SUCCESS;
  
 	GlobusGFSName(commands_init);
 	GlobusGFSHpssDebugEnter();
+
+	*Commands = globus_malloc(sizeof(commands_t));
+	if (! *Commands)
+	{
+		result = GlobusGFSErrorMemory("commands_t");
+		goto cleanup;
+	}
+	memset(*Commands, 0, sizeof(commands_t));
 
 	/*
 	 * Add our local commands.

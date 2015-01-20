@@ -73,7 +73,7 @@ AC_ARG_WITH(globus,
 #
 if test "x$globus_location" == "x/usr" ; then
 	# RPM installation
-	CPPFLAGS=-I$globus_location/lib64/globus/include
+	CPPFLAGS="-I$globus_location/lib64/globus/include -I/usr/include/globus"
 	AC_CHECK_HEADERS([globus_config.h],
 	                 [GLOBUS_CONFIG_CPPFLAGS="$CPPFLAGS"],
 	                 [AC_MSG_ERROR(globus_config.h not found, install globus-core)])
@@ -81,16 +81,16 @@ else
 	# Source installation
 	CPPFLAGS=-I$globus_location/include/globus/gcc64dbg
 	AC_CHECK_HEADERS([globus_config.h],
-                 	 [GLOBUS_CONFIG_CPPFLAGS="$CPPFLAGS"],
-                 	 [AC_MSG_ERROR(globus_config.h not found in $globus_location)])
+	                 [GLOBUS_CONFIG_CPPFLAGS="$CPPFLAGS"],
+	                 [AC_MSG_ERROR(globus_config.h not found in $globus_location)])
 fi
 
 #
 # Now check for globus_common.h using globus_config.h's location
 #
 CPPFLAGS="-I$globus_location/include/globus $GLOBUS_CONFIG_CPPFLAGS"
-AC_CHECK_HEADERS([globus_common.h], 
-                 [GLOBUS_COMMON_CPPFLAGS="-I$globus_location/include/globus"], 
+AC_CHECK_HEADERS([globus_common.h],
+                 [GLOBUS_COMMON_CPPFLAGS="-I$globus_location/include/globus"],
                  [AC_MSG_ERROR(globus_common.h not found)])
 
 #
@@ -105,10 +105,9 @@ fi
 # Now check for globus_gridftp_server.h
 #
 CPPFLAGS="${GLOBUS_CPPFLAGS}"
-AC_CHECK_HEADERS([globus_gridftp_server.h], 
-                 [], 
+AC_CHECK_HEADERS([globus_gridftp_server.h],
+                 [],
                  [AC_MSG_ERROR(globus_gridftp_server.h not found)])
-
 
 AC_SUBST(GLOBUS_CPPFLAGS)
 

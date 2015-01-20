@@ -69,15 +69,16 @@ typedef enum {
 
 struct pio_data {
 	pio_data_op_type_t        OpType;
+	msg_handle_t            * MsgHandle;
+	msg_register_id_t         MsgRegisterID;
+
 	buffer_handle_t         * BufferHandle;
 	buffer_priv_id_t          PrivateBufferID;
 	pio_data_eof_callback_t   EofCallbackFunc;
 	void                    * EofCallbackArg;
 	pio_data_buffer_pass_t    BufferPassFunc;
 	void                    * BufferPassArg;
-	msg_handle_t            * MsgHandle;
 	globus_off_t              BufferSize;
-	msg_register_id_t         MsgRegisterID;
 	range_list_t            * RangeList;
 
 	globus_mutex_t            Lock;
@@ -88,6 +89,8 @@ struct pio_data {
 	hpss_pio_grp_t            StripeGroup;
 	int                       StripeIndex;
 	globus_result_t           Result;
+	globus_off_t              LastBytesWritten;
+	globus_off_t              LastWrittenOffset;
 };
 
 static void *
@@ -572,6 +575,20 @@ pio_data_register_thread(void * Arg)
 	if (retval != 0 && result == GLOBUS_SUCCESS)
 		result = GlobusGFSErrorSystemError("hpss_PIORegister", -retval);
 
+	if (pio_data->LastBytesWritten)
+	{
+		pio_data_bytes_written_t msg_bytes_written;
+
+		msg_bytes_written.Offset = pio_data->LastWrittenOffset;
+		msg_bytes_written.Length = pio_data->LastBytesWritten;
+		msg_send(pio_data->MsgHandle,
+		         MSG_COMP_ID_ANY,
+		         MSG_COMP_ID_TRANSFER_DATA_PIO,
+		         PIO_DATA_MSG_TYPE_BYTES_WRITTEN,
+		         sizeof(msg_bytes_written),
+		         &msg_bytes_written);
+	}
+
 	retval = hpss_PIOEnd(pio_data->StripeGroup);
 	if (retval != 0 && result == GLOBUS_SUCCESS)
 		result = GlobusGFSErrorSystemError("hpss_PIOEnd", -retval);
@@ -790,10 +807,25 @@ pio_data_register_write_callback(void         *  Arg,
 	globus_off_t             stored_ready_length = 0;
 	globus_off_t             stored_ready_offset = 0;
 	globus_result_t          result              = GLOBUS_SUCCESS;
-	pio_data_bytes_written_t bytes_written;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
+
+	if (pio_data->LastBytesWritten)
+	{
+		pio_data_bytes_written_t msg_bytes_written;
+
+		msg_bytes_written.Offset = pio_data->LastWrittenOffset;
+		msg_bytes_written.Length = pio_data->LastBytesWritten;
+		msg_send(pio_data->MsgHandle,
+		         MSG_COMP_ID_ANY,
+		         MSG_COMP_ID_TRANSFER_DATA_PIO,
+		         PIO_DATA_MSG_TYPE_BYTES_WRITTEN,
+		         sizeof(msg_bytes_written),
+		         &msg_bytes_written);
+
+		pio_data->LastBytesWritten = 0;
+	}
 
 	/*
 	 * See if we have a flagged buffer. This is our free buffer from a previous
@@ -805,42 +837,8 @@ pio_data_register_write_callback(void         *  Arg,
 	                          &flagged_offset,
 	                          &flagged_length);
 
-	/* If we have one... */
-	if (flagged_buffer != NULL)
-	{
-		/*
-		 * Send the bytes written message based on the actual
-		 * offset/length of this write. 
-		 */
-		bytes_written.Offset = flagged_offset;
-		bytes_written.Length = flagged_length;
-
-		result = msg_send(pio_data->MsgHandle,
-		                  MSG_COMP_ID_ANY,
-		                  MSG_COMP_ID_TRANSFER_DATA_PIO,
-		                  PIO_DATA_MSG_TYPE_BYTES_WRITTEN,
-		                  sizeof(bytes_written),
-		                  &bytes_written);
-
-		if (result != GLOBUS_SUCCESS)
-		{
-			globus_mutex_lock(&pio_data->Lock);
-			{
-				/* Save our error. */
-				pio_data->Result = result;
-			}
-			globus_mutex_unlock(&pio_data->Lock);
-
-			/* Indicate error. */
-			retval = 1;
-
-			/* Bail. */
-			goto cleanup;
-		}
-	}
-
 	/* If we do not have one... */
-	if (flagged_buffer == NULL)
+	if (!flagged_buffer)
 	{
 		/* Create one. */
 		result = buffer_allocate_buffer(pio_data->BufferHandle,
@@ -1029,6 +1027,9 @@ pio_data_register_write_callback(void         *  Arg,
 		/* Pass these back to the caller. */
 		*ReadyBuffer = flagged_buffer;
 		*ReadyLength = flagged_length;
+
+		pio_data->LastBytesWritten = *ReadyLength;
+		pio_data->LastWrittenOffset = FileOffset;
 	}
 unlock:
 	globus_mutex_unlock(&pio_data->Lock);

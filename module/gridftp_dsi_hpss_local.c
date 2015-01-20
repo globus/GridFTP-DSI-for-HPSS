@@ -70,6 +70,7 @@
 #include "gridftp_dsi_hpss_pio_data.h"
 #include "gridftp_dsi_hpss_session.h"
 #include "gridftp_dsi_hpss_gridftp.h"
+#include "gridftp_dsi_hpss_markers.h"
 #include "gridftp_dsi_hpss_misc.h"
 #include "gridftp_dsi_hpss_msg.h"
 #include "../config.h"
@@ -139,9 +140,10 @@ local_msg_recv(void          * CallbackArg,
                int             MsgLen,
                void          * Msg)
 {
-	monitor_t                       * monitor       = NULL;
-	transfer_control_complete_msg_t * complete_msg  = NULL;
-	pio_data_bytes_written_t        * bytes_written = NULL;
+	monitor_t                       * monitor        = NULL;
+	transfer_control_complete_msg_t * complete_msg   = NULL;
+	pio_data_bytes_written_t        * bytes_written  = NULL;
+	pio_control_restart_marker_t    * restart_marker = NULL;
 
 	GlobusGFSName(__func__);
 	GlobusGFSHpssDebugEnter();
@@ -182,11 +184,26 @@ local_msg_recv(void          * CallbackArg,
 			bytes_written = (pio_data_bytes_written_t *) Msg;
 
 			/* Inform the server of the bytes written. */
-			globus_gridftp_server_update_bytes_written(monitor->Operation,
-			                                           bytes_written->Offset - monitor->PartialOffset,
-			                                           bytes_written->Length);
+			markers_update_perf_markers(monitor->Operation,
+			                            bytes_written->Offset - monitor->PartialOffset,
+			                            bytes_written->Length);
 			break;
 		default:
+			break;
+		}
+		break;
+
+	case MSG_COMP_ID_TRANSFER_CONTROL_PIO:
+		switch (MsgType)
+		{
+		case PIO_CONTROL_MSG_TYPE_RESTART_MARKER:
+			/* Cast our message. */
+			restart_marker = (pio_control_restart_marker_t *) Msg;
+
+			/* Send the marker to the server. */
+			markers_update_restart_markers(monitor->Operation,
+			                               restart_marker->Offset - monitor->PartialOffset,
+			                               restart_marker->Length);
 			break;
 		}
 		break;
@@ -313,6 +330,20 @@ local_stor(globus_gfs_operation_t       Operation,
 	/* Initialize the monitor */
 	local_monitor_init(Operation, TransferInfo, &monitor);
 
+	if (!markers_restart_supported())
+	{
+		globus_off_t range_offset = 0;
+		globus_off_t range_length = 0;
+
+		globus_range_list_at(TransferInfo->range_list, 0, &range_offset, &range_length);
+		if (globus_range_list_size(TransferInfo->range_list) != 1 || (range_offset != 0 || range_length != -1))
+		{
+			result = GlobusGFSErrorGeneric("Partial STOR is not supported");
+			goto cleanup;
+		}
+	}
+
+
 #ifdef UDA_CHECKSUM_SUPPORT
 	/* Clear our any old checksum information. */
 	result = checksum_clear_file_sum(TransferInfo->pathname);
@@ -322,7 +353,9 @@ local_stor(globus_gfs_operation_t       Operation,
 
 	/* Register to receive messages. */
 	result = msg_register(module->Msg,
-	                      MSG_COMP_ID_TRANSFER_DATA_PIO|MSG_COMP_ID_TRANSFER_CONTROL,
+	                      MSG_COMP_ID_TRANSFER_CONTROL_PIO|
+	                      MSG_COMP_ID_TRANSFER_DATA_PIO|
+	                      MSG_COMP_ID_TRANSFER_CONTROL,
 	                      MSG_COMP_ID_NONE,
 	                      local_msg_recv,
 	                      &monitor,

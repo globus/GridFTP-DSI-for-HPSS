@@ -16255,7 +16255,7 @@ fi
 #
 if test "x$globus_location" == "x/usr" ; then
 	# RPM installation
-	CPPFLAGS=-I$globus_location/lib64/globus/include
+	CPPFLAGS="-I$globus_location/lib64/globus/include -I/usr/include/globus"
 
 for ac_header in globus_config.h
 do
@@ -16897,7 +16897,6 @@ $as_echo "$as_me: error: globus_gridftp_server.h not found" >&2;}
 fi
 
 done
-
 
 
 

@@ -118,6 +118,7 @@ am__objects_1 = gridftp_dsi_hpss_transfer_control.lo \
 	gridftp_dsi_hpss_session.lo gridftp_dsi_hpss_buffer.lo \
 	gridftp_dsi_hpss_config.lo gridftp_dsi_hpss_local.lo \
 	gridftp_dsi_hpss_misc.lo gridftp_dsi_hpss_list.lo \
+	gridftp_dsi_hpss_dl.lo gridftp_dsi_hpss_markers.lo \
 	gridftp_dsi_hpss_msg.lo
 am_libglobus_gridftp_server_hpss_real_local_la_OBJECTS =  \
 	$(am__objects_1)
@@ -310,6 +311,10 @@ SOURCES = gridftp_dsi_hpss_transfer_control.c \
 	      gridftp_dsi_hpss_misc.h             \
 	      gridftp_dsi_hpss_list.c             \
 	      gridftp_dsi_hpss_list.h             \
+	      gridftp_dsi_hpss_dl.c               \
+	      gridftp_dsi_hpss_dl.h               \
+	      gridftp_dsi_hpss_markers.c          \
+	      gridftp_dsi_hpss_markers.h          \
 	      gridftp_dsi_hpss_msg.c              \
 	      gridftp_dsi_hpss_msg.h
 
@@ -401,9 +406,11 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_commands.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_config.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_data_ranges.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_dl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_gridftp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_list.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_local.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_markers.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_misc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_msg.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gridftp_dsi_hpss_pio_control.Plo@am__quote@
