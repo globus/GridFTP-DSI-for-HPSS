@@ -171,7 +171,6 @@ AC_SUBST(REAL_CC, CC)
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([source/Makefile])
 AC_CONFIG_FILES([source/loaders/Makefile])
+AC_CONFIG_FILES([source/loaders/version.h])
 AC_CONFIG_FILES([source/module/Makefile])
-dnl AC_CONFIG_FILES([source/module/test/Makefile])
-AC_CONFIG_FILES([source/gridftp/version.h])
 AC_OUTPUT
