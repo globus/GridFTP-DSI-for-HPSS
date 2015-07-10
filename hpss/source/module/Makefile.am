@@ -62,6 +62,7 @@ SOURCES = dsi.c \
 	      session.c \
 	      config.c  \
 	      authenticate.c \
+	      commands.c \
 	      stat.c
 
 libglobus_gridftp_server_hpss_real_la_SOURCES=$(SOURCES)

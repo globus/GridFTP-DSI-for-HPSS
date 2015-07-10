@@ -78,6 +78,14 @@ dsi_destroy(void * Arg)
 }
 
 void
+dsi_command(globus_gfs_operation_t      Operation,
+            globus_gfs_command_info_t * CommandInfo,
+            void                      * UserArg)
+{
+	commands_run(Operation, CommandInfo, globus_gridftp_server_finished_command);
+}
+
+void
 dsi_stat(globus_gfs_operation_t   Operation,
          globus_gfs_stat_info_t * StatInfo,
          void                   * Arg)
@@ -161,7 +169,7 @@ globus_gfs_storage_iface_t hpss_local_dsi_iface =
 	NULL,                /* active_func      */
 	NULL,                /* passive_func     */
 	NULL,                /* data_destroy     */
-	NULL,      /* command_func     */
+	dsi_command,  /* command_func     */
 	dsi_stat,     /* stat_func        */
 	NULL,                /* set_cred_func    */
 	NULL,                /* buffer_send_func */
