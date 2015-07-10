@@ -66,7 +66,7 @@ GlobusDebugDefine(GLOBUS_GRIDFTP_SERVER_HPSS);
 /* Our handle reference which we hold between activate / deactivate. */
 static void * _real_module_handle = NULL;
 
-static
+static void
 loader_log_to_syslog(const char * Format, ...)
 {
 	va_list ap;
@@ -74,7 +74,7 @@ loader_log_to_syslog(const char * Format, ...)
 	openlog("globus-gridftp-server", 0, LOG_FTP);
 
 	va_start(ap, Format);
-	vsyslog(LOG_ERR, ap);
+	vsyslog(LOG_ERR, Format, ap);
 	va_end(ap);
 }
 
@@ -109,7 +109,7 @@ loader_activate(const char                 * DsiName,
 	dsi_interface = (globus_gfs_storage_iface_t*)dlsym(_real_module_handle, DsiInterface);
 	if (!dsi_interface)
 	{
-		loader_log_to_syslog("Failed to symbol %s in libglobus_gridftp_server_hpss_real.so: %s",
+		loader_log_to_syslog("Failed to find symbol %s in libglobus_gridftp_server_hpss_real.so: %s",
 		                     DsiInterface, 
 		                     dlerror());
 		return GLOBUS_FAILURE;
