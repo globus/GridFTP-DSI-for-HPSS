@@ -60,7 +60,8 @@ lib_LTLIBRARIES = libglobus_gridftp_server_hpss_real.la
 
 SOURCES = dsi_interface.c \
 	      session.c \
-	      config.c
+	      config.c  \
+	      authenticate.c
 
 libglobus_gridftp_server_hpss_real_la_SOURCES=$(SOURCES)
 
@@ -73,4 +74,4 @@ LDFLAGS=-L$(HPSS_ROOT)/lib -Wl,-rpath,$(HPSS_ROOT)/lib $(GLOBUS_LDFLAGS)
 # environment. It is necessary to link these here; the XDR/libtirpc issue causes the
 # runtime dynamic linking to fail without this.
 #
-libglobus_gridftp_server_hpss_real_la_LIBADD=-lglobus_gridftp_server -lhpsskrb5auth -lhpssunixauth
+libglobus_gridftp_server_hpss_real_la_LIBADD=-lglobus_gridftp_server -lhpsskrb5auth -lhpssunixauth -lhpss

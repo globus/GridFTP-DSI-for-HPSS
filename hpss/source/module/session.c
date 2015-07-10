@@ -50,15 +50,50 @@
 #include <globus_gridftp_server.h>
 
 /*
+ * HPSS includes
+ */
+#include <hpss_api.h>
+
+/*
  * Local includes
  */
 #include "session.h"
 #include "config.h"
 
 globus_result_t
-session_init(session_t ** Session)
+session_get_uid(char * UserName, int * Uid)
+{
+	struct passwd * passwd = NULL;
+	struct passwd   passwd_buf;
+	char            buffer[1024];
+	int             retval = 0;
+
+	GlobusGFSName(session_get_uid);
+
+	/* Find the passwd entry. */
+	retval = getpwnam_r(UserName,
+	                    &passwd_buf,
+	                    buffer,
+	                    sizeof(buffer),
+	                    &passwd);
+	if (retval != 0)
+		return GlobusGFSErrorSystemError("getpwnam_r", errno);
+
+	if (passwd == NULL)
+		return GlobusGFSErrorGeneric("Account not found");
+
+	/* Copy out the uid */
+	*Uid = passwd->pw_uid;
+
+	return GLOBUS_SUCCESS;
+}
+
+globus_result_t
+session_init(globus_gfs_session_info_t * GFSSessionInfo, session_t ** Session)
 {
 	globus_result_t result = GLOBUS_SUCCESS;
+	int             uid    = 0;
+	sec_cred_t      user_cred;
 
 	GlobusGFSName(session_init);
 
@@ -73,6 +108,40 @@ session_init(session_t ** Session)
 	if (result != GLOBUS_SUCCESS)
 		return result;
 
+	/*
+	 * Authenticate to HPSS.
+	 */
+
+	/* Get the uid of the user logging in. */
+	result = session_get_uid(GFSSessionInfo->username, &uid);
+	if (result != GLOBUS_SUCCESS)
+		return result;
+
+	/* Now authenticate. */
+	result = authenticate((*Session)->Config->LoginName,
+	                      (*Session)->Config->AuthenticationMech,
+	                      (*Session)->Config->Authenticator,
+	                       uid);
+	if (result != GLOBUS_SUCCESS)
+		return result;
+
+	/*
+	 * Find the user's home directory.
+	 */
+
+	/*
+	 * Pulling the HPSS directory from the user's credential will support
+	 * sites that use HPSS LDAP.
+	 */
+	result = hpss_GetThreadUcred(&user_cred);
+	if (result != GLOBUS_SUCCESS)
+		return result;
+
+	/* Copy it out. */
+	(*Session)->HomeDirectory = globus_libc_strdup(user_cred.Directory);
+	if (!(*Session)->HomeDirectory)
+		return GlobusGFSErrorMemory("home_directory");
+
 	return GLOBUS_SUCCESS;
 }
 
@@ -82,6 +151,8 @@ session_destroy(session_t * Session)
 	if (Session)
 	{
 		config_destroy(Session->Config);
+		if (Session->HomeDirectory)
+			globus_free(Session->HomeDirectory);
 		globus_free(Session);
 	}
 }

@@ -38,28 +38,18 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS WITH THE SOFTWARE.
  */
-#ifndef HPSS_DSI_SESSION_H
-#define HPSS_DSI_SESSION_H
+#ifndef HPSS_DSI_AUTHENTICATE_H
+#define HPSS_DSI_AUTHENTICATE_H
 
 /*
  * Globus includes
  */
 #include <globus_gridftp_server.h>
 
-/*
- * Local includes
- */
-#include "config.h"
-
-typedef struct session {
-	config_t * Config;
-	char     * HomeDirectory;
-} session_t;
-
 globus_result_t
-session_init(globus_gfs_session_info_t * GFSSessionInfo, session_t ** Session);
+authenticate(char * LoginName,
+             char * AuthenticationMech,
+             char * Authenticator,
+             int    Uid);
 
-void
-session_destroy(session_t * Session);
-
-#endif /* HPSS_DSI_SESSION_H */
+#endif /* HPSS_DSI_AUTHENTICATE_H */

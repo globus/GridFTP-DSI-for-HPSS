@@ -59,18 +59,15 @@ void
 dsi_init(globus_gfs_operation_t      Operation,
          globus_gfs_session_info_t * SessionInfo)
 {
-// Get config
-// Authenticate user
-// Get home directory
-
 	session_t * session = NULL;
-	globus_result_t result = session_init(&session);
+	// Initialize the session
+	globus_result_t result = session_init(SessionInfo, &session);
 
 	globus_gridftp_server_finished_session_start(Operation,
 	                                             result,
 	                                             session,
 	                                             NULL,  // username
-	                                             NULL); // home directory
+	                                             result ? NULL : session->HomeDirectory);
 }
 
 
