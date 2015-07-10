@@ -40,14 +40,39 @@
  */
 
 /*
+ * System includes
+ */
+#include <stdlib.h>
+
+/*
+ * Globus includes
+ */
+#include <globus_gridftp_server.h>
+
+/*
  * Local includes
  */
 #include "session.h"
+#include "config.h"
 
 globus_result_t
 session_init(session_t ** Session)
 {
-	*Session = NULL;
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(session_init);
+
+	/* Allocate the session struct */
+	*Session = globus_malloc(sizeof(session_t));
+	if (!*Session)
+		return GlobusGFSErrorMemory("session_t");
+	memset(*Session, 0, sizeof(session_t));
+
+	/* Initialize the configuration. */
+	result = config_init(&(*Session)->Config);
+	if (result != GLOBUS_SUCCESS)
+		return result;
+
 	return GLOBUS_SUCCESS;
 }
 
@@ -55,6 +80,9 @@ void
 session_destroy(session_t * Session)
 {
 	if (Session)
+	{
+		config_destroy(Session->Config);
 		globus_free(Session);
+	}
 }
 
