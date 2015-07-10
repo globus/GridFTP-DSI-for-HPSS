@@ -1,8 +1,18 @@
-Version 1.7 Beta: 
+Version 1.8: Tue Jan 20 09:53:20 CST 2015
+	- Fixed perf markers, the last marker wasn't being sent
+	- Fix for restarts. See patches/perf_restart_markers.README. If you don't
+	  understand it, then keep REST disabled (-disable-command-list).
+	- Fixed commands handle allocation
+	- Work has begun to get PIO onto a specific interface instead of listening
+	  on all interfaces. See patches/pio_data_channel.README.
+	- Removed Tape ID while stat'ing in order to improve performance.
+
+Version 1.7: Tue Dec 23 13:30:45 CST 2014
 	- Always link against libhpsskrb5auth and libhpssunixauth to support krb
 	  sites
 	- Fix for sites that are configured to require a specific COS for a
 	  fileset
+	- Removed the session cache, added a commands handle
 
 Version 1.6: Tue Sep 23 11:30:00 CDT 2014
 	- Reduced UDA call overhead for checksums
