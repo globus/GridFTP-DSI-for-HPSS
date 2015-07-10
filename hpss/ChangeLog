@@ -1,0 +1,148 @@
+Version 1.7 Beta: 
+	- Always link against libhpsskrb5auth and libhpssunixauth to support krb
+	  sites
+	- Fix for sites that are configured to require a specific COS for a
+	  fileset
+
+Version 1.6: Tue Sep 23 11:30:00 CDT 2014
+	- Reduced UDA call overhead for checksums
+	- Fixed free() of unallocated memory when staging a file that does not
+	  exist
+	- Updated install guide. Removed references to --with-unixauth and --with_krb5auth.
+	  Corrected --with-hpssdir to --with-hpss.
+	- Changed access type for "SITE STAGE" to READ so that RETR on readonly sharing
+	  works as expected.
+	- Fixed permissions on newly created files and directories. Now by default files are
+	  created 644 and directories are created 755 but these are also subject
+	  to the process's umask setting which can be altered via xinetd.conf.
+
+Version 1.5: Wed May  7 09:39:13 CDT 2014
+	- Fixed PIO race condition for transfers that are stopped prematurely.
+	- 'Fixed' build to not use globus-makefile-header.
+	- Build now expects a 64bit installation
+	- Worked around the XDR issue with HPSS 7.4.2, now the DSI only works
+	  on Linux (See README.xdr)
+	- Separated the source into loaders and module subdirectories (part of
+	  the XDR fix)
+	- Thanks to the XDR fix, we can now load libhpssunixauth.so and 
+	  libhpsskrb5auth.so dynamically. The configure options --with-unixauth
+	  and --with-krb5 have been removed.
+	- Added --enable-uda_checksum_support to store checksums in UDA for use
+	  with HPSS admin tools. Before now, this was not optional.
+
+Version 1.4: Oct 29, 2013
+	- Fix for staged files. Make sure tape SC does not have more bytes
+	  than disk SC.
+	- Fix for "System error in hpss_Opendir: Too many open files" while
+	  doing recursive deletions.
+	- Added tape ID to MLST/MLSC/MLSD output are the first portion of
+	  the unique attribute. This can be used for intelligent ordering
+	  of stage requests.
+	- Prevent multiple stage requests for the same file
+
+Version 1.3: Aug 20, 2013
+	- Added --with-quota_support which will mark files with UDA so that the
+	  NCSA quota system can find them later and fix the account IDs.
+	- MLSC, MLSD, LIST no longer wait until all entries have been stat()'ed,
+	  instead entries are returned 100 at a time to avoid client timeouts
+	- Fixed missing symbol in misc_get_file_size()
+	- Fix for files that change size thus change COS
+	- CKSM operations are stored and retrieved from HPSS UDA. These are
+	  compatible with hpsssum.
+
+Version 1.2 : May 8, 2013
+	- Change misc_file_archived() to check for any bytes on disk. Due to holes,
+	  we can not expect DataLength to be on disk.
+	- Added handling for files with gaps during RETR/CKSM
+	- Fixed race condition in gridftp_register_read() which caused a deadlock
+	- Throttled the call to globus_ftp_control_data_query_channels() to avoid
+	  signal 11
+	- Fixed partial checksums deadlock
+	- Ordered buffers for RETR in streams mode
+	- Another fix for transfer restarts
+	- Prevent hang when hpss_PIOExecute() encounters an error
+	- Limited gridftp read requests to one at a time to avoid bug GT-296
+	- Removed call to globus_gridftp_server_get_optimal_concurrency() during read
+	  requests to avoid bug GT-376
+	- Fix to pio_data_register_read_callback() to handle large gaps
+	- Changed when globus_gridftp_server_begin_transfer() is called when
+	  transfers begin in order for the server to more gracefully handle
+	  open errors.
+
+Version 1.1 : January 28, 2013
+	- Fixed Range Markers with partial stores (ESTO)
+	- Fixed transfer restarts
+	- Fixed range_list_insert() to correctly insert on the tail
+	- Fixed setting of COS on truncated files
+	- Added asynchronous message passing
+	- Use the system MD5 library which is considerably faster than the
+	  HPSS hash functions
+	- Fixed a race condition in pio data which caused alarms with error
+	  code -50 in HPSS and reported 
+	    "system error in hpss_PIOExecute: Input/output error" 
+	  through GridFTP.
+	- Fix to allow files larger than the COS max file size to be placed
+	  into the COS when enforce max file size is disabled.
+
+Version 1.0 : Dec 19, 2012
+	- Added fixes sent by Damian Hazen of LBL:
+		- Fixed user->home directory mapping to use HPSS LDAP
+		- Fixed KRB5 authentication issues
+		- Added $HPSS_PATH_ETC/gridftp.conf as new config file location
+		- Added gridftp_dsi_hpss_commands.c and header to Makefile.am
+	- The search order for the config file is now:
+		1) $HPSS_PATH_ETC/gridftp.conf
+		2) /var/hpss/etc/gridftp.conf
+	- Install directions now include config file setup
+	- Fixed config file's AdminList syntax
+	- No longer force max segment size in hints
+	- Fix for RETR that end early, presumably due to a large segment count
+	- Now requires Globus Toolkit 5.2.3rc1 or newer. See 
+	  http://jira.globus.org/browse/GT-299
+	- Added support for ESTO, ERET, REST (APPE, SCKS not supported yet)
+	- Tested against HPSS 7.3.3P7
+	- Remove libtool from the distribution
+	- Added support for MFMT and SITE UTIME
+	- Added support for SITE SYMLINKFROM/SYMLINKTO
+	- Added symlink targets to list output
+	- Added restart and performance markers in extended block mode
+	- Added SETCOS,LSCOS (class of service), SETFAM,LSFAM (tape families)
+	- Added project, family, cos and admin settings to the config file
+	- Changed '250 Success' messages to '250 OK' to match server.
+	- Added 'SITE HARDLINKFROM' and 'SITE HARDLINKTO'
+	- Added 'SITE STAGE'. Files that can not be staged because they are on a
+	  tape-only class of service will give a special warning.
+	- Changed calculation for what is and is not archived. A file must be 
+	  completely on a disk SC to be considered not archived.
+	- Changed "AR" status in list output to "TP". This should better reflect
+	  that some COS are tape only.
+	- The list function has been removed until a fully functional version
+	  including MLSD and NLST can be implemented.
+	- Removed project file configs until those are better understood.
+	- Split the DSI into local and control/data components
+
+Version 0.2 Alpha
+	- Tested against HPSS 7.4.1B
+	- Remove globus_gridftp_server_hpss_data.c
+	- [BUG 4] Added check for --with-unixauth or --with-krb5auth
+	- [BUG 1] Ported to Globus Toolkit 5.2.1
+	- [BUG 6] Fixed gap handling
+	- [BUG 8] Fixed SIGABRT on file retrieve
+	- [BUG 9] Fixed timestamps in directory listings
+	- Changed HPSS API config flags to API_USE_CONFIG
+	- Reorganized the stor/retr code
+	- Added 'DK'/'AR' archive status to directory listings
+	- Listing large directories no longer hangs until the complete listing is
+	  ready
+	- MLSD is broken
+	- Removed config.log, config.status, Makefile and version.h
+
+Version 0.1 Alpha
+	- Initial version.
+	- Requires Globus Toolkit 5.2.0
+	- Tested against HPSS 7.3.3p4
+	- Supports only single node transfers (no striping).
+	- Hardcoded for unix authentication.
+	- No throttling when creating data buffers.
+	- COS determined by file size.
+	- Very little testing done.

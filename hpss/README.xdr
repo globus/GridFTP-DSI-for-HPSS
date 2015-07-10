@@ -1,0 +1,80 @@
+=== THE XDR SCANDAL ===
+AKA WHY DOES THIS MODULE ONLY WORK ON LINUX
+AKA WHY DO YOU DUAL-LOAD THIS MODULE
+
+  Once upon a time, RPC and XDR were placed in libc. Life was great until the libc authors
+realized that the this bloat was impractical and so RPC and XDR development began in a new
+library named tirpc. In order to provide backwards compatibility with older clients, the
+RPC and XDR routines were left in libc but the headers were scrubbed such that no new
+RPC/XDR development could take place with libc.
+
+  For reasons that occurred before I became involved with HPSS, it was decided that HPSS
+would have its own copy of these routines. It worked. Life was good.
+
+  Then came HPSS 7.4.2.
+
+  As of HPSS 7.4.2, someone decided it was time to remove the RPC/XDR routines from HPSS
+and rely upon libtirpc. Great idea but the implementation is a kludge in HPSS's build
+system. In order for a binary to make use of the implementations in libtirpc over libc,
+the client must be linked to libtirpc before libc. In order to accomplish this, the 
+author added -ltirpc to CC in the build scripts. This forces libtirpc on everything 
+even during the compile phase. But alas, all is good for HPSS; it works as intended.
+
+  However, this DSI is dynamically loaded (lt_dlopenext() to be specific) and the rules
+for which-symbols-overide-which-symbols change drasticaly. When a module is dynamically
+loaded, the run time linker uses the symbols available in the current process to resolve
+dependencies in the module BEFORE using the libraries linked to the module. In our case,
+the 'process' is globus_gridftp_server which is NOT linked to libtirpc but IS linked to
+libc. This means that, despite what we link our module against, the process's libc
+RPC/XDR implemenation will trump our link to libtirpc. When that happens, the client
+will fail to log into HPSS. A stack trace reveals a failure in clnt_dg_create().
+(Sorry can't post the HPSS portion of the trace to the web).
+
+  Since we can not relink the gridftp server (we could but what a pain that would be),
+we need a way to force the run time linker to respect the module's linked libraries
+before the process's available symbols. Fortunately, authors of the Linux implementation
+of dlopen() and the linker forsaw this and added a non POSIX option named RTLD_DEEPBIND.
+This Linux-only option forces the linker to resolve symbols in the module using the
+module's linked libraries before using the current process's symbol table. This is
+exactly what we needed.
+
+  But how do we get the gridftp server to do this for us?
+
+  I tried to catch lt_dlopenext() with LD_PRELOAD and override it with the necessary
+call to dlopen() but I was unsuccessful. Not to say it is not possible, but I found
+another way, one that should be transparent to all but myself.
+
+  Instead, I moved the bare-bones of the DSI (the portion the gridftp server expects
+to be in the module) into loaders/hpss_local.c. When that module is loaded, it will
+dlopen(RTLD_DEEPBIND) the 'real' module 'hpss_real_local'. This works! But there are
+some very strict and interesting rules on the linking requirements of libtirpc to
+make this work.
+
+* If this module were a shared library linked directly to the process, then libtirpc
+  must be linked to the binary (before libc) in order for libtirpc's RPC/XDR
+  implemenation to override libc's implementation. It does not matter if libtirpc
+  is linked to the shared library or not.
+
+* The previous is true if the module is dynamically loaded by the program as opposed
+  to dynamically linked to the program.
+
+* If the module is dlopen(RTLD_DEEPBIND) which we need to do, everything works if and
+  only if the module is the ONLY piece that is linked to libtirpc. If the gridftp
+  server is linked to tirpc, everyting breaks. If our loader module is linked to
+  libtirpc, everything breaks. I have no idea why this is but I have seen it happen
+  this way with test code.
+
+  So, since HPSS has special make file settings (CFLAGS, LDFLAGS, etc) that are required
+by clients such as this module in order to build correctly, we must source HPSS's 
+Makefile to get the proper values. However, since CC is now polluted with -ltirpc in
+the HPSS Makefiles to make it work, we are sunk because our loader picks up -ltirpc
+violating the third bullet above. In order to overcome this, the source was broken 
+down into loaders/ and module/ to keep the build sane.
+
+To summarize:
+
+* The RPC/XDR dual implementations are a headache
+* HPSS needs to fix the build scripts to not include -ltirpc with everything
+* RTLD_DEEPBIND is the only reason this works now and so the DSI only works
+  on LINUX
+* If the gridftp server links to libtirpc, we are sunk
