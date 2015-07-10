@@ -61,8 +61,9 @@
 
 /*
  * The config file search order is:
- *   1) $HPSS_PATH_ETC/gridftp.conf
- *   2) DEFAULT_CONFIG_FILE (/var/hpss/etc/gridftp.conf)
+ *   1) env HPSS_DSI_CONFIG_FILE=<path>
+ *   2) $HPSS_PATH_ETC/gridftp.conf
+ *   3) DEFAULT_CONFIG_FILE (/var/hpss/etc/gridftp.conf)
  */
 globus_result_t
 config_find_config_file(char ** ConfigFilePath)
@@ -75,6 +76,22 @@ config_find_config_file(char ** ConfigFilePath)
 
 	/* Initialize the return value. */
 	*ConfigFilePath = NULL;
+
+	if (getenv("HPSS_DSI_CONFIG_FILE"))
+	{
+		*ConfigFilePath = strdup(getenv("HPSS_DSI_CONFIG_FILE"));
+		if (!*ConfigFilePath)
+		{
+			result = GlobusGFSErrorMemory("HPSS_DSI_CONFIG_FILE");
+			goto cleanup;
+		}
+
+		/* Check if it exists and if we have access. */
+		retval = access(*ConfigFilePath, R_OK);
+		if (retval)
+			result = GlobusGFSErrorGeneric("Could not open config file defined in environment");
+		goto cleanup;
+	}
 
 	/* Check for HPSS_PATH_ETC in the environment. */
 	hpss_path_etc = hpss_Getenv("HPSS_PATH_ETC");
@@ -149,6 +166,124 @@ cleanup:
 	return result;
 }
 
+/*
+ * Helper that removes leading whitespace, newlines, comments, etc.
+ */
+static void
+config_find_next_word(char *  Buffer,
+                      char ** Word,
+                      int  *  Length)
+{
+	GlobusGFSName(config_find_next_word);
+
+	*Word   = NULL;
+	*Length = 0;
+
+	if (Buffer == NULL)
+		return;
+
+	/* Skip spacing. */
+	while (isspace(*Buffer)) Buffer++;
+
+	/* Skip EOL */
+	if (*Buffer == '\0' || *Buffer == '\n')
+		return;
+
+	/* Skip comments. */
+	if (*Buffer == '#')
+		return;
+
+	/* Return the start of the found keep word */
+	*Word = Buffer;
+
+	/* Find the length of the word. */
+	while (!isspace(*Buffer) && *Buffer != '\0' && *Buffer != '\n')
+	{
+		(*Length)++;
+		Buffer++;
+	}
+}
+
+static globus_result_t
+config_parse_config_file(config_t * Config)
+{
+	int                index        = 0;
+	int                tmp_length   = 0;
+	int                key_length   = 0;
+	int                value_length = 0;
+	FILE            *  config_f     = NULL;
+	char            *  tmp          = NULL;
+	char            *  key          = NULL;
+	char            *  value        = NULL;
+	char               buffer[1024];
+	globus_result_t    result       = GLOBUS_SUCCESS;
+
+	GlobusGFSName(config_parse_config_file);
+
+	/*
+	 * Open the config file.
+	 */
+	config_f = fopen(Config->ConfigFilePath, "r");
+	if (!config_f)
+	{
+		result = GlobusGFSErrorWrapFailed("Attempting to open config file",
+		                                  GlobusGFSErrorSystemError("fopen()", errno));
+		goto cleanup;
+	}
+
+	while (fgets(buffer, sizeof(buffer), config_f) != NULL)
+	{
+		/* Reset index. */
+		index = 0;
+
+		/* Locate the keyword */
+		config_find_next_word(buffer, &key, &key_length);
+		if (key == NULL)
+			continue;
+
+		/* Locate the value */
+		config_find_next_word(key+key_length, &value, &value_length);
+		if (key == NULL)
+		{
+			result = GlobusGFSErrorWrapFailed("Parsing config options",
+			                                  GlobusGFSErrorGeneric(buffer));
+			goto cleanup;
+		}
+
+		/* Make sure the value was the last word. */
+		config_find_next_word(value+value_length, &tmp, &tmp_length);
+		if (tmp != NULL)
+		{
+			result = GlobusGFSErrorWrapFailed("Parsing config options",
+			                                  GlobusGFSErrorGeneric(buffer));
+			goto cleanup;
+		}
+
+		/* Now match the directive. */
+		if (key_length == strlen("LoginName") && strncasecmp(key, "LoginName", key_length) == 0)
+		{
+			Config->LoginName = strndup(value, value_length);
+		} else if (key_length == strlen("AuthenticationMech") &&
+		           strncasecmp(key, "AuthenticationMech", key_length) == 0)
+		{
+			Config->AuthenticationMech = strndup(value, value_length);
+		} else if (key_length == strlen("Authenticator") && strncasecmp(key, "Authenticator", key_length) == 0)
+		{
+			Config->Authenticator = strndup(value, value_length);
+		} else
+		{
+			result = GlobusGFSErrorWrapFailed("Parsing config options", GlobusGFSErrorGeneric(buffer));
+			goto cleanup;
+		}
+	}
+
+cleanup:
+	if (config_f != NULL)
+		fclose(config_f);
+
+	return result;
+}
+
 globus_result_t
 config_init(config_t ** Config)
 {
@@ -156,19 +291,35 @@ config_init(config_t ** Config)
 
 	GlobusGFSName(config_init);
 
-	/* Allocate the session struct */
+	/* Allocate the config struct */
 	*Config = globus_malloc(sizeof(config_t));
 	if (!*Config)
 		return GlobusGFSErrorMemory("config_t");
 	memset(*Config, 0, sizeof(config_t));
 
-    return GLOBUS_SUCCESS;
+	/* Find the config file. */
+	result = config_find_config_file(&(*Config)->ConfigFilePath);
+	if (result != GLOBUS_SUCCESS)
+		return result;
+
+	return config_parse_config_file(*Config);
 }
 
 void
 config_destroy(config_t * Config)
 {
 	if (Config)
+	{
+		if (Config->ConfigFilePath)
+			globus_free(Config->ConfigFilePath);
+		if (Config->LoginName)
+			globus_free(Config->LoginName);
+		if (Config->AuthenticationMech)
+			globus_free(Config->AuthenticationMech);
+		if (Config->Authenticator)
+			globus_free(Config->Authenticator);
+
 		globus_free(Config);
+	}
 }
 
