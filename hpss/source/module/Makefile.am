@@ -61,7 +61,8 @@ lib_LTLIBRARIES = libglobus_gridftp_server_hpss_real.la
 SOURCES = dsi_interface.c \
 	      session.c \
 	      config.c  \
-	      authenticate.c
+	      authenticate.c \
+	      stat.c
 
 libglobus_gridftp_server_hpss_real_la_SOURCES=$(SOURCES)
 

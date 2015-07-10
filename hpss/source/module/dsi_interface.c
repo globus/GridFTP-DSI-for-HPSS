@@ -40,20 +40,20 @@
  */
 
 /*
- * Globus includes.
+ * Globus includes
  */
 #include <globus_gridftp_server.h>
+
+/*
+ * HPSS includes
+ */
+#include <hpss_api.h>
 
 /*
  * Local includes
  */
 #include "session.h"
-
-void
-dsi_destroy(void * Arg)
-{
-	session_destroy(Arg);
-}
+#include "stat.h"
 
 void
 dsi_init(globus_gfs_operation_t      Operation,
@@ -71,6 +71,84 @@ dsi_init(globus_gfs_operation_t      Operation,
 }
 
 
+void
+dsi_destroy(void * Arg)
+{
+	session_destroy(Arg);
+}
+
+void
+dsi_stat(globus_gfs_operation_t   Operation,
+         globus_gfs_stat_info_t * StatInfo,
+         void                   * Arg)
+{
+	GlobusGFSName(dsi_stat);
+
+	globus_result_t   result = GLOBUS_SUCCESS;
+	globus_gfs_stat_t gfs_stat;
+
+	switch (StatInfo->use_symlink_info)
+	{
+	case 0:
+		result = stat_object(StatInfo->pathname, &gfs_stat);
+		break;
+	default:
+		result = stat_link(StatInfo->pathname, &gfs_stat);
+		break;
+	}
+
+	if (result != GLOBUS_SUCCESS || StatInfo->file_only || !S_ISDIR(gfs_stat.mode))
+	{
+		globus_gridftp_server_finished_stat(Operation, result, &gfs_stat, 1);
+		stat_destroy(&gfs_stat);
+		return;
+	}
+
+	stat_destroy(&gfs_stat);
+
+#define STAT_ENTRIES_PER_REPLY 200
+	/*
+	 * Directory listing.
+	 */
+
+	hpss_fileattr_t dir_attrs;
+
+	int retval;
+	if ((retval = hpss_FileGetAttributes(StatInfo->pathname, &dir_attrs)) < 0)
+	{
+		result = GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
+		globus_gridftp_server_finished_stat(Operation, result, NULL, 0);
+		return;
+	}
+
+	uint64_t offset = 0;
+	uint32_t end    = FALSE;
+	while (!end)
+	{
+		globus_gfs_stat_t gfs_stat_array[STAT_ENTRIES_PER_REPLY];
+		uint32_t count_out;
+
+		result = stat_directory_entries(&dir_attrs.ObjectHandle,
+		                                offset,
+		                                STAT_ENTRIES_PER_REPLY,
+		                                &end,
+		                                &offset,
+		                                gfs_stat_array,
+		                                &count_out);
+		if (result)
+			break;
+
+		globus_gridftp_server_finished_stat_partial(Operation,
+		                                            GLOBUS_SUCCESS,
+		                                            gfs_stat_array,
+		                                            count_out);
+
+		stat_destroy_array(gfs_stat_array, count_out);
+	}
+
+	globus_gridftp_server_finished_stat(Operation, result, NULL, 0);
+}
+
 globus_gfs_storage_iface_t hpss_local_dsi_iface =
 {
 	0,                   /* Descriptor       */
@@ -84,7 +162,7 @@ globus_gfs_storage_iface_t hpss_local_dsi_iface =
 	NULL,                /* passive_func     */
 	NULL,                /* data_destroy     */
 	NULL,      /* command_func     */
-	NULL,          /* stat_func        */
+	dsi_stat,     /* stat_func        */
 	NULL,                /* set_cred_func    */
 	NULL,                /* buffer_send_func */
 	NULL,                /* realpath_func    */
