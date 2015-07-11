@@ -1,0 +1,45 @@
+/******************************************************************************
+ *
+ * NOTE ABOUT RESTART MARKERS, TRANSFER OFFSETS, FILE OFFSETS, PARTIAL OFFSETS
+ *
+ * The inital offset of any NEW transfer is 0 regardless of partial offsets
+ * or restart markers.
+ *
+ * Range markers are in terms of transfer offsets
+ *  PUT file
+ *  111 Range Marker 0-1046478848
+ *  111 Range Marker 1046478848-2217738240
+ *  111 Range Marker 2217738240-3312451584
+ *
+ *  PPUT 1048576 16106127360 file
+ *  111 Range Marker 0-1280311296
+ *  111 Range Marker 1280311296-250085376
+ *
+ * Restart markers are in terms of transfer offsets, not file offsets. So:
+ *  PUT file
+ *  111 Range Marker 0-1046478848
+ *  111 Range Marker 1046478848-2217738240
+ *  111 Range Marker 2217738240-3312451584
+ *
+ *  REST 0-3312451584
+ *  PUT file
+ *  111 Range Marker 3312451584-4543479808
+ *  111 Range Marker 4543479808-5715787776
+ *  111 Range Marker 5715787776-6896484352
+ *
+ *  PPUT 1048576 16106127360 file
+ *  111 Range Marker 0-1280311296
+ *  111 Range Marker 1280311296-250085376
+ *
+ *  REST 0-250085376
+ *  PPUT 1048576 16106127360 file
+ *  111 Range Marker 250085376-345832957 (+1048576 to get file offset)
+ *
+ *  Partial offsets are not reflected in transfer offsets. So:
+ *    File Offset = TransferOffset + Partial Offset
+ *
+ *  Restart markers are the portion of the transfer offsets to skip on
+ *  the next transfer.
+ *
+ *****************************************************************************/
+
