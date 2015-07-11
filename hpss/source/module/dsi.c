@@ -53,7 +53,9 @@
  * Local includes
  */
 #include "session.h"
+#include "commands.h"
 #include "stat.h"
+#include "stor.h"
 
 void
 dsi_init(globus_gfs_operation_t      Operation,
@@ -75,6 +77,14 @@ void
 dsi_destroy(void * Arg)
 {
 	session_destroy(Arg);
+}
+
+static void
+dsi_recv(globus_gfs_operation_t       Operation,
+         globus_gfs_transfer_info_t * TransferInfo,
+         void                       * UserArg)
+{
+	stor(Operation, TransferInfo);
 }
 
 void
@@ -164,7 +174,7 @@ globus_gfs_storage_iface_t hpss_local_dsi_iface =
 	dsi_destroy,  /* destroy_func     */
 	NULL,                /* list_func        */
 	NULL,          /* send_func        */
-	NULL,          /* recv_func        */
+	dsi_recv,     /* recv_func        */
 	NULL,                /* trev_func        */
 	NULL,                /* active_func      */
 	NULL,                /* passive_func     */
