@@ -57,6 +57,7 @@
 /*
  * Local includes
  */
+#include "authenticate.h"
 #include "session.h"
 #include "config.h"
 
