@@ -207,7 +207,6 @@ config_find_next_word(char *  Buffer,
 static globus_result_t
 config_parse_config_file(config_t * Config)
 {
-	int                index        = 0;
 	int                tmp_length   = 0;
 	int                key_length   = 0;
 	int                value_length = 0;
@@ -233,9 +232,6 @@ config_parse_config_file(config_t * Config)
 
 	while (fgets(buffer, sizeof(buffer), config_f) != NULL)
 	{
-		/* Reset index. */
-		index = 0;
-
 		/* Locate the keyword */
 		config_find_next_word(buffer, &key, &key_length);
 		if (key == NULL)
