@@ -40,308 +40,333 @@
  */
 
 /*
+ * System includes
+ */
+#include <assert.h>
+
+/*
  * Local includes
  */
 #include "stor.h"
 #include "pio.h"
 
-void
-stor_pio_callback(globus_result_t   Result,
-                  char            * Buffer,
-                  uint32_t          Length,
-                  void            * CallbackArg);
+int
+stor_pio_callout(char     * Buffer,
+                 uint32_t * Length,
+                 uint64_t   Offset,
+                 void     * CallbackArg);
 
 void
-stor_gridfp_callback(globus_gfs_operation_t  Operation,
-                     globus_result_t         Result,
-                     globus_byte_t         * Buffer,
-                     globus_size_t           Length,
-                     globus_off_t            Offset,
-                     globus_bool_t           Eof,
-                     void                  * CallbackArg);
-
+stor_pio_completion_callback(globus_result_t Result,
+                             void          * UserArg);
 globus_result_t
-stor_register_gridftp_reads(stor_info_t  * StorInfo,
-                            char         * Buffer,
-                            globus_size_t  Length)
+stor_can_change_cos(char * Pathname, int * can_change_cos)
 {
-	char          * buffer = Buffer;
-	globus_result_t result = GLOBUS_SUCCESS;
+	int retval;
+	hpss_fileattr_t fileattr;
+	ns_FilesetAttrBits_t fileset_attr_bits;
+	ns_FilesetAttrs_t    fileset_attr;
 
-	GlobusGFSName(stor_register_gridftp_reads);
+	GlobusGFSName(stor_can_change_cos);
 
-	pthread_mutex_lock(&StorInfo->Mutex);
-	{
-		/*
-		 * Check optimal concurrency.
-		 */
-		if (StorInfo->OptConChkCnt == 0)
-		{
-			globus_gridftp_server_get_optimal_concurrency(StorInfo->Operation,
-			                                              &StorInfo->OptConCnt);
-		}
-		if (StorInfo->OptConChkCnt++ >= 100)
-			StorInfo->OptConChkCnt = 0;
+	memset(&fileattr, 0, sizeof(hpss_fileattr_t));
+	retval = hpss_FileGetAttributes(Pathname, &fileattr);
+	if (retval)
+		return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
 
-		while (buffer || StorInfo->OptConCnt > globus_list_size(StorInfo->BufferList))
-		{
-			/*
-			 * Allocate a buffer if we weren't given one.
-			 */
-			if (!buffer)
-			{
-				buffer = globus_malloc(StorInfo->BlockSize);
-				if (!buffer)
-				{
-					result = GlobusGFSErrorMemory("buffer");
-					goto cleanup;
-				}
+	fileset_attr_bits = orbit64m(0, NS_FS_ATTRINDEX_COS);
+	memset(&fileset_attr, 0, sizeof(ns_FilesetAttrs_t));
+	retval = hpss_FilesetGetAttributes(NULL,
+	                                   &fileattr.Attrs.FilesetId,
+	                                   NULL,
+	                                   NULL,
+	                                   fileset_attr_bits,
+	                                   &fileset_attr);
+	if (retval)
+		return GlobusGFSErrorSystemError("hpss_FilesetGetAttributes", -retval);
 
-				globus_list_insert(&StorInfo->BufferList, buffer);
-			}
-
-			/*
-			 * Request a new read.
-			 */
-			result = globus_gridftp_server_register_read(StorInfo->Operation,
-			                                             (globus_byte_t*)buffer,
-			                                             StorInfo->BlockSize,
-			                                             stor_gridfp_callback,
-			                                             StorInfo);
-			if (result != GLOBUS_SUCCESS)
-				goto cleanup;
-
-			/* Release our reference to buffer. */
-			buffer = NULL;
-		}
-	}
-cleanup:
-	pthread_mutex_unlock(&StorInfo->Mutex);
-
-	return result;
+	*can_change_cos = !fileset_attr.ClassOfService;
+	return GLOBUS_SUCCESS;
 }
 
-/*
- * We need to populate RangeList with the File Offsets to transfer.
- * TransferInfo->partial_length will be  = -1.
- * TransferInfo->partial_offset will be >= 0
- * TransferInfo->alloc_size = the amount of incoming data
- *
- * RangeList is the inverse of the restart markers; it is the transfer
- * offsets that should be transferred. The last entry will have a length
- * of -1 meaning end of file.
- */
 globus_result_t
-stor_fill_range_list(globus_range_list_t          RangeList,
-                     globus_gfs_transfer_info_t * TransferInfo)
+stor_open_for_writing(char        * Pathname,
+                      globus_off_t  AllocSize,
+                      globus_bool_t Truncate,
+                      int         * FileFD,
+                      int         * FileStripeWidth)
 {
-	int             index                 = 0;
-	globus_off_t    range_offset          = 0;
-	globus_off_t    range_length          = 0;
-	globus_off_t    remaining_file_length = 0;
-	globus_off_t    starting_file_offset  = 0;
-	globus_result_t result                = GLOBUS_SUCCESS;
+	int                     oflags      = 0;
+	int                     retval      = 0;
+	int                     can_change_cos = 0;
+	globus_off_t            file_length = 0;
+	globus_result_t         result      = GLOBUS_SUCCESS;
+	hpss_cos_hints_t        hints_in;
+	hpss_cos_hints_t        hints_out;
+	hpss_cos_priorities_t   priorities;
 
-	GlobusGFSName(stor_file_range_list);
+	GlobusGFSName(stor_open_for_writing);
 
-	/* Get the starting file offset. */
-	starting_file_offset = TransferInfo->partial_offset;
+	*FileFD = -1;
 
-	/* Get the remaining file length. */
-	remaining_file_length = TransferInfo->alloc_size;
+	/* Initialize the hints in. */
+	memset(&hints_in, 0, sizeof(hpss_cos_hints_t));
 
-	/* For each range in the restart list. */
-	for (index = 0;
-	     index < globus_range_list_size(TransferInfo->range_list);
-	     index++)
+	/* Initialize the hints out. */
+	memset(&hints_out, 0, sizeof(hpss_cos_hints_t));
+
+	/* Initialize the priorities. */
+	memset(&priorities, 0, sizeof(hpss_cos_priorities_t));
+
+	/*
+	 * If this is a new file we need to determine the class of service
+	 * by either:
+	 *  1) set explicitly within the session handle or
+	 *  2) determined by the size of the incoming file
+	 */
+	if (Truncate == GLOBUS_TRUE)
 	{
-		globus_range_list_at(TransferInfo->range_list, index, &range_offset, &range_length);
+		if (AllocSize != 0)
+		{
+			/*
+			 * Use the ALLO size.
+			 */
+			file_length = AllocSize;
+			CONVERT_LONGLONG_TO_U64(file_length, hints_in.MinFileSize);
+			CONVERT_LONGLONG_TO_U64(file_length, hints_in.MaxFileSize);
+			priorities.MinFileSizePriority = REQUIRED_PRIORITY;
+			/*
+			 * If MaxFileSizePriority is required, you can not place
+			 *  a file into a COS where it's max size is < the size
+			 *  of this file regardless of whether or not enforce max
+			 *  is enabled on the COS (it doesn't even try).
+			 */
+			priorities.MaxFileSizePriority = HIGHLY_DESIRED_PRIORITY;
+		}
+    }
 
-		/* Convert from transfer offset to file offset. */
-		range_offset += TransferInfo->partial_offset;
+	/* Determine the open flags. */
+	oflags = O_WRONLY;
+	if (Truncate == GLOBUS_TRUE)
+		oflags |= O_CREAT|O_TRUNC;
 
-		/* Skip zero-length ranges. */
-		if (range_length == 0)
-			continue;
-
-		/* -1 is code for 'remainder of transfer'. */
-		if (range_length == -1)
-			range_length = remaining_file_length;
-
-		/* Truncate the range to fit the alloc_size. */
-		if (range_length > remaining_file_length)
-			range_length = remaining_file_length;
-
-		/* Insert this range into the list. */
-		result = globus_range_list_insert(RangeList, range_offset, range_length);
-		if (result != GLOBUS_SUCCESS)
-			return result;
-
-		/* Decrement the remaining file length to transfer. */
-		remaining_file_length -= range_length;
-
-		/* Bail if there is nothing to transfer. */
-		if (remaining_file_length == 0)
-			break;
+	/* Open the HPSS file. */
+	*FileFD = hpss_Open(Pathname,
+	                    oflags,
+	                    S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH,
+	                    &hints_in,
+	                    &priorities,
+	                    &hints_out);
+	if (*FileFD < 0)
+	{
+		result = GlobusGFSErrorSystemError("hpss_Open", -(*FileFD));
+		goto cleanup;
 	}
 
-    return GLOBUS_SUCCESS;
+	result = stor_can_change_cos(Pathname, &can_change_cos);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	/* Handle the case of the file that already existed. */
+	if (Truncate == GLOBUS_TRUE && can_change_cos)
+	{
+		hpss_cos_md_t cos_md;
+
+		retval = hpss_SetCOSByHints(*FileFD,
+		                            0,
+		                            &hints_in,
+		                            &priorities,
+		                            &cos_md);
+
+		if (retval)
+		{
+			result = GlobusGFSErrorSystemError("hpss_SetCOSByHints", -(retval));
+			goto cleanup;
+		}
+	}
+
+	/* Copy out the file stripe width. */
+	*FileStripeWidth = hints_out.StripeWidth;
+
+cleanup:
+	if (result)
+	{
+		if (*FileFD != -1)
+			hpss_Close(*FileFD);
+		*FileFD = -1;
+	}
+
+	return result;
 }
 
 void
 stor(globus_gfs_operation_t       Operation,
      globus_gfs_transfer_info_t * TransferInfo)
 {
-	globus_result_t result    = GLOBUS_SUCCESS;
-	stor_info_t   * stor_info = NULL;
+	stor_info_t   * stor_info         = NULL;
+	globus_result_t result            = GLOBUS_SUCCESS;
+	int             file_stripe_width = 0;
 
 	GlobusGFSName(stor);
 
 	/*
-	 * Allocate our stor_info_t struct.
+	 * Create our structure.
 	 */
-	stor_info = globus_malloc(sizeof(stor_info_t));
+	stor_info = malloc(sizeof(stor_info_t));
 	if (!stor_info)
 	{
 		result = GlobusGFSErrorMemory("stor_info_t");
-		globus_gridftp_server_finished_transfer(Operation, result);
-		return;
+		goto cleanup;
 	}
-	memset(stor_info, 0, sizeof(*stor_info));
-
-	pthread_mutexattr_t mutex_attr;
-	pthread_mutexattr_init(&mutex_attr);
-	pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(&stor_info->Mutex, &mutex_attr);
-	pthread_mutexattr_destroy(&mutex_attr);
+	memset(stor_info, 0, sizeof(stor_info_t));
+	stor_info->Operation    = Operation;
+	stor_info->TransferInfo = TransferInfo;
+	stor_info->FileFD       = -1;
+	pthread_mutex_init(&stor_info->Mutex, NULL);
 	pthread_cond_init(&stor_info->Cond, NULL);
 
-	stor_info->Operation = Operation;
 	globus_gridftp_server_get_block_size(Operation, &stor_info->BlockSize);
-	globus_range_list_init(&stor_info->RangeList);
-	result = stor_fill_range_list(stor_info->RangeList, TransferInfo);
-	if (result != GLOBUS_SUCCESS)
+
+	/*
+	 * Open the file.
+	 */
+	result = stor_open_for_writing(TransferInfo->pathname,
+	                               TransferInfo->alloc_size,
+	                               TransferInfo->truncate,
+	                               &stor_info->FileFD,
+	                               &file_stripe_width);
+	if (result) goto cleanup;
+
+	/*
+	 * Setup PIO
+	 */
+	result = pio_start(stor_info->FileFD,
+	                   file_stripe_width,
+	                   stor_info->BlockSize,
+	                   TransferInfo->alloc_size,
+	                   stor_pio_callout,
+	                   stor_pio_completion_callback,
+	                   stor_info);
+
+cleanup:
+	if (result)
 	{
-		globus_range_list_destroy(stor_info->RangeList);
-		pthread_mutex_destroy(&stor_info->Mutex);
-		pthread_cond_destroy(&stor_info->Cond);
-		globus_free(stor_info);
 		globus_gridftp_server_finished_transfer(Operation, result);
-		return;
-	}
-
-	// Initialize PIO
-	result = pio_init(&stor_info->Pio);
-	if (result != GLOBUS_SUCCESS)
-	{
-		globus_range_list_destroy(stor_info->RangeList);
-		pthread_mutex_destroy(&stor_info->Mutex);
-		pthread_cond_destroy(&stor_info->Cond);
-		globus_free(stor_info);
-		globus_gridftp_server_finished_transfer(Operation, result);
-		return;
-	}
-
-	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
-
-	pthread_mutex_lock(&stor_info->Mutex);
-	{
-		// Fire off GridFTP reads
-		result = stor_register_gridftp_reads(stor_info, NULL, 0);
-		if (result != GLOBUS_SUCCESS)
+		if (stor_info)
 		{
-			pio_cancel(stor_info->Pio);
-			pio_destroy(stor_info->Pio);
-			globus_list_destroy_all(stor_info->BufferList, free);
-			globus_range_list_destroy(stor_info->RangeList);
-			pthread_mutex_unlock(&stor_info->Mutex);
+			if (stor_info->FileFD != -1)
+				hpss_Close(stor_info->FileFD);
 			pthread_mutex_destroy(&stor_info->Mutex);
 			pthread_cond_destroy(&stor_info->Cond);
-			globus_free(stor_info);
-			globus_gridftp_server_finished_transfer(Operation, result);
-			return;
-		}
-
-		// Start PIO
-		result = pio_start(stor_info->Pio);
-		if (result != GLOBUS_SUCCESS)
-		{
-			pio_cancel(stor_info->Pio);
-			pio_destroy(stor_info->Pio);
-			globus_list_destroy_all(stor_info->BufferList, free);
-			globus_range_list_destroy(stor_info->RangeList);
-			pthread_mutex_unlock(&stor_info->Mutex);
-			pthread_mutex_destroy(&stor_info->Mutex);
-			pthread_cond_destroy(&stor_info->Cond);
-			globus_free(stor_info);
-			globus_gridftp_server_finished_transfer(Operation, result);
-			return;
+			free(stor_info);
 		}
 	}
-	pthread_mutex_unlock(&stor_info->Mutex);
-
-	return;
 }
 
 void
-stor_pio_callback(globus_result_t   Result,
-                  char            * Buffer,
-                  uint32_t          Length,
-                  void            * CallbackArg)
+stor_gridftp_callout(globus_gfs_operation_t Operation,
+                     globus_result_t        Result,
+                     globus_byte_t        * Buffer,
+                     globus_size_t          Length,
+                     globus_off_t           Offset,
+                     globus_bool_t          Eof,
+                     void                 * UserArg)
 {
-	stor_info_t   * stor_info = CallbackArg;
-	globus_result_t result    = GLOBUS_SUCCESS;
+	stor_info_t * stor_info = UserArg;
 
 	pthread_mutex_lock(&stor_info->Mutex);
 	{
-		result = stor_register_gridftp_reads(stor_info, Buffer, Length);
+		if (Eof) stor_info->Eof = Eof;
+		if (Result && !stor_info->Result) stor_info->Result = Result;
+		if (!Result) stor_info->Length = Length;
+if (Length)
+assert(Offset  == stor_info->Offset);
+assert(Length  <= stor_info->BlockSize);
+		pthread_cond_signal(&stor_info->Cond);
 	}
 	pthread_mutex_unlock(&stor_info->Mutex);
 }
 
-void
-stor_gridfp_callback(globus_gfs_operation_t  Operation,
-                     globus_result_t         Result,
-                     globus_byte_t         * Buffer,
-                     globus_size_t           Length,
-                     globus_off_t            Offset,
-                     globus_bool_t           Eof,
-                     void                  * CallbackArg)
+int
+stor_pio_callout(char     * Buffer,
+                 uint32_t * Length,
+                 uint64_t   Offset,
+                 void     * CallbackArg)
 {
+	int             rc        = 0;
 	stor_info_t   * stor_info = CallbackArg;
 	globus_result_t result    = GLOBUS_SUCCESS;
 
+	GlobusGFSName(stor_pio_callout);
+
 	pthread_mutex_lock(&stor_info->Mutex);
 	{
-		/* Remove this range from our expected range list. */
-		globus_range_list_remove(stor_info->RangeList, Offset, Length);
-
-		/* Send this buffer to PIO. */
-		result = pio_register_write(stor_info->Pio, 
-		                            (char *)Buffer, 
-		                            Offset, 
-		                            Length,
-		                            stor_pio_callback,
-		                            stor_info);
-
-		if (Eof)
+assert(Offset == stor_info->Offset);
+assert(*Length <= stor_info->BlockSize);
+		if (stor_info->Eof)
 		{
-			if (globus_range_list_size(stor_info->RangeList) == 0)
-			{
-				result = pio_destroy(stor_info->Pio);
-				globus_list_destroy_all(stor_info->BufferList, free);
-				globus_range_list_destroy(stor_info->RangeList);
-				pthread_mutex_unlock(&stor_info->Mutex);
-				pthread_mutex_destroy(&stor_info->Mutex);
-				pthread_cond_destroy(&stor_info->Cond);
-				globus_free(stor_info);
-				globus_gridftp_server_finished_transfer(Operation, result);
-				return;
-			}
+			rc = 1; /* Signal to shutdown. */
+			if (!stor_info->Result)
+				stor_info->Result = GlobusGFSErrorGeneric("Premature end of data transfer");
+			goto cleanup;
 		}
 
-		result = stor_register_gridftp_reads(stor_info, NULL, 0);
+		if (!stor_info->Started)
+			globus_gridftp_server_begin_transfer(stor_info->Operation, 0, NULL);
+		stor_info->Started = 1;
+
+		result = globus_gridftp_server_register_read(stor_info->Operation,
+		                                             (globus_byte_t *)Buffer,
+		                                             *Length,
+		                                             stor_gridftp_callout,
+		                                             stor_info);
+
+		if (result)
+		{
+			rc = 1; /* Signal to shutdown. */
+			if (!stor_info->Result) stor_info->Result = result;
+			goto cleanup;
+		}
+
+		pthread_cond_wait(&stor_info->Cond, &stor_info->Mutex);
+
+		if (stor_info->Result)
+		{
+			rc = 1; /* Signal to shutdown. */
+			goto cleanup;
+		}
+
+		*Length = stor_info->Length;
+		stor_info->Offset += *Length;
 	}
+cleanup:
 	pthread_mutex_unlock(&stor_info->Mutex);
+
+	return rc;
+}
+
+void
+stor_pio_completion_callback (globus_result_t Result,
+                              void          * UserArg)
+{
+	globus_result_t result    = Result;
+	stor_info_t   * stor_info = UserArg;
+	int             rc        = 0;
+
+	GlobusGFSName(stor_pio_completion_callback);
+
+	/* Give our error priority. */
+	if (stor_info->Result)
+		result = stor_info->Result;
+
+	rc = hpss_Close(stor_info->FileFD);
+	if (rc && !result)
+		result = GlobusGFSErrorSystemError("hpss_Close", -rc);
+
+	globus_gridftp_server_finished_transfer(stor_info->Operation, result);
+
+	pthread_mutex_destroy(&stor_info->Mutex);
+	pthread_cond_destroy(&stor_info->Cond);
+	free(stor_info);
 }
 

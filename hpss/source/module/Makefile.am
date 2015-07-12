@@ -64,6 +64,7 @@ SOURCES = dsi.c \
 	      authenticate.c \
 	      commands.c \
 	      stor.c \
+	      pio.c \
 	      stat.c
 
 libglobus_gridftp_server_hpss_real_la_SOURCES=$(SOURCES)

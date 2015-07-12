@@ -59,25 +59,22 @@
 #include "pio.h"
 
 typedef struct {
-	/* Recursive */
-	pthread_mutex_t        Mutex;
-	pthread_cond_t         Cond;
+	globus_gfs_operation_t       Operation;
+	globus_gfs_transfer_info_t * TransferInfo;
 
-	globus_gfs_operation_t Operation;
+	int FileFD;
+	int Started;
 
-	/* Based on globus_gridftp_server_get_block_size() */
-	globus_size_t          BlockSize;
-	/* All buffers we create. */
-	globus_list_t        * BufferList;
+	globus_result_t Result;
+	globus_size_t   BlockSize;
 
-	/* Used to detect if we receive EOF early. */
-	globus_range_list_t    RangeList;
+	pthread_mutex_t Mutex;
+	pthread_cond_t  Cond;
 
-	pio_t                * Pio;
+	globus_off_t    Offset;
+	globus_bool_t   Eof;
+	globus_size_t   Length;
 
-	/* Used to make sure we have enough buffers */
-	int                    OptConChkCnt;
-	int                    OptConCnt;
 } stor_info_t;
 
 void

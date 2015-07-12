@@ -79,11 +79,48 @@ dsi_destroy(void * Arg)
 	session_destroy(Arg);
 }
 
+int
+dsi_partial_transfer(globus_gfs_transfer_info_t * TransferInfo)
+{
+	return (TransferInfo->partial_offset  != 0 || TransferInfo->partial_length != -1);
+}
+
+int
+dsi_restart_transfer(globus_gfs_transfer_info_t * TransferInfo)
+{
+	globus_off_t offset;
+	globus_off_t length;
+
+	if (globus_range_list_size(TransferInfo->range_list) != 1)
+		return 1;
+
+	globus_range_list_at(TransferInfo->range_list, 0, &offset, &length);
+		return (offset != 0 || length != -1);
+}
+
 static void
 dsi_recv(globus_gfs_operation_t       Operation,
          globus_gfs_transfer_info_t * TransferInfo,
          void                       * UserArg)
 {
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(dsi_recv);
+
+	if (dsi_partial_transfer(TransferInfo))
+	{
+		result = GlobusGFSErrorGeneric("Partial STOR is not supported");
+		globus_gridftp_server_finished_transfer(Operation, result);
+		return;
+	}
+
+	if (dsi_restart_transfer(TransferInfo))
+	{
+		result = GlobusGFSErrorGeneric("Restarts are is supported");
+		globus_gridftp_server_finished_transfer(Operation, result);
+		return;
+	}
+
 	stor(Operation, TransferInfo);
 }
 

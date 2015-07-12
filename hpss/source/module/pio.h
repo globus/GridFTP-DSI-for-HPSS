@@ -56,70 +56,38 @@
  */
 #include <hpss_api.h>
 
-typedef struct {
-} pio_t;
-
-globus_result_t
-pio_init(pio_t ** Pio);
-
-globus_result_t
-pio_start(pio_t * Pio);
+typedef int
+(*pio_write_callout)(char     * Buffer,
+                     uint32_t * Length, /* IN / OUT */
+                     uint64_t   Offset,
+                     void     * CallbackArg);
 
 typedef void
-(*pio_write_callback) (globus_result_t Result,
-                       char          * Buffer,
-                       uint32_t        Length,
-                       void          * CallbackArg);
+(*pio_completion_callback) (globus_result_t Result, void * UserArg);
 
-globus_result_t
-pio_register_write(pio_t            * Pio,
-                   char             * Buffer,
-                   uint64_t           Offset,
-                   uint32_t           Length,
-                   pio_write_callback Callback,
-                   void             * CallbackArg);
-                   
-
-void
-pio_cancel(pio_t * Pio);
-
-globus_result_t
-pio_destroy(pio_t * Pio);
-
-/*
 typedef struct {
-	int FD;
-	int BlockSize;
+	int           FD;
+	uint32_t      BlockSize;
+	uint64_t      FileSize;
+	char        * Buffer;
 
-	struct {
-		hpss_pio_grp_t  StripeGroup;
-		globus_result_t Result;
-		pthread_t       ThreadID;
-	} Coordinator;
+	pio_write_callout       WriteCO;
+	pio_completion_callback CompletionCB;
+	void                  * UserArg;
 
-	struct {
-		hpss_pio_grp_t  StripeGroup;
-		globus_result_t Result;
-		pthread_t       ThreadID;
-		hpss_pio_cb_t   Callout;
-		void          * CalloutArg;
-	} Participant;
+	globus_result_t CoordinatorResult;
+	hpss_pio_grp_t  CoordinatorSG;
+	hpss_pio_grp_t  ParticipantSG;
 } pio_t;
+    
 
 globus_result_t
-pio_init(globus_gfs_operation_t       Operation,
-         globus_gfs_transfer_info_t * TransferInfo,
-         hpss_pio_operation_t         OperationType,
-         int                          BlockSize,
-         hpss_pio_cb_t                PioCallout,
-         void                       * PioCalloutArg,
-         pio_t                     ** Pio);
-
-globus_result_t
-pio_start(pio_t * Pio);
-
-void
-pio_destroy(pio_t * Pio);
-*/
+pio_start(int                     FD,
+          int                     FileStripeWidth,
+          uint32_t                BlockSize,
+          uint64_t                FileSize,
+          pio_write_callout       Callout,
+          pio_completion_callback CompletionCB,
+          void                  * UserArg);
 
 #endif /* HPSS_DSI_PIO_H */
