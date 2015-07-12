@@ -284,6 +284,9 @@ commands_run(globus_gfs_operation_t      Operation,
 		break;
 
 	case GLOBUS_GFS_CMD_CKSM:
+		cksm(Operation, CommandInfo, Callback);
+		break;
+
 	case GLOBUS_GFS_CMD_SITE_AUTHZ_ASSERT:
 	case GLOBUS_GFS_CMD_SITE_RDEL:
 	case GLOBUS_GFS_CMD_SITE_DSI:

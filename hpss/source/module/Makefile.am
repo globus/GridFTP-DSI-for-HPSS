@@ -65,6 +65,7 @@ SOURCES = dsi.c \
 	      commands.c \
 	      stor.c \
 	      retr.c \
+	      cksm.c \
 	      pio.c \
 	      stat.c
 

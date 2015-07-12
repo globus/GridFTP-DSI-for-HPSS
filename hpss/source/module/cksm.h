@@ -38,45 +38,38 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS WITH THE SOFTWARE.
  */
-#ifndef HPSS_DSI_RETR_H
-#define HPSS_DSI_RETR_H
+#ifndef HPSS_DSI_CKSM_H
+#define HPSS_DSI_CKSM_H
 
 /*
  * System includes
  */
-#include <pthread.h>
+#include <openssl/md5.h>
 
 /*
  * Globus includes
  */
 #include <globus_gridftp_server.h>
-#include <globus_range_list.h>
-#include <globus_list.h>
 
 /*
  * Local includes
  */
-#include "pio.h"
+#include "commands.h"
 
 typedef struct {
-	globus_gfs_operation_t       Operation;
-	globus_gfs_transfer_info_t * TransferInfo;
-
-	int FileFD;
-	int Started;
-
-	globus_result_t Result;
-	globus_size_t   BlockSize;
-
-	pthread_mutex_t Mutex;
-	pthread_cond_t  Cond;
-
-	globus_off_t    Offset;
-
-} retr_info_t;
+	globus_gfs_operation_t      Operation;
+	globus_gfs_command_info_t * CommandInfo;
+	commands_callback           Callback;
+	MD5_CTX                     MD5Context;
+	globus_result_t             Result;
+	int                         FileFD;
+	globus_size_t               BlockSize;
+	uint64_t                    Offset;
+} cksm_info_t;
 
 void
-retr(globus_gfs_operation_t       Operation,
-     globus_gfs_transfer_info_t * TransferInfo);
+cksm(globus_gfs_operation_t      Operation,
+     globus_gfs_command_info_t * CommandInfo,
+     commands_callback           Callback);
 
-#endif /* HPSS_DSI_RETR_H */
+#endif /* HPSS_DSI_CKSM_H */
