@@ -56,6 +56,7 @@
 #include "commands.h"
 #include "stat.h"
 #include "stor.h"
+#include "retr.h"
 
 void
 dsi_init(globus_gfs_operation_t      Operation,
@@ -96,6 +97,32 @@ dsi_restart_transfer(globus_gfs_transfer_info_t * TransferInfo)
 
 	globus_range_list_at(TransferInfo->range_list, 0, &offset, &length);
 		return (offset != 0 || length != -1);
+}
+
+void
+dsi_send(globus_gfs_operation_t       Operation,
+         globus_gfs_transfer_info_t * TransferInfo,
+         void                       * UserArg)
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(dsi_send);
+
+	if (dsi_partial_transfer(TransferInfo))
+	{
+		result = GlobusGFSErrorGeneric("Partial RETR is not supported");
+		globus_gridftp_server_finished_transfer(Operation, result);
+		return;
+	}
+
+	if (dsi_restart_transfer(TransferInfo))
+	{
+		result = GlobusGFSErrorGeneric("Restarts are not supported");
+		globus_gridftp_server_finished_transfer(Operation, result);
+		return;
+	}
+
+	retr(Operation, TransferInfo);
 }
 
 static void
@@ -210,7 +237,7 @@ globus_gfs_storage_iface_t hpss_local_dsi_iface =
 	dsi_init,     /* init_func        */
 	dsi_destroy,  /* destroy_func     */
 	NULL,                /* list_func        */
-	NULL,          /* send_func        */
+	dsi_send,     /* send_func        */
 	dsi_recv,     /* recv_func        */
 	NULL,                /* trev_func        */
 	NULL,                /* active_func      */

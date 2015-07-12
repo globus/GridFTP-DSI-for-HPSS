@@ -38,8 +38,8 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS WITH THE SOFTWARE.
  */
-#ifndef HPSS_DSI_PIO_H
-#define HPSS_DSI_PIO_H
+#ifndef HPSS_DSI_RETR_H
+#define HPSS_DSI_RETR_H
 
 /*
  * System includes
@@ -50,45 +50,37 @@
  * Globus includes
  */
 #include <globus_gridftp_server.h>
+#include <globus_range_list.h>
+#include <globus_list.h>
 
 /*
- * HPSS includes
+ * Local includes
  */
-#include <hpss_api.h>
-
-typedef int
-(*pio_data_callout)(char     * Buffer,
-                    uint32_t * Length, /* IN / OUT */
-                    uint64_t   Offset,
-                    void     * CallbackArg);
-
-typedef void
-(*pio_completion_callback) (globus_result_t Result, void * UserArg);
+#include "pio.h"
 
 typedef struct {
-	int           FD;
-	uint32_t      BlockSize;
-	uint64_t      FileSize;
-	char        * Buffer;
+	globus_gfs_operation_t       Operation;
+	globus_gfs_transfer_info_t * TransferInfo;
 
-	pio_data_callout        DataCO;
-	pio_completion_callback CompletionCB;
-	void                  * UserArg;
+	int FileFD;
+	int Started;
 
-	globus_result_t CoordinatorResult;
-	hpss_pio_grp_t  CoordinatorSG;
-	hpss_pio_grp_t  ParticipantSG;
-} pio_t;
-    
+	globus_result_t Result;
+	globus_size_t   BlockSize;
 
-globus_result_t
-pio_start(hpss_pio_operation_t    PioOperation,
-          int                     FD,
-          int                     FileStripeWidth,
-          uint32_t                BlockSize,
-          uint64_t                FileSize,
-          pio_data_callout        Callout,
-          pio_completion_callback CompletionCB,
-          void                  * UserArg);
+	pthread_mutex_t Mutex;
+	pthread_cond_t  Cond;
 
-#endif /* HPSS_DSI_PIO_H */
+	globus_off_t    Offset;
+/*
+	globus_bool_t   Eof;
+	globus_size_t   Length;
+*/
+
+} retr_info_t;
+
+void
+retr(globus_gfs_operation_t       Operation,
+     globus_gfs_transfer_info_t * TransferInfo);
+
+#endif /* HPSS_DSI_RETR_H */

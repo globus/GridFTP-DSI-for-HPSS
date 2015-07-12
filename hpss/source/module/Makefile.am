@@ -64,6 +64,7 @@ SOURCES = dsi.c \
 	      authenticate.c \
 	      commands.c \
 	      stor.c \
+	      retr.c \
 	      pio.c \
 	      stat.c
 

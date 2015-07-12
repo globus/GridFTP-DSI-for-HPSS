@@ -240,7 +240,8 @@ stor(globus_gfs_operation_t       Operation,
 	/*
 	 * Setup PIO
 	 */
-	result = pio_start(stor_info->FileFD,
+	result = pio_start(HPSS_PIO_WRITE,
+	                   stor_info->FileFD,
 	                   file_stripe_width,
 	                   stor_info->BlockSize,
 	                   TransferInfo->alloc_size,
