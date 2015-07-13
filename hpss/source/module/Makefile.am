@@ -59,7 +59,6 @@ include $(HPSS_LOCATION)/Makefile.macros
 lib_LTLIBRARIES = libglobus_gridftp_server_hpss_real.la
 
 SOURCES = dsi.c \
-	      session.c \
 	      config.c  \
 	      authenticate.c \
 	      commands.c \

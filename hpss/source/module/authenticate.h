@@ -50,6 +50,6 @@ globus_result_t
 authenticate(char * LoginName,
              char * AuthenticationMech,
              char * Authenticator,
-             int    Uid);
+             char * UserName);
 
 #endif /* HPSS_DSI_AUTHENTICATE_H */

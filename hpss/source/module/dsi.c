@@ -52,8 +52,9 @@
 /*
  * Local includes
  */
-#include "session.h"
+#include "authenticate.h"
 #include "commands.h"
+#include "config.h"
 #include "stat.h"
 #include "stor.h"
 #include "retr.h"
@@ -62,22 +63,47 @@ void
 dsi_init(globus_gfs_operation_t      Operation,
          globus_gfs_session_info_t * SessionInfo)
 {
-	session_t * session = NULL;
-	// Initialize the session
-	globus_result_t result = session_init(SessionInfo, &session);
+	globus_result_t result = GLOBUS_SUCCESS;
+	config_t      * config = NULL;
+	char          * home   = NULL;
+	sec_cred_t      user_cred;
 
+	/*
+	 * Read in the config.
+	 */
+	result = config_init(&config);
+	if (result)
+		goto cleanup;
+
+	/* Now authenticate. */
+	result = authenticate(config->LoginName,
+	                      config->AuthenticationMech,
+	                      config->Authenticator,
+	                      SessionInfo->username);
+	if (result != GLOBUS_SUCCESS)
+		goto cleanup;
+
+	/*
+	 * Pulling the HPSS directory from the user's credential will support
+	 * sites that use HPSS LDAP.
+	 */
+	result = hpss_GetThreadUcred(&user_cred);
+
+cleanup:
 	globus_gridftp_server_finished_session_start(Operation,
 	                                             result,
-	                                             session,
+	                                             NULL,
 	                                             NULL,  // username
-	                                             result ? NULL : session->HomeDirectory);
+	                                             home);
+
+	config_destroy(config);
+	if (home) globus_free(home);
 }
 
 
 void
 dsi_destroy(void * Arg)
 {
-	session_destroy(Arg);
 }
 
 int
