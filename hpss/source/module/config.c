@@ -205,7 +205,8 @@ config_find_next_word(char *  Buffer,
 }
 
 static globus_result_t
-config_parse_config_file(config_t * Config)
+config_parse_config_file(char     * ConfigFilePath,
+                         config_t * Config)
 {
 	int                tmp_length   = 0;
 	int                key_length   = 0;
@@ -222,7 +223,7 @@ config_parse_config_file(config_t * Config)
 	/*
 	 * Open the config file.
 	 */
-	config_f = fopen(Config->ConfigFilePath, "r");
+	config_f = fopen(ConfigFilePath, "r");
 	if (!config_f)
 	{
 		result = GlobusGFSErrorWrapFailed("Attempting to open config file",
@@ -283,22 +284,33 @@ cleanup:
 globus_result_t
 config_init(config_t ** Config)
 {
+	char          * config_file_path = NULL;
 	globus_result_t result = GLOBUS_SUCCESS;
 
 	GlobusGFSName(config_init);
 
-	/* Allocate the config struct */
-	*Config = globus_malloc(sizeof(config_t));
-	if (!*Config)
-		return GlobusGFSErrorMemory("config_t");
-	memset(*Config, 0, sizeof(config_t));
-
 	/* Find the config file. */
-	result = config_find_config_file(&(*Config)->ConfigFilePath);
+	result = config_find_config_file(&config_file_path);
 	if (result != GLOBUS_SUCCESS)
 		return result;
 
-	return config_parse_config_file(*Config);
+	/* Allocate the config struct */
+	*Config = globus_malloc(sizeof(config_t));
+	if (!*Config)
+	{
+		globus_free(config_file_path);
+		return GlobusGFSErrorMemory("config_t");
+	}
+	memset(*Config, 0, sizeof(config_t));
+
+	result = config_parse_config_file(config_file_path, *Config);
+	if (result)
+	{
+		config_destroy(*Config);
+		*Config = NULL;
+	}
+	globus_free(config_file_path);
+	return result;
 }
 
 void
@@ -306,8 +318,6 @@ config_destroy(config_t * Config)
 {
 	if (Config)
 	{
-		if (Config->ConfigFilePath)
-			globus_free(Config->ConfigFilePath);
 		if (Config->LoginName)
 			globus_free(Config->LoginName);
 		if (Config->AuthenticationMech)
