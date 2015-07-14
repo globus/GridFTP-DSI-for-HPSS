@@ -313,7 +313,6 @@ retr_wait_for_gridftp(retr_info_t * RetrInfo)
 			pthread_cond_wait(&RetrInfo->Cond, &RetrInfo->Mutex);
 		}
 	}
-cleanup:
 	pthread_mutex_unlock(&RetrInfo->Mutex);
 }
 
