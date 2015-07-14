@@ -65,13 +65,19 @@ typedef struct {
 	int FileFD;
 	int Started;
 
+	uint64_t Offset; // Just for sanity checking
+
 	globus_result_t Result;
 	globus_size_t   BlockSize;
 
 	pthread_mutex_t Mutex;
 	pthread_cond_t  Cond;
 
-	globus_off_t    Offset;
+	int OptConnCnt;
+	int ConnChkCnt;
+
+	globus_list_t * AllBufferList;
+	globus_list_t * FreeBufferList;
 
 } retr_info_t;
 
