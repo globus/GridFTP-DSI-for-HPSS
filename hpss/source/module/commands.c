@@ -221,7 +221,6 @@ commands_utime(globus_gfs_operation_t      Operation,
 	times.actime  = CommandInfo->utime_time;
 	times.modtime = CommandInfo->utime_time;
 
-// XXX not working because directory statting is not return correct time
 	int retval = hpss_Utime(CommandInfo->pathname, &times);
 	if (retval)
 		result = GlobusGFSErrorSystemError("hpss_Utime", -retval);
