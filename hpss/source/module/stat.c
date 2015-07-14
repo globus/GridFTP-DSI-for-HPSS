@@ -219,7 +219,7 @@ stat_translate_dir_entry(ns_ObjHandle_t    * ParentObjHandle,
 	GFSStat->dev   = 0;
 
 	GFSStat->atime = DirEntry->Attrs.TimeLastRead;
-	GFSStat->mtime = DirEntry->Attrs.TimeModified;
+	GFSStat->mtime = DirEntry->Attrs.TimeLastWritten;
 	GFSStat->ctime = DirEntry->Attrs.TimeCreated;
 	GFSStat->ino   = 0; // XXX
 	GFSStat->size  = DirEntry->Attrs.DataLength;
