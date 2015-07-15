@@ -47,6 +47,7 @@
 /*
  * Local includes
  */
+#include "markers.h"
 #include "retr.h"
 #include "pio.h"
 
@@ -290,6 +291,9 @@ assert(*Length <= retr_info->BlockSize);
 			if (!retr_info->Result) retr_info->Result = result;
 			goto cleanup;
 		}
+
+		/* Update perf markers */
+		markers_update_perf_markers(retr_info->Operation, Offset, *Length);
 
 		retr_info->Offset += *Length;
 	}
