@@ -330,7 +330,6 @@ stor_pio_callout(char     * Buffer,
                  void     * CallbackArg)
 {
 	int             rc          = 0;
-	int             found       = 0;
 	stor_info_t   * stor_info   = CallbackArg;
 	globus_result_t result      = GLOBUS_SUCCESS;
 	globus_list_t * buf_entry   = NULL;
@@ -354,7 +353,7 @@ assert(*Length <= stor_info->BlockSize);
 		stor_info->Started = 1;
 
 		/* Until we find a buffer with this offset... */
-		while (!found)
+		while (1)
 		{
 			/*
 			 * Look for a buffer containing this offset.
@@ -389,14 +388,11 @@ assert(*Length <= stor_info->BlockSize);
 					globus_list_remove(&stor_info->ReadyBufferList, buf_entry);
 					globus_list_insert(&stor_info->FreeBufferList,  stor_info->PioCallout.Buffer);
 				}
-				found = 1;
+				goto cleanup;
 			}
 
-			if (found && stor_info->Eof)
-				goto cleanup;
-
 			/* If we have an EOF then something has gone wrong. */
-			if (!found && stor_info->Eof)
+			if (stor_info->Eof)
 			{
 				result = GlobusGFSErrorGeneric("Premature end of data transfer");
 				goto cleanup;
