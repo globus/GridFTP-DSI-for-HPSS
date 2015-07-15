@@ -50,7 +50,6 @@
  * Globus includes
  */
 #include <globus_gridftp_server.h>
-#include <globus_range_list.h>
 #include <globus_list.h>
 
 /*
@@ -58,7 +57,21 @@
  */
 #include "pio.h"
 
+/*
+ * Because of the sequential, ascending nature of offsets with PIO,
+ * we do not need a range list.
+ */
+struct stor_info;
+
 typedef struct {
+	char             * Buffer;
+	globus_off_t       BufferOffset;   // Moves as buffer is consumed
+	globus_off_t       TransferOffset; // Moves as BufferOffset moves
+	globus_off_t       BufferLength;   // Moves as BufferOffset moves
+	struct stor_info * StorInfo;
+} stor_buffer_t;
+
+typedef struct stor_info {
 	globus_gfs_operation_t       Operation;
 	globus_gfs_transfer_info_t * TransferInfo;
 
@@ -71,9 +84,21 @@ typedef struct {
 	pthread_mutex_t Mutex;
 	pthread_cond_t  Cond;
 
-	globus_off_t    Offset;
+	globus_off_t    Offset; // Sanity check only
 	globus_bool_t   Eof;
-	globus_size_t   Length;
+
+	int OptConnCnt;
+	int ConnChkCnt;
+	int CurConnCnt;
+
+	globus_list_t * AllBufferList;
+	globus_list_t * ReadyBufferList;
+	globus_list_t * FreeBufferList;
+
+	struct pio_callout {
+		stor_buffer_t * Buffer;
+		globus_off_t    NeededOffset;
+	} PioCallout;
 
 } stor_info_t;
 
