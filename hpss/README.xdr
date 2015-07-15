@@ -78,3 +78,17 @@ To summarize:
 * RTLD_DEEPBIND is the only reason this works now and so the DSI only works
   on LINUX
 * If the gridftp server links to libtirpc, we are sunk
+
+====== Addendum =======
+RTLD_DEEPBIND plays havoc on LD_PRELOAD as well. If you launch the process with LD_PRELOAD,
+you can catch non static library calls from the program (proper) as expected. However, you
+can not catch the non static library calls from the DSI once loaded with RTLD_DEEPBIND if the
+DSI links against the library. This is because (presumably) RTLD_DEEPBIND forces symbol resolution
+in the module scope first which does not include the LD_PRELOAD symbols (those only exist in
+the program's proper scope).
+
+A partial fix for this is NOT link the DSI against libraries containing calls you'd like to catch
+with LD_PRELOAD. Since the symbold doesn't exist in the DSI's scope, it will lookup the symbol
+in the program's name space which includes the LD_PRELOAD definitions. Problem is, you can only
+do this with libraries already linked to by the server (Ex libglobus_gridftp_server.so but not
+libhpss.so). This makes LD_PRELOAD pretty worthless when RTLD_DEEPBIND is used.
