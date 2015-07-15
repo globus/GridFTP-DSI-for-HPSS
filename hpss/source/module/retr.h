@@ -50,7 +50,6 @@
  * Globus includes
  */
 #include <globus_gridftp_server.h>
-#include <globus_range_list.h>
 #include <globus_list.h>
 
 /*
