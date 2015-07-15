@@ -1,0 +1,53 @@
+Updated: 1/5/2015
+
+Overview
+========
+This documents the work thus far to enable transfer restarts when storing data with the DSI.
+In short, it does not work yet. Retrieves do work.
+
+Problem One (GT-517)
+====================
+The Globus API supports one function for DSI's to report performance and restart information.
+This is a problem for the HPSS DSI because performance and restart markers must be reported
+separately. GT-517 (https://globus.atlassian.net/browse/GT-517) was opened for this issue. It
+is expected to be in GT6. As of 1/5/2015, it is not included.
+
+Problem Two (HPSS Call Report XXX)
+==================================
+Performance markers can come from the participant thread (hpss_PIORegister()). Restart markers
+must come from the coordinator (hpss_PIOExecute()). The reason is that, on error, HPSS can
+roll back the bytes received to some random earlier point. That information can only be
+determined from the return of hpss_PIOExecute(). 
+
+hpss_PIOExecute() only returns on success or error. On success, restart markers are not needed
+although they certainly can be reported. On error, however, this is when we need restart markers.
+We need to send a final restart marker as soon as hpss_PIOExecute() returns and before the
+final response goes back to the FTP client. The problem is that hpss_PIOExecute() will not
+report 'BytesMoved' on error although the value is available to it. HPSS has a call report
+with this issue.
+
+Problem Three (GT-377)
+======================
+There is a problem with the GridFTP server in that it crashes on anything that forces close
+on data channels (ABRT, transfer resulting in an error). This is because of two paths in the
+code both calling globus_l_gfs_data_handle_free(). 
+This is GT-377 (https://globus.atlassian.net/browse/GT-377). Problems 2&3 prevent us from
+sending valid restart markers on error.
+
+
+Solution
+========
+The supplied patch fixes problem 1 (GT-517) and problem 3 (GT-377). It provides the two
+separate reporting functions. Apply it to globus-gridftp-server source and put the resulting
+library into the server's LD_LIBRARY_PATH before the default non-patched version of the library.
+The DSI will detect the functions at runtime and use them.
+
+If the DSI can not locate the additional functions supplied by the patch, it will fall back on 
+the standard perf and restart marker API but the DSI will refuse REST+STOR; REST+RETR should
+work. Note that REST+STOR will still be unsuccessful in most cases until the HPSS bug is patched
+because, in most cases, the client will not receive a restart marker.
+
+Make sure to apply this patch to the globus-gridftp-server source version that matches the
+installed rpm. 
+
+Problem 2 (HPSS) is still pending.
