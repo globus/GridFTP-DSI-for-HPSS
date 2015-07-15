@@ -66,6 +66,8 @@ SOURCES = dsi.c \
 	      retr.c \
 	      cksm.c \
 	      pio.c \
+	      dl.c \
+	      markers.c \
 	      stat.c
 
 libglobus_gridftp_server_hpss_real_la_SOURCES=$(SOURCES)

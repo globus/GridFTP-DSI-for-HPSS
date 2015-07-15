@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2015 NCSA.  All rights reserved.
+ * Copyright © 2014-2015 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -38,60 +38,31 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS WITH THE SOFTWARE.
  */
-#ifndef HPSS_DSI_PIO_H
-#define HPSS_DSI_PIO_H
 
 /*
- * System includes
+ * Wrappers for perf and restart markers which may or may not
+ * be available depending upon what is installed on the system.
  */
-#include <pthread.h>
+
+#ifndef HPSS_DSI_MARKERS_H
+#define HPSS_DSI_MARKERS_H
 
 /*
- * Globus includes
+ * Globus includes.
  */
 #include <globus_gridftp_server.h>
 
-/*
- * HPSS includes
- */
-#include <hpss_api.h>
+void
+markers_update_perf_markers(globus_gfs_operation_t Operation,
+                            globus_off_t           Offset,
+                            globus_off_t           Length);
 
-typedef int
-(*pio_data_callout)(char     * Buffer,
-                    uint32_t * Length, /* IN / OUT */
-                    uint64_t   Offset,
-                    void     * CallbackArg);
+void
+markers_update_restart_markers(globus_gfs_operation_t Operation,
+                               globus_off_t           Offset,
+                               globus_off_t           Length);
 
-typedef void
-(*pio_completion_callback) (globus_result_t Result, void * UserArg);
+int
+markers_restart_supported();
 
-typedef struct {
-	int           FD;
-	uint32_t      BlockSize;
-	uint64_t      FileSize;
-	char        * Buffer;
-
-	hpss_pio_operation_t    PioOperation;
-	globus_gfs_operation_t  GFtpOperation;
-	pio_data_callout        DataCO;
-	pio_completion_callback CompletionCB;
-	void                  * UserArg;
-
-	globus_result_t CoordinatorResult;
-	hpss_pio_grp_t  CoordinatorSG;
-	hpss_pio_grp_t  ParticipantSG;
-} pio_t;
-    
-
-globus_result_t
-pio_start(hpss_pio_operation_t    PioOperation,
-          globus_gfs_operation_t  GFtpOperation,
-          int                     FD,
-          int                     FileStripeWidth,
-          uint32_t                BlockSize,
-          uint64_t                FileSize,
-          pio_data_callout        Callout,
-          pio_completion_callback CompletionCB,
-          void                  * UserArg);
-
-#endif /* HPSS_DSI_PIO_H */
+#endif /* HPSS_DSI_MARKERS_H */

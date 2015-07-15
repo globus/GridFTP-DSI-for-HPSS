@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2015 NCSA.  All rights reserved.
+ * Copyright © 2014-2015 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -38,60 +38,51 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS WITH THE SOFTWARE.
  */
-#ifndef HPSS_DSI_PIO_H
-#define HPSS_DSI_PIO_H
+
+/*
+ * Dynamic loader related functions.
+ */
 
 /*
  * System includes
  */
-#include <pthread.h>
+#include <stdlib.h>
+#include <dlfcn.h>
 
 /*
- * Globus includes
+ * Local includes
  */
-#include <globus_gridftp_server.h>
+#include "dl.h"
 
-/*
- * HPSS includes
- */
-#include <hpss_api.h>
+int
+dl_symbol_avail(const char * Symbol)
+{
+	void * dl_handle    = NULL;
+	void * dl_sym       = NULL;
+	int    symbol_found = 0;
 
-typedef int
-(*pio_data_callout)(char     * Buffer,
-                    uint32_t * Length, /* IN / OUT */
-                    uint64_t   Offset,
-                    void     * CallbackArg);
+	dl_handle = dlopen(NULL, RTLD_NOW);
+	if (dl_handle)
+	{
+		dl_sym = dlsym(dl_handle, Symbol);
+		if (dl_sym)
+			symbol_found = 1;
 
-typedef void
-(*pio_completion_callback) (globus_result_t Result, void * UserArg);
+		dlclose(dl_handle);
+	}
 
-typedef struct {
-	int           FD;
-	uint32_t      BlockSize;
-	uint64_t      FileSize;
-	char        * Buffer;
+	return symbol_found;
+}
 
-	hpss_pio_operation_t    PioOperation;
-	globus_gfs_operation_t  GFtpOperation;
-	pio_data_callout        DataCO;
-	pio_completion_callback CompletionCB;
-	void                  * UserArg;
+void *
+dl_find_symbol(const char * Symbol)
+{
+	void * dl_handle    = NULL;
+	void * dl_sym       = NULL;
 
-	globus_result_t CoordinatorResult;
-	hpss_pio_grp_t  CoordinatorSG;
-	hpss_pio_grp_t  ParticipantSG;
-} pio_t;
-    
+	dl_handle = dlopen(NULL, RTLD_NOW);
+	if (dl_handle)
+		dl_sym = dlsym(dl_handle, Symbol);
 
-globus_result_t
-pio_start(hpss_pio_operation_t    PioOperation,
-          globus_gfs_operation_t  GFtpOperation,
-          int                     FD,
-          int                     FileStripeWidth,
-          uint32_t                BlockSize,
-          uint64_t                FileSize,
-          pio_data_callout        Callout,
-          pio_completion_callback CompletionCB,
-          void                  * UserArg);
-
-#endif /* HPSS_DSI_PIO_H */
+	return dl_sym;
+}

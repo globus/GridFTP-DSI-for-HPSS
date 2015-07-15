@@ -147,6 +147,7 @@ retr(globus_gfs_operation_t       Operation,
 	 * Setup PIO
 	 */
 	result = pio_start(HPSS_PIO_READ,
+	                   Operation,
 	                   retr_info->FileFD,
 	                   file_stripe_width,
 	                   retr_info->BlockSize,

@@ -48,6 +48,7 @@
  * Local includes
  */
 #include "pio.h"
+#include "markers.h"
 
 globus_result_t
 pio_launch_detached(void * (*ThreadEntry)(void * Arg), void * Arg)
@@ -132,9 +133,11 @@ pio_coordinator_thread(void * Arg)
 		if (neqz64m(gap_info.Length))
 			bytes_moved = add64m(gap_info.Offset, gap_info.Length);
 
-		offset += bytes_moved;
-		length -= bytes_moved;
+		/* Restart markers, when supported. */
+		if (pio->PioOperation == HPSS_PIO_WRITE && markers_restart_supported())
+			markers_update_restart_markers(pio->GFtpOperation, offset, bytes_moved);
 
+		offset += bytes_moved;
 	} while (rc == 0 && offset < length);
 
 	rc = hpss_PIOEnd(pio->CoordinatorSG);
@@ -222,6 +225,7 @@ cleanup:
 
 globus_result_t
 pio_start(hpss_pio_operation_t    PioOperation,
+          globus_gfs_operation_t  GFtpOperation,
           int                     FD,
           int                     FileStripeWidth,
           uint32_t                BlockSize,
@@ -248,12 +252,14 @@ pio_start(hpss_pio_operation_t    PioOperation,
 		goto cleanup;
 	}
 	memset(pio, 0, sizeof(pio_t));
-	pio->FD           = FD;
-	pio->BlockSize    = BlockSize;
-	pio->FileSize     = FileSize;
-	pio->DataCO       = DataCO;
-	pio->CompletionCB = CompletionCB;
-	pio->UserArg      = UserArg;
+	pio->FD            = FD;
+	pio->BlockSize     = BlockSize;
+	pio->FileSize      = FileSize;
+	pio->GFtpOperation = GFtpOperation;
+	pio->PioOperation  = PioOperation;
+	pio->DataCO        = DataCO;
+	pio->CompletionCB  = CompletionCB;
+	pio->UserArg       = UserArg;
 
 	/*
 	 * Don't use HPSS_PIO_HANDLE_GAP, it's bugged in HPSS 7.4.

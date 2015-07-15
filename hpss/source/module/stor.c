@@ -48,6 +48,7 @@
 /*
  * Local includes
  */
+#include "markers.h"
 #include "stor.h"
 #include "pio.h"
 
@@ -242,6 +243,7 @@ stor(globus_gfs_operation_t       Operation,
 	 * Setup PIO
 	 */
 	result = pio_start(HPSS_PIO_WRITE,
+	                   Operation,
 	                   stor_info->FileFD,
 	                   file_stripe_width,
 	                   stor_info->BlockSize,
@@ -372,6 +374,8 @@ assert(*Length <= stor_info->BlockSize);
 				memcpy(Buffer, 
 				       stor_info->PioCallout.Buffer->Buffer + stor_info->PioCallout.Buffer->BufferOffset,
 				       copy_length);
+
+				markers_update_perf_markers(stor_info->Operation, Offset, copy_length);
 
 				/* Update buffer counters. */
 				stor_info->PioCallout.Buffer->BufferOffset   += copy_length;

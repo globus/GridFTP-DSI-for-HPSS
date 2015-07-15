@@ -162,6 +162,7 @@ cksm(globus_gfs_operation_t      Operation,
 	 * Setup PIO
 	 */
 	result = pio_start(HPSS_PIO_READ,
+	                   Operation,
 	                   cksm_info->FileFD,
 	                   file_stripe_width,
 	                   cksm_info->BlockSize,
