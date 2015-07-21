@@ -52,12 +52,6 @@
 #include "stor.h"
 #include "pio.h"
 
-int
-stor_pio_callout(char     * Buffer,
-                 uint32_t * Length,
-                 uint64_t   Offset,
-                 void     * CallbackArg);
-
 void
 stor_pio_completion_callback(globus_result_t Result,
                              void          * UserArg);
@@ -199,72 +193,6 @@ cleanup:
 	}
 
 	return result;
-}
-
-void
-stor(globus_gfs_operation_t       Operation,
-     globus_gfs_transfer_info_t * TransferInfo)
-{
-	stor_info_t   * stor_info         = NULL;
-	globus_result_t result            = GLOBUS_SUCCESS;
-	int             file_stripe_width = 0;
-
-	GlobusGFSName(stor);
-
-	/*
-	 * Create our structure.
-	 */
-	stor_info = malloc(sizeof(stor_info_t));
-	if (!stor_info)
-	{
-		result = GlobusGFSErrorMemory("stor_info_t");
-		goto cleanup;
-	}
-	memset(stor_info, 0, sizeof(stor_info_t));
-	stor_info->Operation    = Operation;
-	stor_info->TransferInfo = TransferInfo;
-	stor_info->FileFD       = -1;
-	pthread_mutex_init(&stor_info->Mutex, NULL);
-	pthread_cond_init(&stor_info->Cond, NULL);
-
-	globus_gridftp_server_get_block_size(Operation, &stor_info->BlockSize);
-
-	/*
-	 * Open the file.
-	 */
-	result = stor_open_for_writing(TransferInfo->pathname,
-	                               TransferInfo->alloc_size,
-	                               TransferInfo->truncate,
-	                               &stor_info->FileFD,
-	                               &file_stripe_width);
-	if (result) goto cleanup;
-
-	/*
-	 * Setup PIO
-	 */
-	result = pio_start(HPSS_PIO_WRITE,
-	                   Operation,
-	                   stor_info->FileFD,
-	                   file_stripe_width,
-	                   stor_info->BlockSize,
-	                   TransferInfo->alloc_size,
-	                   stor_pio_callout,
-	                   stor_pio_completion_callback,
-	                   stor_info);
-
-cleanup:
-	if (result)
-	{
-		globus_gridftp_server_finished_transfer(Operation, result);
-		if (stor_info)
-		{
-			if (stor_info->FileFD != -1)
-				hpss_Close(stor_info->FileFD);
-			pthread_mutex_destroy(&stor_info->Mutex);
-			pthread_cond_destroy(&stor_info->Cond);
-			free(stor_info);
-		}
-	}
 }
 
 void
@@ -487,8 +415,8 @@ stor_wait_for_gridftp(stor_info_t * StorInfo)
 }
 
 void
-stor_pio_completion_callback (globus_result_t Result,
-                              void          * UserArg)
+stor_pio_completion_callback(globus_result_t Result,
+                             void          * UserArg)
 {
 	globus_result_t result    = Result;
 	stor_info_t   * stor_info = UserArg;
@@ -508,9 +436,75 @@ stor_pio_completion_callback (globus_result_t Result,
 
 	pthread_mutex_destroy(&stor_info->Mutex);
 	pthread_cond_destroy(&stor_info->Cond);
-    globus_list_free(stor_info->FreeBufferList);
-    globus_list_free(stor_info->ReadyBufferList);
-    globus_list_destroy_all(stor_info->AllBufferList, free);
+	globus_list_free(stor_info->FreeBufferList);
+	globus_list_free(stor_info->ReadyBufferList);
+	globus_list_destroy_all(stor_info->AllBufferList, free);
 	free(stor_info);
+}
+
+void
+stor(globus_gfs_operation_t       Operation,
+     globus_gfs_transfer_info_t * TransferInfo)
+{
+	stor_info_t   * stor_info         = NULL;
+	globus_result_t result            = GLOBUS_SUCCESS;
+	int             file_stripe_width = 0;
+
+	GlobusGFSName(stor);
+
+	/*
+	 * Create our structure.
+	 */
+	stor_info = malloc(sizeof(stor_info_t));
+	if (!stor_info)
+	{
+		result = GlobusGFSErrorMemory("stor_info_t");
+		goto cleanup;
+	}
+	memset(stor_info, 0, sizeof(stor_info_t));
+	stor_info->Operation    = Operation;
+	stor_info->TransferInfo = TransferInfo;
+	stor_info->FileFD       = -1;
+	pthread_mutex_init(&stor_info->Mutex, NULL);
+	pthread_cond_init(&stor_info->Cond, NULL);
+
+	globus_gridftp_server_get_block_size(Operation, &stor_info->BlockSize);
+
+	/*
+	 * Open the file.
+	 */
+	result = stor_open_for_writing(TransferInfo->pathname,
+	                               TransferInfo->alloc_size,
+	                               TransferInfo->truncate,
+	                               &stor_info->FileFD,
+	                               &file_stripe_width);
+	if (result) goto cleanup;
+
+	/*
+	 * Setup PIO
+	 */
+	result = pio_start(HPSS_PIO_WRITE,
+	                   Operation,
+	                   stor_info->FileFD,
+	                   file_stripe_width,
+	                   stor_info->BlockSize,
+	                   TransferInfo->alloc_size,
+	                   stor_pio_callout,
+	                   stor_pio_completion_callback,
+	                   stor_info);
+
+cleanup:
+	if (result)
+	{
+		globus_gridftp_server_finished_transfer(Operation, result);
+		if (stor_info)
+		{
+			if (stor_info->FileFD != -1)
+				hpss_Close(stor_info->FileFD);
+			pthread_mutex_destroy(&stor_info->Mutex);
+			pthread_cond_destroy(&stor_info->Cond);
+			free(stor_info);
+		}
+	}
 }
 

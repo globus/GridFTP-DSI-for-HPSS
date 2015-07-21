@@ -51,16 +51,6 @@
 #include "retr.h"
 #include "pio.h"
 
-int
-retr_pio_callout(char     * Buffer,
-                 uint32_t * Length,
-                 uint64_t   Offset,
-                 void     * CallbackArg);
-
-void
-retr_pio_completion_callback(globus_result_t Result,
-                             void          * UserArg);
-
 globus_result_t
 retr_open_for_reading(char * Pathname,
 	                  int  * FileFD,
@@ -97,79 +87,6 @@ retr_open_for_reading(char * Pathname,
 	*FileStripeWidth = hints_out.StripeWidth;
 
     return GLOBUS_SUCCESS;
-}
-
-void
-retr(globus_gfs_operation_t       Operation,
-     globus_gfs_transfer_info_t * TransferInfo)
-{
-	int             rc                = 0;
-	retr_info_t   * retr_info         = NULL;
-	globus_result_t result            = GLOBUS_SUCCESS;
-	int             file_stripe_width = 0;
-	hpss_stat_t     hpss_stat_buf;
-
-	GlobusGFSName(retr);
-
-	/*
-	 * Create our structure.
-	 */
-	retr_info = globus_malloc(sizeof(retr_info_t));
-	if (!retr_info)
-	{
-		result = GlobusGFSErrorMemory("retr_info_t");
-		goto cleanup;
-	}
-	memset(retr_info, 0, sizeof(retr_info_t));
-	retr_info->Operation    = Operation;
-	retr_info->TransferInfo = TransferInfo;
-	retr_info->FileFD       = -1;
-	pthread_mutex_init(&retr_info->Mutex, NULL);
-	pthread_cond_init(&retr_info->Cond, NULL);
-
-	globus_gridftp_server_get_block_size(Operation, &retr_info->BlockSize);
-
-	rc = hpss_Stat(TransferInfo->pathname, &hpss_stat_buf);
-	if (rc)
-	{
-		result = GlobusGFSErrorSystemError("hpss_Stat", -rc);
-		goto cleanup;
-	}
-
-	/*
-	 * Open the file.
-	 */
-	result = retr_open_for_reading(TransferInfo->pathname,
-	                               &retr_info->FileFD,
-	                               &file_stripe_width);
-	if (result) goto cleanup;
-
-	/*
-	 * Setup PIO
-	 */
-	result = pio_start(HPSS_PIO_READ,
-	                   Operation,
-	                   retr_info->FileFD,
-	                   file_stripe_width,
-	                   retr_info->BlockSize,
-	                   hpss_stat_buf.st_size,
-	                   retr_pio_callout,
-	                   retr_pio_completion_callback,
-	                   retr_info);
-
-cleanup:
-	if (result)
-	{
-		globus_gridftp_server_finished_transfer(Operation, result);
-		if (retr_info)
-		{
-			if (retr_info->FileFD != -1)
-				hpss_Close(retr_info->FileFD);
-			pthread_mutex_destroy(&retr_info->Mutex);
-			pthread_cond_destroy(&retr_info->Cond);
-			globus_free(retr_info);
-		}
-	}
 }
 
 void
@@ -347,5 +264,78 @@ retr_pio_completion_callback (globus_result_t Result,
 	globus_list_free(retr_info->FreeBufferList);
 	globus_list_destroy_all(retr_info->AllBufferList, free);
 	globus_free(retr_info);
+}
+
+void
+retr(globus_gfs_operation_t       Operation,
+     globus_gfs_transfer_info_t * TransferInfo)
+{
+	int             rc                = 0;
+	retr_info_t   * retr_info         = NULL;
+	globus_result_t result            = GLOBUS_SUCCESS;
+	int             file_stripe_width = 0;
+	hpss_stat_t     hpss_stat_buf;
+
+	GlobusGFSName(retr);
+
+	/*
+	 * Create our structure.
+	 */
+	retr_info = globus_malloc(sizeof(retr_info_t));
+	if (!retr_info)
+	{
+		result = GlobusGFSErrorMemory("retr_info_t");
+		goto cleanup;
+	}
+	memset(retr_info, 0, sizeof(retr_info_t));
+	retr_info->Operation    = Operation;
+	retr_info->TransferInfo = TransferInfo;
+	retr_info->FileFD       = -1;
+	pthread_mutex_init(&retr_info->Mutex, NULL);
+	pthread_cond_init(&retr_info->Cond, NULL);
+
+	globus_gridftp_server_get_block_size(Operation, &retr_info->BlockSize);
+
+	rc = hpss_Stat(TransferInfo->pathname, &hpss_stat_buf);
+	if (rc)
+	{
+		result = GlobusGFSErrorSystemError("hpss_Stat", -rc);
+		goto cleanup;
+	}
+
+	/*
+	 * Open the file.
+	 */
+	result = retr_open_for_reading(TransferInfo->pathname,
+	                               &retr_info->FileFD,
+	                               &file_stripe_width);
+	if (result) goto cleanup;
+
+	/*
+	 * Setup PIO
+	 */
+	result = pio_start(HPSS_PIO_READ,
+	                   Operation,
+	                   retr_info->FileFD,
+	                   file_stripe_width,
+	                   retr_info->BlockSize,
+	                   hpss_stat_buf.st_size,
+	                   retr_pio_callout,
+	                   retr_pio_completion_callback,
+	                   retr_info);
+
+cleanup:
+	if (result)
+	{
+		globus_gridftp_server_finished_transfer(Operation, result);
+		if (retr_info)
+		{
+			if (retr_info->FileFD != -1)
+				hpss_Close(retr_info->FileFD);
+			pthread_mutex_destroy(&retr_info->Mutex);
+			pthread_cond_destroy(&retr_info->Cond);
+			globus_free(retr_info);
+		}
+	}
 }
 
