@@ -60,6 +60,88 @@ void
 cksm_pio_completion_callback(globus_result_t Result,
                              void          * UserArg);
 
+void
+cksm_update_markers(cksm_marker_t * Marker, globus_off_t Bytes)
+{
+	if (Marker)
+	{
+		pthread_mutex_lock(&Marker->Lock);
+		{
+			Marker->TotalBytes += Bytes;
+		}
+		pthread_mutex_unlock(&Marker->Lock);
+	}
+}
+
+void
+cksm_send_markers(void * UserArg)
+{
+	cksm_marker_t * marker = (cksm_marker_t *) UserArg;
+    char            total_bytes_string[128];
+
+	pthread_mutex_lock(&marker->Lock);
+	{
+		/* Convert the byte count to a string. */
+		sprintf(total_bytes_string, "%"GLOBUS_OFF_T_FORMAT, marker->TotalBytes);
+
+		/* Send the intermediate response. */
+		globus_gridftp_server_intermediate_command(marker->Operation,
+		                                           GLOBUS_SUCCESS,
+		                                           total_bytes_string);
+	}
+    pthread_mutex_unlock(&marker->Lock);
+}
+
+globus_result_t
+cksm_start_markers(cksm_marker_t ** Marker, globus_gfs_operation_t Operation)
+{
+	int marker_freq = 0;
+	globus_reltime_t delay;
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(cksm_start_markers);
+
+	/* Get the frequency for maker updates. */
+	globus_gridftp_server_get_update_interval(Operation, &marker_freq);
+
+	if (marker_freq > 0)
+	{
+		*Marker = malloc(sizeof(cksm_marker_t));
+		if (!*Marker)
+			return GlobusGFSErrorMemory("cksm_marker_t");
+
+		pthread_mutex_init(&(*Marker)->Lock, NULL);
+		(*Marker)->TotalBytes = 0;
+		(*Marker)->Operation  = Operation;
+
+		/* Setup the periodic callback. */
+		GlobusTimeReltimeSet(delay, marker_freq, 0);
+		result = globus_callback_register_periodic(&(*Marker)->CallbackHandle,
+		                                           &delay,
+		                                           &delay,
+		                                           cksm_send_markers,
+		                                           (*Marker));
+		if (result)
+		{
+			free(*Marker);
+			*Marker = NULL;
+		}
+	}
+
+	return result;
+}
+
+void
+cksm_stop_markers(cksm_marker_t * Marker)
+{
+	if (Marker)
+	{
+		globus_callback_unregister(Marker->CallbackHandle, NULL, NULL, NULL);
+		pthread_mutex_destroy(&Marker->Lock);
+		free(Marker);
+	}
+}
+
 globus_result_t
 cksm_open_for_reading(char * Pathname,
 	                  int  * FileFD,
@@ -158,6 +240,9 @@ cksm(globus_gfs_operation_t      Operation,
 	                               &file_stripe_width);
 	if (result) goto cleanup;
 
+	result = cksm_start_markers(&cksm_info->Marker, Operation);
+	if (result) goto cleanup;
+
 	/*
 	 * Setup PIO
 	 */
@@ -205,6 +290,9 @@ assert(*Length <= cksm_info->BlockSize);
 		return 1;
 	}
 cksm_info->Offset += *Length;
+
+	cksm_update_markers(cksm_info->Marker, *Length);
+
 	return 0;
 }
 
@@ -242,6 +330,8 @@ cksm_pio_completion_callback(globus_result_t Result, void * UserArg)
 			sprintf(&(cksm_string[i*2]), "%02x", (unsigned int)md5_digest[i]);
 		}
 	}
+
+	cksm_stop_markers(cksm_info->Marker);
 
 	cksm_info->Callback(cksm_info->Operation, result, result ? NULL : cksm_string);
 

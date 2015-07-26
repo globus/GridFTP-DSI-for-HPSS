@@ -57,6 +57,13 @@
 #include "commands.h"
 
 typedef struct {
+	pthread_mutex_t          Lock;
+	globus_off_t             TotalBytes;
+	globus_gfs_operation_t   Operation;
+	globus_callback_handle_t CallbackHandle;
+} cksm_marker_t;
+
+typedef struct {
 	globus_gfs_operation_t      Operation;
 	globus_gfs_command_info_t * CommandInfo;
 	commands_callback           Callback;
@@ -65,6 +72,7 @@ typedef struct {
 	int                         FileFD;
 	globus_size_t               BlockSize;
 	uint64_t                    Offset;
+	cksm_marker_t             * Marker;
 } cksm_info_t;
 
 void
