@@ -54,9 +54,6 @@
 #include "cksm.h"
 #include "pio.h"
 
-void
-stor_pio_completion_callback(globus_result_t Result,
-                             void          * UserArg);
 globus_result_t
 stor_can_change_cos(char * Pathname, int * can_change_cos)
 {
@@ -271,7 +268,6 @@ stor_pio_callout(char     * Buffer,
 
 	pthread_mutex_lock(&stor_info->Mutex);
 	{
-assert(Offset == stor_info->Offset);
 assert(*Length <= stor_info->BlockSize);
 		if (stor_info->Result)
 		{
@@ -307,9 +303,6 @@ assert(*Length <= stor_info->BlockSize);
 				stor_info->PioCallout.Buffer->TransferOffset += copy_length;
 				stor_info->PioCallout.Buffer->BufferLength   -= copy_length;
 				*Length = copy_length;
-
-				/* Update our sanity-check counter */
-				stor_info->Offset += copy_length;
 
 				/* If empty, move it to free. */
 				if (stor_info->PioCallout.Buffer->BufferLength == 0)
@@ -412,14 +405,40 @@ stor_wait_for_gridftp(stor_info_t * StorInfo)
 }
 
 void
-stor_pio_completion_callback(globus_result_t Result,
-                             void          * UserArg)
+stor_range_complete_callback(globus_off_t * Offset,
+                             globus_off_t * Length,
+                             int          * Eot,
+                             void         * UserArg)
+{
+	stor_info_t * stor_info = UserArg;
+
+	markers_update_restart_markers(stor_info->Operation, *Offset, *Length);
+
+assert(*Length <= stor_info->RangeLength);
+
+	stor_info->RangeLength -= *Length;
+	*Offset                += *Length;
+	*Length                 = stor_info->RangeLength;
+
+	*Eot = 0;
+	if (stor_info->RangeLength == 0)
+	{
+		globus_gridftp_server_get_write_range(stor_info->Operation, Offset, Length);
+		if (*Length == -1)
+			*Eot = 1;
+		stor_info->RangeLength = *Length;
+	}
+}
+
+void
+stor_transfer_complete_callback(globus_result_t Result,
+                                void          * UserArg)
 {
 	globus_result_t result    = Result;
 	stor_info_t   * stor_info = UserArg;
 	int             rc        = 0;
 
-	GlobusGFSName(stor_pio_completion_callback);
+	GlobusGFSName(stor_transfer_complete_callback);
 
 	if (!result) result = stor_info->Result;
 	if (!result) stor_wait_for_gridftp(stor_info);
@@ -447,6 +466,7 @@ stor(globus_gfs_operation_t       Operation,
 	stor_info_t   * stor_info         = NULL;
 	globus_result_t result            = GLOBUS_SUCCESS;
 	int             file_stripe_width = 0;
+	globus_off_t    offset            = 0;
 
 	GlobusGFSName(stor);
 
@@ -483,17 +503,22 @@ stor(globus_gfs_operation_t       Operation,
 
 	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
+	globus_gridftp_server_get_write_range(Operation, &offset, &stor_info->RangeLength);
+	if (stor_info->RangeLength == -1)
+		stor_info->RangeLength = TransferInfo->alloc_size;
+
 	/*
 	 * Setup PIO
 	 */
 	result = pio_start(HPSS_PIO_WRITE,
-	                   Operation,
 	                   stor_info->FileFD,
 	                   file_stripe_width,
 	                   stor_info->BlockSize,
-	                   TransferInfo->alloc_size,
+	                   offset,
+	                   stor_info->RangeLength,
 	                   stor_pio_callout,
-	                   stor_pio_completion_callback,
+	                   stor_range_complete_callback,
+	                   stor_transfer_complete_callback,
 	                   stor_info);
 
 cleanup:

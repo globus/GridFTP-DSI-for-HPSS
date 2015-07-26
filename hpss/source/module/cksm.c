@@ -58,8 +58,8 @@ cksm_pio_callout(char     * Buffer,
                  void     * CallbackArg);
 
 void
-cksm_pio_completion_callback(globus_result_t Result,
-                             void          * UserArg);
+cksm_transfer_complete_callback(globus_result_t Result,
+                                void          * UserArg);
 
 void
 cksm_update_markers(cksm_marker_t * Marker, globus_off_t Bytes)
@@ -181,109 +181,6 @@ cksm_open_for_reading(char * Pathname,
     return GLOBUS_SUCCESS;
 }
 
-void
-cksm(globus_gfs_operation_t      Operation,
-     globus_gfs_command_info_t * CommandInfo,
-     config_t                  * Config,
-     commands_callback           Callback)
-{
-	globus_result_t result            = GLOBUS_SUCCESS;
-	cksm_info_t   * cksm_info         = NULL;
-	int             rc                = 0;
-	int             file_stripe_width = 0;
-	char          * checksum_string   = NULL;
-	hpss_stat_t     hpss_stat_buf;
-
-	GlobusGFSName(cksm);
-
-	/*
-	 * XXX Partial checksums not supported.
-	 */
-	if (CommandInfo->cksm_offset != 0 || CommandInfo->cksm_length != -1)
-	{
-		result = GlobusGFSErrorGeneric("Partial checksums not supported");
-		Callback(Operation, result, NULL);
-		return;
-	}
-
-	result = checksum_get_file_sum(CommandInfo->pathname, Config, &checksum_string);
-	if (result || checksum_string)
-	{
-		Callback(Operation, result, result ? NULL : checksum_string);
-		if (checksum_string) free(checksum_string);
-		return;
-	}
-
-	rc = hpss_Stat(CommandInfo->pathname, &hpss_stat_buf);
-	if (rc)
-	{
-		result = GlobusGFSErrorSystemError("hpss_Stat", -rc);
-		Callback(Operation, result, NULL);
-		return;
-	}
-
-	cksm_info = malloc(sizeof(cksm_info_t));
-	if (!cksm_info)
-	{
-		result = GlobusGFSErrorMemory("cksm_info_t");
-		goto cleanup;
-	}
-	memset(cksm_info, 0, sizeof(cksm_info_t));
-	cksm_info->Operation   = Operation;
-	cksm_info->CommandInfo = CommandInfo;
-	cksm_info->Callback    = Callback;
-	cksm_info->Config      = Config;
-	cksm_info->FileFD      = -1;
-	cksm_info->Pathname    = strdup(CommandInfo->pathname);
-
-	rc = MD5_Init(&cksm_info->MD5Context);
-	if (rc != 1)
-	{
-		result = GlobusGFSErrorGeneric("Failed to create MD5 context");
-		goto cleanup;
-	}
-
-	globus_gridftp_server_get_block_size(Operation, &cksm_info->BlockSize);
-
-	/*
-	 * Open the file.
-	 */
-	result = cksm_open_for_reading(CommandInfo->pathname,
-	                               &cksm_info->FileFD,
-	                               &file_stripe_width);
-	if (result) goto cleanup;
-
-	result = cksm_start_markers(&cksm_info->Marker, Operation);
-	if (result) goto cleanup;
-
-	/*
-	 * Setup PIO
-	 */
-	result = pio_start(HPSS_PIO_READ,
-	                   Operation,
-	                   cksm_info->FileFD,
-	                   file_stripe_width,
-	                   cksm_info->BlockSize,
-	                   hpss_stat_buf.st_size,
-	                   cksm_pio_callout,
-	                   cksm_pio_completion_callback,
-	                   cksm_info);
-
-cleanup:
-	if (result)
-	{
-		if (cksm_info)
-		{
-			if (cksm_info->FileFD != -1)
-				hpss_Close(cksm_info->FileFD);
-			if (cksm_info->Pathname)
-				free(cksm_info->Pathname);
-			free(cksm_info);
-		}
-		Callback(Operation, result, NULL);
-	}
-}
-
 int
 cksm_pio_callout(char     * Buffer,
                  uint32_t * Length,
@@ -295,7 +192,6 @@ cksm_pio_callout(char     * Buffer,
 
 	GlobusGFSName(cksm_pio_callout);
 
-assert(Offset == cksm_info->Offset);
 assert(*Length <= cksm_info->BlockSize);
 
 	rc = MD5_Update(&cksm_info->MD5Context, Buffer, *Length);
@@ -304,7 +200,6 @@ assert(*Length <= cksm_info->BlockSize);
 		cksm_info->Result = GlobusGFSErrorGeneric("MD5_Update() failed");
 		return 1;
 	}
-cksm_info->Offset += *Length;
 
 	cksm_update_markers(cksm_info->Marker, *Length);
 
@@ -312,7 +207,23 @@ cksm_info->Offset += *Length;
 }
 
 void
-cksm_pio_completion_callback(globus_result_t Result, void * UserArg)
+cksm_range_complete_callback(globus_off_t * Offset,
+                             globus_off_t * Length,
+                             int          * Eot,
+                             void         * UserArg)
+{
+	cksm_info_t * cksm_info = UserArg;
+
+	*Offset                += *Length;
+	cksm_info->RangeLength -= *Length;
+	*Length                 = cksm_info->RangeLength;
+
+	if (*Length == 0)
+		*Eot = 1;
+}
+
+void
+cksm_transfer_complete_callback(globus_result_t Result, void * UserArg)
 {
 	globus_result_t result    = Result;
 	cksm_info_t   * cksm_info = UserArg;
@@ -321,7 +232,7 @@ cksm_pio_completion_callback(globus_result_t Result, void * UserArg)
 	char            cksm_string[2*MD5_DIGEST_LENGTH+1];
 	int             i;
 
-	GlobusGFSName(cksm_pio_completion_callback);
+	GlobusGFSName(cksm_transfer_complete_callback);
 
 	/* Give our error priority. */
 	if (cksm_info->Result)
@@ -350,11 +261,112 @@ cksm_pio_completion_callback(globus_result_t Result, void * UserArg)
 
 	cksm_info->Callback(cksm_info->Operation, result, result ? NULL : cksm_string);
 
-	if (!result)
+	if (!result && cksm_info->CommandInfo->cksm_offset == 0 && cksm_info->CommandInfo->cksm_length == -1)
 		cksm_set_checksum(cksm_info->Pathname, cksm_info->Config, cksm_string);
 
 	free(cksm_info->Pathname);
 	free(cksm_info);
+}
+
+void
+cksm(globus_gfs_operation_t      Operation,
+     globus_gfs_command_info_t * CommandInfo,
+     config_t                  * Config,
+     commands_callback           Callback)
+{
+	globus_result_t result            = GLOBUS_SUCCESS;
+	cksm_info_t   * cksm_info         = NULL;
+	int             rc                = 0;
+	int             file_stripe_width = 0;
+	char          * checksum_string   = NULL;
+	hpss_stat_t     hpss_stat_buf;
+
+	GlobusGFSName(cksm);
+
+	if (CommandInfo->cksm_offset == 0 && CommandInfo->cksm_length == -1)
+	{
+		result = checksum_get_file_sum(CommandInfo->pathname, Config, &checksum_string);
+		if (result || checksum_string)
+		{
+			Callback(Operation, result, result ? NULL : checksum_string);
+			if (checksum_string) free(checksum_string);
+			return;
+		}
+	}
+
+	rc = hpss_Stat(CommandInfo->pathname, &hpss_stat_buf);
+	if (rc)
+	{
+		result = GlobusGFSErrorSystemError("hpss_Stat", -rc);
+		Callback(Operation, result, NULL);
+		return;
+	}
+
+	cksm_info = malloc(sizeof(cksm_info_t));
+	if (!cksm_info)
+	{
+		result = GlobusGFSErrorMemory("cksm_info_t");
+		goto cleanup;
+	}
+	memset(cksm_info, 0, sizeof(cksm_info_t));
+	cksm_info->Operation   = Operation;
+	cksm_info->CommandInfo = CommandInfo;
+	cksm_info->Callback    = Callback;
+	cksm_info->Config      = Config;
+	cksm_info->FileFD      = -1;
+	cksm_info->Pathname    = strdup(CommandInfo->pathname);
+	cksm_info->RangeLength = CommandInfo->cksm_length;
+	if (cksm_info->RangeLength == -1)
+		cksm_info->RangeLength  = hpss_stat_buf.st_size - CommandInfo->cksm_offset;
+
+	rc = MD5_Init(&cksm_info->MD5Context);
+	if (rc != 1)
+	{
+		result = GlobusGFSErrorGeneric("Failed to create MD5 context");
+		goto cleanup;
+	}
+
+	globus_gridftp_server_get_block_size(Operation, &cksm_info->BlockSize);
+
+	/*
+	 * Open the file.
+	 */
+	result = cksm_open_for_reading(CommandInfo->pathname,
+	                               &cksm_info->FileFD,
+	                               &file_stripe_width);
+	if (result) goto cleanup;
+
+	result = cksm_start_markers(&cksm_info->Marker, Operation);
+	if (result) goto cleanup;
+
+
+	/*
+	 * Setup PIO
+	 */
+	result = pio_start(HPSS_PIO_READ,
+	                   cksm_info->FileFD,
+	                   file_stripe_width,
+	                   cksm_info->BlockSize,
+	                   CommandInfo->cksm_offset,
+	                   cksm_info->RangeLength,
+	                   cksm_pio_callout,
+	                   cksm_range_complete_callback,
+	                   cksm_transfer_complete_callback,
+	                   cksm_info);
+
+cleanup:
+	if (result)
+	{
+		if (cksm_info)
+		{
+			if (cksm_info->FileFD != -1)
+				hpss_Close(cksm_info->FileFD);
+			if (cksm_info->Pathname)
+				free(cksm_info->Pathname);
+			free(cksm_info);
+		}
+		Callback(Operation, result, NULL);
+	}
 }
 
 /*

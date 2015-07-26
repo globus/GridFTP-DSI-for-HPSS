@@ -84,7 +84,7 @@ typedef struct stor_info {
 	pthread_mutex_t Mutex;
 	pthread_cond_t  Cond;
 
-	globus_off_t    Offset; // Sanity check only
+	globus_off_t    RangeLength; // Current range transfer length
 	globus_bool_t   Eof;
 
 	int OptConnCnt;

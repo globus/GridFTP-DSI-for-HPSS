@@ -79,7 +79,7 @@ typedef struct {
 	globus_result_t             Result;
 	int                         FileFD;
 	globus_size_t               BlockSize;
-	uint64_t                    Offset;
+	globus_off_t                RangeLength;
 	cksm_marker_t             * Marker;
 } cksm_info_t;
 

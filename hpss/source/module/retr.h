@@ -61,12 +61,12 @@ typedef struct {
 	globus_gfs_operation_t       Operation;
 	globus_gfs_transfer_info_t * TransferInfo;
 
-	int FileFD;
-
-	uint64_t Offset; // Just for sanity checking
+	int      FileFD;
+	uint64_t FileSize;
 
 	globus_result_t Result;
 	globus_size_t   BlockSize;
+	globus_off_t    RangeLength;
 
 	pthread_mutex_t Mutex;
 	pthread_cond_t  Cond;

@@ -177,7 +177,6 @@ retr_pio_callout(char     * ReadyBuffer,
 
 	pthread_mutex_lock(&retr_info->Mutex);
 	{
-assert(Offset == retr_info->Offset);
 assert(*Length <= retr_info->BlockSize);
 
 		result = retr_get_free_buffer(retr_info, &free_buffer);
@@ -207,8 +206,6 @@ assert(*Length <= retr_info->BlockSize);
 
 		/* Update perf markers */
 		markers_update_perf_markers(retr_info->Operation, Offset, *Length);
-
-		retr_info->Offset += *Length;
 	}
 cleanup:
 	pthread_mutex_unlock(&retr_info->Mutex);
@@ -235,14 +232,40 @@ retr_wait_for_gridftp(retr_info_t * RetrInfo)
 }
 
 void
-retr_pio_completion_callback (globus_result_t Result,
-                              void          * UserArg)
+retr_range_complete_callback(globus_off_t * Offset,
+                             globus_off_t * Length,
+                             int          * Eot,
+                             void         * UserArg)
+{
+	retr_info_t * retr_info = UserArg;
+
+	assert(*Length <= retr_info->RangeLength);
+
+	retr_info->RangeLength -= *Length;
+	*Offset                += *Length;
+	*Length                 = retr_info->RangeLength;
+
+	*Eot = 0;
+	if (retr_info->RangeLength == 0)
+	{
+		globus_gridftp_server_get_read_range(retr_info->Operation, Offset, Length);
+		if (*Length == 0)
+			*Eot = 1;
+		if (*Length == -1)
+			*Length = retr_info->FileSize - *Offset;
+		retr_info->RangeLength = *Length;
+	}
+}
+
+void
+retr_transfer_complete_callback (globus_result_t Result,
+                                 void          * UserArg)
 {
 	globus_result_t result    = Result;
 	retr_info_t   * retr_info = UserArg;
 	int             rc        = 0;
 
-	GlobusGFSName(retr_pio_completion_callback);
+	GlobusGFSName(retr_transfer_complete_callback);
 
 	if (!Result)
 		retr_wait_for_gridftp(retr_info);
@@ -267,12 +290,20 @@ retr(globus_gfs_operation_t       Operation,
      globus_gfs_transfer_info_t * TransferInfo)
 {
 	int             rc                = 0;
-	retr_info_t   * retr_info         = NULL;
-	globus_result_t result            = GLOBUS_SUCCESS;
 	int             file_stripe_width = 0;
+	retr_info_t   * retr_info         = NULL;
+	globus_off_t    offset            = 0;
+	globus_result_t result            = GLOBUS_SUCCESS;
 	hpss_stat_t     hpss_stat_buf;
 
 	GlobusGFSName(retr);
+
+	rc = hpss_Stat(TransferInfo->pathname, &hpss_stat_buf);
+	if (rc)
+	{
+		result = GlobusGFSErrorSystemError("hpss_Stat", -rc);
+		goto cleanup;
+	}
 
 	/*
 	 * Create our structure.
@@ -287,17 +318,11 @@ retr(globus_gfs_operation_t       Operation,
 	retr_info->Operation    = Operation;
 	retr_info->TransferInfo = TransferInfo;
 	retr_info->FileFD       = -1;
+	retr_info->FileSize     = hpss_stat_buf.st_size;
 	pthread_mutex_init(&retr_info->Mutex, NULL);
 	pthread_cond_init(&retr_info->Cond, NULL);
 
 	globus_gridftp_server_get_block_size(Operation, &retr_info->BlockSize);
-
-	rc = hpss_Stat(TransferInfo->pathname, &hpss_stat_buf);
-	if (rc)
-	{
-		result = GlobusGFSErrorSystemError("hpss_Stat", -rc);
-		goto cleanup;
-	}
 
 	/*
 	 * Open the file.
@@ -309,17 +334,22 @@ retr(globus_gfs_operation_t       Operation,
 
 	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
+	globus_gridftp_server_get_read_range(Operation, &offset, &retr_info->RangeLength);
+	if (retr_info->RangeLength == -1)
+		retr_info->RangeLength = retr_info->FileSize - offset;
+
 	/*
 	 * Setup PIO
 	 */
 	result = pio_start(HPSS_PIO_READ,
-	                   Operation,
 	                   retr_info->FileFD,
 	                   file_stripe_width,
 	                   retr_info->BlockSize,
-	                   hpss_stat_buf.st_size,
+	                   offset,
+	                   retr_info->RangeLength,
 	                   retr_pio_callout,
-	                   retr_pio_completion_callback,
+	                   retr_range_complete_callback,
+	                   retr_transfer_complete_callback,
 	                   retr_info);
 
 cleanup:

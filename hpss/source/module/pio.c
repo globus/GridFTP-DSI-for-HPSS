@@ -95,11 +95,12 @@ pio_launch_attached(void *   (* ThreadEntry)(void * Arg),
 void *
 pio_coordinator_thread(void * Arg)
 {
-	pio_t *  pio = Arg;
-	int      rc  = 0;
-	uint64_t length      = pio->FileSize;
-	uint64_t offset      = 0;
-	uint64_t bytes_moved = 0;
+	int                rc          = 0;
+	int                eot         = 0;
+	pio_t            * pio         = Arg;
+	globus_off_t       length      = pio->InitialLength;
+	globus_off_t       offset      = pio->InitialOffset;
+	uint64_t           bytes_moved = 0;
 	hpss_pio_gapinfo_t gap_info;
 
 	GlobusGFSName(pio_coordinator_thread);
@@ -117,28 +118,24 @@ pio_coordinator_thread(void * Arg)
 		                     &bytes_moved);
 
 		if (rc != 0)
-		{
 			pio->CoordinatorResult = GlobusGFSErrorSystemError("hpss_PIOExecute", -rc);
-			break;
-		}
 
 		/*
 		 * It appears that gap_info.offset is relative to offset. So you
 		 * must add the two to get the real offset of the gap. Also, if
 		 * there is a gap, bytes_moved = gap_info.offset since bytes_moved
-		 * is also relative to range_offset.
+		 * is also relative to offset.
 		 */
 
 		/* Add in any hole we may have found. */
+		length = bytes_moved;
 		if (neqz64m(gap_info.Length))
-			bytes_moved = add64m(gap_info.Offset, gap_info.Length);
+			length = add64m(gap_info.Offset, gap_info.Length);
 
-		/* Restart markers, when supported. */
-		if (pio->PioOperation == HPSS_PIO_WRITE && markers_restart_supported())
-			markers_update_restart_markers(pio->GFtpOperation, offset, bytes_moved);
-
-		offset += bytes_moved;
-	} while (rc == 0 && offset < length);
+		do {
+			pio->RngCmpltCB(&offset, &length, &eot, pio->UserArg);
+		} while (length == 0 && !eot && !rc);
+	} while (!rc && !eot);
 
 	rc = hpss_PIOEnd(pio->CoordinatorSG);
 	if (rc && pio->CoordinatorResult == GLOBUS_SUCCESS)
@@ -217,35 +214,42 @@ cleanup:
 
 	if (!result) result = pio->CoordinatorResult;
 
-	pio->CompletionCB(result, pio->UserArg);
+	pio->XferCmpltCB(result, pio->UserArg);
 	free(pio);
 
 	return NULL;
 }
 
 globus_result_t
-pio_start(hpss_pio_operation_t    PioOperation,
-          globus_gfs_operation_t  GFtpOperation,
-          int                     FD,
-          int                     FileStripeWidth,
-          uint32_t                BlockSize,
-          uint64_t                FileSize,
-          pio_data_callout        DataCO,
-          pio_completion_callback CompletionCB,
-          void                  * UserArg)
+pio_start(hpss_pio_operation_t           PioOpType,
+          int                            FD,
+          int                            FileStripeWidth,
+          uint32_t                       BlockSize,
+          globus_off_t                   Offset,
+          globus_off_t                   Length,
+          pio_data_callout               DataCO,
+          pio_range_complete_callback    RngCmpltCB,
+          pio_transfer_complete_callback XferCmpltCB,
+          void                         * UserArg)
 {
 	globus_result_t   result = GLOBUS_SUCCESS;
 	pio_t           * pio    = NULL;
 	hpss_pio_params_t pio_params;
 	void            * group_buffer  = NULL;
 	unsigned int      buffer_length = 0;
+	int               eot           = 0;
 
 	GlobusGFSName(pio_start);
 
-	if (FileSize == 0)
+	/* No zero length transfers. */
+	while (Length == 0)
 	{
-		CompletionCB(GLOBUS_SUCCESS, UserArg);
-		return GLOBUS_SUCCESS;
+		RngCmpltCB(&Offset, &Length, &eot, UserArg);
+		if (eot)
+		{
+			XferCmpltCB(GLOBUS_SUCCESS, UserArg);
+			return GLOBUS_SUCCESS;
+		}
 	}
 
 	/*
@@ -260,17 +264,17 @@ pio_start(hpss_pio_operation_t    PioOperation,
 	memset(pio, 0, sizeof(pio_t));
 	pio->FD            = FD;
 	pio->BlockSize     = BlockSize;
-	pio->FileSize      = FileSize;
-	pio->GFtpOperation = GFtpOperation;
-	pio->PioOperation  = PioOperation;
+	pio->InitialOffset = Offset;
+	pio->InitialLength = Length;
 	pio->DataCO        = DataCO;
-	pio->CompletionCB  = CompletionCB;
+	pio->RngCmpltCB    = RngCmpltCB;
+	pio->XferCmpltCB   = XferCmpltCB;
 	pio->UserArg       = UserArg;
 
 	/*
 	 * Don't use HPSS_PIO_HANDLE_GAP, it's bugged in HPSS 7.4.
 	 */
-	pio_params.Operation       = PioOperation;
+	pio_params.Operation       = PioOpType;
 	pio_params.ClntStripeWidth = 1;
 	pio_params.BlockSize       = BlockSize;
 	pio_params.FileStripeWidth = FileStripeWidth;

@@ -59,6 +59,7 @@
  */
 #include "authenticate.h"
 #include "commands.h"
+#include "markers.h"
 #include "config.h"
 #include "stat.h"
 #include "stor.h"
@@ -137,12 +138,6 @@ dsi_destroy(void * Arg)
 }
 
 int
-dsi_partial_transfer(globus_gfs_transfer_info_t * TransferInfo)
-{
-	return (TransferInfo->partial_offset  != 0 || TransferInfo->partial_length != -1);
-}
-
-int
 dsi_restart_transfer(globus_gfs_transfer_info_t * TransferInfo)
 {
 	globus_off_t offset;
@@ -164,20 +159,6 @@ dsi_send(globus_gfs_operation_t       Operation,
 
 	GlobusGFSName(dsi_send);
 
-	if (dsi_partial_transfer(TransferInfo))
-	{
-		result = GlobusGFSErrorGeneric("Partial RETR is not supported");
-		globus_gridftp_server_finished_transfer(Operation, result);
-		return;
-	}
-
-	if (dsi_restart_transfer(TransferInfo))
-	{
-		result = GlobusGFSErrorGeneric("Restarts are not supported");
-		globus_gridftp_server_finished_transfer(Operation, result);
-		return;
-	}
-
 	retr(Operation, TransferInfo);
 }
 
@@ -190,16 +171,9 @@ dsi_recv(globus_gfs_operation_t       Operation,
 
 	GlobusGFSName(dsi_recv);
 
-	if (dsi_partial_transfer(TransferInfo))
+	if (dsi_restart_transfer(TransferInfo) && !markers_restart_supported())
 	{
-		result = GlobusGFSErrorGeneric("Partial STOR is not supported");
-		globus_gridftp_server_finished_transfer(Operation, result);
-		return;
-	}
-
-	if (dsi_restart_transfer(TransferInfo))
-	{
-		result = GlobusGFSErrorGeneric("Restarts are is supported");
+		result = GlobusGFSErrorGeneric("Restarts are not supported");
 		globus_gridftp_server_finished_transfer(Operation, result);
 		return;
 	}
