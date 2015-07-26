@@ -180,10 +180,6 @@ retr_pio_callout(char     * ReadyBuffer,
 assert(Offset == retr_info->Offset);
 assert(*Length <= retr_info->BlockSize);
 
-		if (!retr_info->Started)
-			globus_gridftp_server_begin_transfer(retr_info->Operation, 0, NULL);
-		retr_info->Started = 1;
-
 		result = retr_get_free_buffer(retr_info, &free_buffer);
 		if (result)
 		{
@@ -310,6 +306,8 @@ retr(globus_gfs_operation_t       Operation,
 	                               &retr_info->FileFD,
 	                               &file_stripe_width);
 	if (result) goto cleanup;
+
+	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
 	/*
 	 * Setup PIO

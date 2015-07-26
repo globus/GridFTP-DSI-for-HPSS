@@ -242,6 +242,12 @@ pio_start(hpss_pio_operation_t    PioOperation,
 
 	GlobusGFSName(pio_start);
 
+	if (FileSize == 0)
+	{
+		CompletionCB(GLOBUS_SUCCESS, UserArg);
+		return GLOBUS_SUCCESS;
+	}
+
 	/*
 	 * Allocate our structure.
 	 */

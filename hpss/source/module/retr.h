@@ -62,7 +62,6 @@ typedef struct {
 	globus_gfs_transfer_info_t * TransferInfo;
 
 	int FileFD;
-	int Started;
 
 	uint64_t Offset; // Just for sanity checking
 

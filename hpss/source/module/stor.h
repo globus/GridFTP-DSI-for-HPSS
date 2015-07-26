@@ -76,7 +76,6 @@ typedef struct stor_info {
 	globus_gfs_transfer_info_t * TransferInfo;
 
 	int FileFD;
-	int Started;
 
 	globus_result_t Result;
 	globus_size_t   BlockSize;

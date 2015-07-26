@@ -277,11 +277,6 @@ assert(*Length <= stor_info->BlockSize);
 			goto cleanup;
 		}
 
-		/* On first pass, inform the server that we are starting. */
-		if (!stor_info->Started)
-			globus_gridftp_server_begin_transfer(stor_info->Operation, 0, NULL);
-		stor_info->Started = 1;
-
 		/* Until we find a buffer with this offset... */
 		while (1)
 		{
@@ -479,6 +474,8 @@ stor(globus_gfs_operation_t       Operation,
 	                               &stor_info->FileFD,
 	                               &file_stripe_width);
 	if (result) goto cleanup;
+
+	globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
 	/*
 	 * Setup PIO
