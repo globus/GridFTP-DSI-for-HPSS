@@ -283,6 +283,9 @@ config_parse_file(char     * ConfigFilePath,
 		} else if (key_length == strlen("QuotaSupport") && strncasecmp(key, "QuotaSupport", key_length) == 0)
 		{
 			Config->QuotaSupport = config_get_bool_value(value, value_length);
+		} else if (key_length == strlen("UDAChecksumSupport") && strncasecmp(key, "UDAChecksumSupport", key_length) == 0)
+		{
+			Config->UDAChecksumSupport = config_get_bool_value(value, value_length);
 		} else
 		{
 			result = GlobusGFSErrorWrapFailed("Parsing config options", GlobusGFSErrorGeneric(buffer));

@@ -54,6 +54,7 @@ typedef struct config {
 	char * AuthenticationMech;
 	char * Authenticator;
 	int    QuotaSupport;
+	int    UDAChecksumSupport;
 } config_t;
 
 globus_result_t

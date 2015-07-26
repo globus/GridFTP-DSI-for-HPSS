@@ -55,6 +55,7 @@
 /*
  * Local includes
  */
+#include "config.h"
 #include "pio.h"
 
 /*
@@ -103,6 +104,7 @@ typedef struct stor_info {
 
 void
 stor(globus_gfs_operation_t       Operation,
-     globus_gfs_transfer_info_t * TransferInfo);
+     globus_gfs_transfer_info_t * TransferInfo,
+     config_t                   * Config);
 
 #endif /* HPSS_DSI_STOR_H */

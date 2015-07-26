@@ -333,7 +333,7 @@ commands_run(globus_gfs_operation_t      Operation,
 		commands_symlink(Operation, CommandInfo, Callback);
 		break;
 	case GLOBUS_GFS_CMD_CKSM:
-		cksm(Operation, CommandInfo, Callback);
+		cksm(Operation, CommandInfo, Config, Callback);
 		break;
 	case GLOBUS_GFS_HPSS_CMD_SITE_STAGE:
 		stage(Operation, CommandInfo, Callback);

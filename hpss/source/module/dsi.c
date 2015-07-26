@@ -204,7 +204,7 @@ dsi_recv(globus_gfs_operation_t       Operation,
 		return;
 	}
 
-	stor(Operation, TransferInfo);
+	stor(Operation, TransferInfo, UserArg);
 }
 
 void

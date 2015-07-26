@@ -52,9 +52,15 @@
 #include <globus_gridftp_server.h>
 
 /*
+ * HPSS includes
+ */
+#include <hpss_xml.h>
+
+/*
  * Local includes
  */
 #include "commands.h"
+#include "config.h"
 
 typedef struct {
 	pthread_mutex_t          Lock;
@@ -66,6 +72,8 @@ typedef struct {
 typedef struct {
 	globus_gfs_operation_t      Operation;
 	globus_gfs_command_info_t * CommandInfo;
+	config_t                  * Config;
+	char                      * Pathname;
 	commands_callback           Callback;
 	MD5_CTX                     MD5Context;
 	globus_result_t             Result;
@@ -78,6 +86,16 @@ typedef struct {
 void
 cksm(globus_gfs_operation_t      Operation,
      globus_gfs_command_info_t * CommandInfo,
+     config_t                  * Config,
      commands_callback           Callback);
+
+globus_result_t
+cksm_set_checksum(char * Pathname, config_t * Config, char * Checksum);
+
+globus_result_t
+checksum_get_file_sum(char * Pathname, config_t * Config, char ** ChecksumString);
+
+globus_result_t
+cksm_clear_checksum(char * Pathname, config_t * Config);
 
 #endif /* HPSS_DSI_CKSM_H */

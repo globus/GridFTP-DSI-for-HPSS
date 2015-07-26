@@ -27,60 +27,10 @@ Authenticator auth_keytab:/var/hpss/etc/gridftp.keytab
 #
 #QuotaSupport on
 
-# CURRENTLY NOT SUPPORTED
-# (optional) Path to file that defines which projects each user belongs to.
-# Project file format is:
-#   username:project1,project2
+# (optional) UDAChecksumSupport
+# Causes checksums to be stored automatically within UDAs so that the checksum
+# can be recalled later without bring the file back from tape. The value is not
+# case sensitive. The default is off.
+#   UDAChecksumSupport on
 #
-# No spaces (leading, following or in between).
-# Lines starting with # are comments.
-#ProjectFile <path_to_project_filename>
-
-# (optional) Path to file that defines family id<->name translations along
-# with which projects/groups/users can explicitly make use of that family.
-# Note that users can still use the family even if they are not included in the
-# acl_list if the system is configured to use that family.
-#
-# Family file format is:
-#   family_name:family_id:acl_list
-# 
-# where family_name is a character string (max length 15)
-#   family_id is an integer
-#   acl_list is [[u:]user[,p:project][,g:group]]
-# 
-#  The special keyword 'all' in the acl_list enables that family for all users.
-#
-# No spaces (leading, following or in between).
-# Lines starting with # are comments.
-#
-#  'default' is a reserved family name used by GridFTP to allow the system to
-#  determine which family to use.
-#
-#FamilyFile <path_to_family_filename>
-
-# (optional) Path to file that defines cos id<->name translations along
-# with which projects/groups/users can explicitly make use of that COS
-# Note that users can still use the COS even if they are not included in the
-# acl_list if the system is configured to use that COS.
-#
-#  COS file format is:
-#    cos_id:cos_name:acl_list
-#   
-#  where cos_name is a character string (max length 15)
-#    cos_id is an integer
-#    acl_list is [[u:]user[,p:project][,g:group]]
-#
-#  The special keyword 'all' in the acl_list enables that cos for all users.
-#       
-#  No spaces (leading or following).
-#  Lines starting with # are comments.
-#
-#  'default' is a reserved cos name used by GridFTP to allow the system to
-#  determine which cos to use.
-#
-#CosFile <path_to_cos_filename>
-
-# (optional) List of users, groups or projects that have admin rights. Admin rights
-# allow you to migrate and purge files and use any cos or family.
-# Format is "Admin [u:]user,g:group
-#Admin <user1,user2,group1>
+#UDAChecksumSupport on

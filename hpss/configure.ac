@@ -1,7 +1,7 @@
 dnl
 dnl  University of Illinois/NCSA Open Source License
 dnl
-dnl  Copyright © 2012-2014, NCSA.  All rights reserved.
+dnl  Copyright © 2012-2015, NCSA.  All rights reserved.
 dnl
 dnl  Developed by:
 dnl
@@ -46,13 +46,6 @@ AC_PROG_LIBTOOL
 AC_PROG_CXX
 AC_PROG_CC
 AC_CONFIG_MACRO_DIR([m4])
-
-AC_ARG_ENABLE(quota_support,
-    AC_HELP_STRING([--enable-quota_support], [mark renamed files for quota support.]),
-    [
-        AC_DEFINE(MARK_RENAMED_FILES, 1, [mark renamed files for quota support.])
-    ],
-    [])
 
 #
 # For checksums
@@ -131,28 +124,6 @@ AC_ARG_WITH(hpss, AC_HELP_STRING([--with-hpss=dir],\
    [hpss_location=$withval],
    [])
 AC_SUBST(HPSS_LOCATION, $hpss_location)
-
-AC_ARG_ENABLE(ncsa_features, 
-    AC_HELP_STRING([--enable-ncsa_features], [shortcut to enable quota and UDA support.]),
-    [
-        AC_DEFINE(MARK_RENAMED_FILES, 1, [mark renamed files for quota support.])
-        AC_DEFINE(UDA_CHECKSUM_SUPPORT, 1, [Store checksums in UDA.])
-    ],
-    [])
-
-AC_ARG_ENABLE(quota_support, 
-    AC_HELP_STRING([--enable-quota_support], [mark renamed files for quota support.]),
-    [
-        AC_DEFINE(MARK_RENAMED_FILES, 1, [mark renamed files for quota support.])
-    ],
-    [])
-
-AC_ARG_ENABLE(uda_checksum_support, 
-    AC_HELP_STRING([--enable-uda_checksum_support], [store checksums in UDA.]),
-    [
-        AC_DEFINE(UDA_CHECKSUM_SUPPORT, 1, [Store checksums in UDA.])
-    ],
-    [])
 
 dnl
 dnl These values are hardcoded for now, until I can get the packaging stuff working again
