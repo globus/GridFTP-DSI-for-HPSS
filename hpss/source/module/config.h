@@ -53,6 +53,7 @@ typedef struct config {
 	char * LoginName;
 	char * AuthenticationMech;
 	char * Authenticator;
+	int    QuotaSupport;
 } config_t;
 
 globus_result_t

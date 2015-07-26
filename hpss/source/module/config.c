@@ -204,9 +204,22 @@ config_find_next_word(char *  Buffer,
 	}
 }
 
+int
+config_get_bool_value(char * Value, int ValueLength)
+{
+	if (!strncasecmp(Value, "on", ValueLength)   ||
+	    !strncasecmp(Value, "true", ValueLength) ||
+	    !strncasecmp(Value, "yes", ValueLength))
+	{
+		return 1;
+	}
+
+	return 0;
+}
+
 static globus_result_t
-config_parse_config_file(char     * ConfigFilePath,
-                         config_t * Config)
+config_parse_file(char     * ConfigFilePath,
+                  config_t * Config)
 {
 	int                tmp_length   = 0;
 	int                key_length   = 0;
@@ -218,7 +231,7 @@ config_parse_config_file(char     * ConfigFilePath,
 	char               buffer[1024];
 	globus_result_t    result       = GLOBUS_SUCCESS;
 
-	GlobusGFSName(config_parse_config_file);
+	GlobusGFSName(config_parse_file);
 
 	/*
 	 * Open the config file.
@@ -267,6 +280,9 @@ config_parse_config_file(char     * ConfigFilePath,
 		} else if (key_length == strlen("Authenticator") && strncasecmp(key, "Authenticator", key_length) == 0)
 		{
 			Config->Authenticator = strndup(value, value_length);
+		} else if (key_length == strlen("QuotaSupport") && strncasecmp(key, "QuotaSupport", key_length) == 0)
+		{
+			Config->QuotaSupport = config_get_bool_value(value, value_length);
 		} else
 		{
 			result = GlobusGFSErrorWrapFailed("Parsing config options", GlobusGFSErrorGeneric(buffer));
@@ -303,7 +319,7 @@ config_init(config_t ** Config)
 	}
 	memset(*Config, 0, sizeof(config_t));
 
-	result = config_parse_config_file(config_file_path, *Config);
+	result = config_parse_file(config_file_path, *Config);
 	if (result)
 	{
 		config_destroy(*Config);

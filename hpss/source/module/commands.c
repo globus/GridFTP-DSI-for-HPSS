@@ -60,6 +60,7 @@
  * Local includes
  */
 #include "commands.h"
+#include "config.h"
 #include "cksm.h"
 
 globus_result_t
@@ -134,16 +135,43 @@ commands_unlink(globus_gfs_operation_t      Operation,
 void
 commands_rename(globus_gfs_operation_t      Operation,
                 globus_gfs_command_info_t * CommandInfo,
+                config_t                  * Config,
                 commands_callback           Callback)
 {
+	int             retval = 0;
 	globus_result_t result = GLOBUS_SUCCESS;
 
 	GlobusGFSName(commands_rename);
 
-	int retval = hpss_Rename(CommandInfo->from_pathname, CommandInfo->pathname);
+	if (Config->QuotaSupport)
+	{
+		hpss_userattr_list_t attr_list;
+
+		attr_list.len  = 1;
+		attr_list.Pair = malloc(sizeof(hpss_userattr_t));
+		if (!attr_list.Pair)
+		{
+			result = GlobusGFSErrorMemory("hpss_userattr_t");
+			goto cleanup;
+		}
+
+		attr_list.Pair[0].Key = "/hpss/ncsa/quota/Renamed";
+		attr_list.Pair[0].Value = "1";
+
+		retval = hpss_UserAttrSetAttrs(CommandInfo->from_pathname, &attr_list, NULL);
+		free(attr_list.Pair);
+		if (retval)
+		{
+			result = GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
+			goto cleanup;
+		}
+	}
+
+	retval = hpss_Rename(CommandInfo->from_pathname, CommandInfo->pathname);
 	if (retval)
 		result = GlobusGFSErrorSystemError("hpss_Rename", -retval);
 
+cleanup:
 	Callback(Operation, result, NULL);
 }
 
@@ -269,6 +297,7 @@ commands_symlink(globus_gfs_operation_t      Operation,
 void
 commands_run(globus_gfs_operation_t      Operation,
              globus_gfs_command_info_t * CommandInfo,
+             config_t                  * Config,
              commands_callback           Callback)
 {
 	GlobusGFSName(commands_run);
@@ -285,7 +314,7 @@ commands_run(globus_gfs_operation_t      Operation,
 		commands_unlink(Operation, CommandInfo, Callback);
 		break;
 	case GLOBUS_GFS_CMD_RNTO:
-		commands_rename(Operation, CommandInfo, Callback);
+		commands_rename(Operation, CommandInfo, Config, Callback);
 		break;
 	case GLOBUS_GFS_CMD_RNFR:
 		break;

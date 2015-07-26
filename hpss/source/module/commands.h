@@ -46,6 +46,11 @@
  */
 #include <globus_gridftp_server.h>
 
+/*
+ * Local includes
+ */
+#include "config.h"
+
 enum {
 	GLOBUS_GFS_HPSS_CMD_SITE_STAGE = GLOBUS_GFS_MIN_CUSTOM_CMD,
 };
@@ -60,6 +65,7 @@ typedef void (*commands_callback)(globus_gfs_operation_t  Operation,
 void
 commands_run(globus_gfs_operation_t      Operation,
              globus_gfs_command_info_t * CommandInfo,
+             config_t                  * Config,
              commands_callback           Callback);
 
 #endif /* HPSS_DSI_COMMANDS_H */

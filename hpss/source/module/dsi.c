@@ -40,6 +40,11 @@
  */
 
 /*
+ * System includes
+ */
+#include <string.h>
+
+/*
  * Globus includes
  */
 #include <globus_gridftp_server.h>
@@ -68,6 +73,8 @@ dsi_init(globus_gfs_operation_t      Operation,
 	char          * home   = NULL;
 	sec_cred_t      user_cred;
 
+	GlobusGFSName(dsi_init);
+
 	/*
 	 * Read in the config.
 	 */
@@ -91,23 +98,42 @@ dsi_init(globus_gfs_operation_t      Operation,
 	if (result)
 		goto cleanup;
 
+	home = strdup(user_cred.Directory);
+	if (!home)
+	{
+		result = GlobusGFSErrorMemory("home directory");
+		goto cleanup;
+	}
+
 	result = commands_init(Operation);
 
 cleanup:
+
+	/*
+	 * Inform the server that we are done. If we do not pass in a username, the
+	 * server will use the name we mapped to with GSI. If we do not pass in a
+	 * home directory, the server will (1) look it up if we are root or
+	 * (2) leave it as the unprivileged user's home directory.
+	 *
+	 * As far as I can tell, the server keeps a pointer to home_directory and frees
+	 * it when it is done.
+	 */
 	globus_gridftp_server_finished_session_start(Operation,
 	                                             result,
-	                                             NULL,
+	                                             result ? NULL : config,
 	                                             NULL,  // username
-	                                             home);
+	                                             result ? NULL : home);
 
-	config_destroy(config);
-	if (home) globus_free(home);
+	if (result) config_destroy(config);
+	if (result && home) free(home);
 }
 
 
 void
 dsi_destroy(void * Arg)
 {
+	if (Arg)
+		config_destroy(Arg);
 }
 
 int
@@ -186,7 +212,7 @@ dsi_command(globus_gfs_operation_t      Operation,
             globus_gfs_command_info_t * CommandInfo,
             void                      * UserArg)
 {
-	commands_run(Operation, CommandInfo, globus_gridftp_server_finished_command);
+	commands_run(Operation, CommandInfo, UserArg, globus_gridftp_server_finished_command);
 }
 
 void
@@ -263,19 +289,19 @@ dsi_stat(globus_gfs_operation_t   Operation,
 
 globus_gfs_storage_iface_t hpss_local_dsi_iface =
 {
-	0,                   /* Descriptor       */
+	0,            /* Descriptor       */
 	dsi_init,     /* init_func        */
 	dsi_destroy,  /* destroy_func     */
-	NULL,                /* list_func        */
+	NULL,         /* list_func        */
 	dsi_send,     /* send_func        */
 	dsi_recv,     /* recv_func        */
-	NULL,                /* trev_func        */
-	NULL,                /* active_func      */
-	NULL,                /* passive_func     */
-	NULL,                /* data_destroy     */
+	NULL,         /* trev_func        */
+	NULL,         /* active_func      */
+	NULL,         /* passive_func     */
+	NULL,         /* data_destroy     */
 	dsi_command,  /* command_func     */
 	dsi_stat,     /* stat_func        */
-	NULL,                /* set_cred_func    */
-	NULL,                /* buffer_send_func */
-	NULL,                /* realpath_func    */
+	NULL,         /* set_cred_func    */
+	NULL,         /* buffer_send_func */
+	NULL,         /* realpath_func    */
 };
