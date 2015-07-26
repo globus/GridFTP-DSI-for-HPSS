@@ -19,6 +19,14 @@ AuthenticationMech unix
 #   where <auth_type> = auth_keytab, auth_keyfile, auth_key, auth_passwd, auth_none
 Authenticator auth_keytab:/var/hpss/etc/gridftp.keytab
 
+# (optional) QuotaSupport
+# used when using NCSA's quota system. Turning this on causes renamed files to
+# be marked with UDAs so that they can be found later and have the quota information
+# updated. The value is not case sensitive. The default is off.
+#   QuotaSupport on
+#
+#QuotaSupport on
+
 # CURRENTLY NOT SUPPORTED
 # (optional) Path to file that defines which projects each user belongs to.
 # Project file format is:
