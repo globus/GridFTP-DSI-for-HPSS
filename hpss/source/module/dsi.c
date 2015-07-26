@@ -88,6 +88,10 @@ dsi_init(globus_gfs_operation_t      Operation,
 	 * sites that use HPSS LDAP.
 	 */
 	result = hpss_GetThreadUcred(&user_cred);
+	if (result)
+		goto cleanup;
+
+	result = commands_init(Operation);
 
 cleanup:
 	globus_gridftp_server_finished_session_start(Operation,

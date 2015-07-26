@@ -38,28 +38,29 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS WITH THE SOFTWARE.
  */
-#ifndef HPSS_DSI_COMMANDS_H
-#define HPSS_DSI_COMMANDS_H
+#ifndef HPSS_DSI_STAGE_H
+#define HPSS_DSI_STAGE_H
 
 /*
  * Globus includes
  */
 #include <globus_gridftp_server.h>
 
-enum {
-	GLOBUS_GFS_HPSS_CMD_SITE_STAGE = GLOBUS_GFS_MIN_CUSTOM_CMD,
-};
+/*
+ * Local includes
+ */
+#include "commands.h"
+#include "stage.h"
 
-globus_result_t
-commands_init(globus_gfs_operation_t Operation);
-
-typedef void (*commands_callback)(globus_gfs_operation_t  Operation,
-                                  globus_result_t         Result,
-                                  char                  * CommandResponse);
+typedef enum {
+	STAGE_FILE_RESIDENT,
+	STAGE_FILE_TAPE_ONLY,
+	STAGE_FILE_ARCHIVED,
+} stage_file_residency;
 
 void
-commands_run(globus_gfs_operation_t      Operation,
-             globus_gfs_command_info_t * CommandInfo,
-             commands_callback           Callback);
+stage(globus_gfs_operation_t      Operation,
+      globus_gfs_command_info_t * CommandInfo,
+      commands_callback           Callback);
 
-#endif /* HPSS_DSI_COMMANDS_H */
+#endif /* HPSS_DSI_STAGE_H */

@@ -68,6 +68,7 @@ SOURCES = dsi.c \
 	      pio.c \
 	      dl.c \
 	      markers.c \
+	      stage.c \
 	      stat.c
 
 libglobus_gridftp_server_hpss_real_la_SOURCES=$(SOURCES)
