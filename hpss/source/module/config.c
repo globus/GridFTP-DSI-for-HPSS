@@ -115,7 +115,7 @@ config_find_config_file(char ** ConfigFilePath)
 			goto cleanup;
 
 		/* Release the full path to the config file. */
-		globus_free(*ConfigFilePath);
+		free(*ConfigFilePath);
 		*ConfigFilePath = NULL;
 
 		/* Otherwise, determine why we do not have access. */
@@ -161,7 +161,7 @@ config_find_config_file(char ** ConfigFilePath)
 
 cleanup:
 	if (result != GLOBUS_SUCCESS && *ConfigFilePath)
-		globus_free(*ConfigFilePath);
+		free(*ConfigFilePath);
 
 	return result;
 }
@@ -314,10 +314,10 @@ config_init(config_t ** Config)
 		return result;
 
 	/* Allocate the config struct */
-	*Config = globus_malloc(sizeof(config_t));
+	*Config = malloc(sizeof(config_t));
 	if (!*Config)
 	{
-		globus_free(config_file_path);
+		free(config_file_path);
 		return GlobusGFSErrorMemory("config_t");
 	}
 	memset(*Config, 0, sizeof(config_t));
@@ -328,7 +328,7 @@ config_init(config_t ** Config)
 		config_destroy(*Config);
 		*Config = NULL;
 	}
-	globus_free(config_file_path);
+	free(config_file_path);
 	return result;
 }
 
@@ -338,13 +338,13 @@ config_destroy(config_t * Config)
 	if (Config)
 	{
 		if (Config->LoginName)
-			globus_free(Config->LoginName);
+			free(Config->LoginName);
 		if (Config->AuthenticationMech)
-			globus_free(Config->AuthenticationMech);
+			free(Config->AuthenticationMech);
 		if (Config->Authenticator)
-			globus_free(Config->Authenticator);
+			free(Config->Authenticator);
 
-		globus_free(Config);
+		free(Config);
 	}
 }
 

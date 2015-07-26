@@ -155,7 +155,7 @@ retr_get_free_buffer(retr_info_t *  RetrInfo,
 		return GLOBUS_SUCCESS;
 	}
 
-	*FreeBuffer = globus_malloc(RetrInfo->BlockSize);
+	*FreeBuffer = malloc(RetrInfo->BlockSize);
 	if (!*FreeBuffer)
 		return GlobusGFSErrorMemory("free_buffer");
 	globus_list_insert(&RetrInfo->AllBufferList, *FreeBuffer);
@@ -259,7 +259,7 @@ retr_pio_completion_callback (globus_result_t Result,
 	pthread_cond_destroy(&retr_info->Cond);
 	globus_list_free(retr_info->FreeBufferList);
 	globus_list_destroy_all(retr_info->AllBufferList, free);
-	globus_free(retr_info);
+	free(retr_info);
 }
 
 void
@@ -277,7 +277,7 @@ retr(globus_gfs_operation_t       Operation,
 	/*
 	 * Create our structure.
 	 */
-	retr_info = globus_malloc(sizeof(retr_info_t));
+	retr_info = malloc(sizeof(retr_info_t));
 	if (!retr_info)
 	{
 		result = GlobusGFSErrorMemory("retr_info_t");
@@ -332,7 +332,7 @@ cleanup:
 				hpss_Close(retr_info->FileFD);
 			pthread_mutex_destroy(&retr_info->Mutex);
 			pthread_cond_destroy(&retr_info->Cond);
-			globus_free(retr_info);
+			free(retr_info);
 		}
 	}
 }

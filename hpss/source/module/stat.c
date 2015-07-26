@@ -276,7 +276,7 @@ stat_directory_entries(ns_ObjHandle_t    * ObjHandle,       // IN
 
 	memset(GFSStatArray, 0, sizeof(globus_gfs_stat_t)*GFSStatCountIn);
 
-	dir_entry_buffer = globus_malloc(sizeof(ns_DirEntry_t)*GFSStatCountIn);
+	dir_entry_buffer = malloc(sizeof(ns_DirEntry_t)*GFSStatCountIn);
 	if (!dir_entry_buffer)
 		return GlobusGFSErrorMemory("ns_DirEntry_t array");
 
@@ -290,7 +290,7 @@ stat_directory_entries(ns_ObjHandle_t    * ObjHandle,       // IN
 	                              dir_entry_buffer);
 	if (retval < 0)
 	{
-		globus_free(dir_entry_buffer);
+		free(dir_entry_buffer);
 		return GlobusGFSErrorSystemError("hpss_ReadAttrsHandle", -retval);
 	}
 
@@ -301,7 +301,7 @@ stat_directory_entries(ns_ObjHandle_t    * ObjHandle,       // IN
 		if (result)
 		{
 			stat_destroy_array(GFSStatArray, i);
-			globus_free(dir_entry_buffer);
+			free(dir_entry_buffer);
 			return result;
 		}
 	}
@@ -315,9 +315,9 @@ stat_destroy(globus_gfs_stat_t * GFSStat)
 	if (GFSStat)
 	{
 		if (GFSStat->symlink_target != NULL)
-			globus_free(GFSStat->symlink_target);
+			free(GFSStat->symlink_target);
 		if (GFSStat->name != NULL)
-			globus_free(GFSStat->name);
+			free(GFSStat->name);
 	}
 	return;
 }
