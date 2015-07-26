@@ -49,7 +49,6 @@
 #define DEFAULT_CONFIG_FILE   "/var/hpss/etc/gridftp.conf"
 
 typedef struct config {
-	char * ConfigFilePath;
 	char * LoginName;
 	char * AuthenticationMech;
 	char * Authenticator;
