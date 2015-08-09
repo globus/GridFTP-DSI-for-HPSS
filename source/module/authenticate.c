@@ -125,10 +125,10 @@ authenticate(char * LoginName,
 		return GlobusGFSErrorSystemError("hpss_ParseAuthString()", -retval);
 
 	/* Now set the current HPSS client configuration. */
-	api_config.Flags  =  API_USE_CONFIG;
-	retval = hpss_SetConfiguration(&api_config);
-	if (retval != HPSS_E_NOERROR)
-		return GlobusGFSErrorSystemError("hpss_SetConfiguration()", -retval);
+//	api_config.Flags  =  API_USE_CONFIG;
+//	retval = hpss_SetConfiguration(&api_config);
+//	if (retval != HPSS_E_NOERROR)
+//		return GlobusGFSErrorSystemError("hpss_SetConfiguration()", -retval);
 
 	/* Now log into HPSS using our configured 'super user' */
 	retval = hpss_SetLoginCred(LoginName,
