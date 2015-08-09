@@ -61,6 +61,7 @@
  */
 #include "commands.h"
 #include "config.h"
+#include "stage.h"
 #include "cksm.h"
 
 globus_result_t
