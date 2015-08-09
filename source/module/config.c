@@ -53,6 +53,7 @@
  * HPSS includes
  */
 #include <hpss_Getenv.h>
+#include <hpss_api.h>
 
 /*
  * Local includes
@@ -300,6 +301,41 @@ cleanup:
 	return result;
 }
 
+/*
+ * Right now, the only env vars we process affect HPSS's default
+ * config, not ours.
+ */
+globus_result_t 
+config_process_env()
+{
+	int             retval    = 0;
+	char          * env_value = NULL;
+	api_config_t    api_config;
+
+	GlobusGFSName(config_process_env);
+
+	/*
+	 * Get the current HPSS client configuration.
+	 */
+	retval = hpss_GetConfiguration(&api_config);
+	if (retval != 0)
+		return GlobusGFSErrorSystemError("hpss_GetConfiguration", -retval);
+
+	if ((env_value = getenv("HPSS_API_DEBUG")))
+		api_config.DebugValue = atoi(env_value);
+
+	if ((env_value = getenv("HPSS_API_DEBUG_PATH")))
+		strncpy(api_config.DebugPath, env_value, sizeof(api_config.DebugPath));
+
+    /* Now set the current HPSS client configuration. */
+	api_config.Flags = API_USE_CONFIG;
+	retval = hpss_SetConfiguration(&api_config);
+	if (retval != 0)
+		return GlobusGFSErrorSystemError("hpss_SetConfiguration", -retval);
+
+	return GLOBUS_SUCCESS;
+}
+
 globus_result_t
 config_init(config_t ** Config)
 {
@@ -307,6 +343,8 @@ config_init(config_t ** Config)
 	globus_result_t result = GLOBUS_SUCCESS;
 
 	GlobusGFSName(config_init);
+
+	*Config = NULL;
 
 	/* Find the config file. */
 	result = config_find_config_file(&config_file_path);
@@ -317,18 +355,25 @@ config_init(config_t ** Config)
 	*Config = malloc(sizeof(config_t));
 	if (!*Config)
 	{
-		free(config_file_path);
-		return GlobusGFSErrorMemory("config_t");
+		result = GlobusGFSErrorMemory("config_t");
+		goto cleanup;
 	}
 	memset(*Config, 0, sizeof(config_t));
 
 	result = config_parse_file(config_file_path, *Config);
 	if (result)
+		goto cleanup;
+
+	result = config_process_env();
+
+cleanup:
+	if (config_file_path)
+		free(config_file_path);
+	if (result)
 	{
 		config_destroy(*Config);
 		*Config = NULL;
 	}
-	free(config_file_path);
 	return result;
 }
 
