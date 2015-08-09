@@ -1,3 +1,10 @@
+Version 2.0: Beta
+	- Added support for env vars HPSS_API_DEBUG, HPSS_API_DEBUG_PATH
+	- Removed config options: ProjectFile, FamilyFile, CosFile, Admin
+	- Added config options: QuotaSupport, UDAChecksumSupport
+	- Removed config options: --enable-quota_support, --enable-ncsa_features, 
+	  --enable-uda_checksum_support
+
 Version 1.8: Tue Jan 20 09:53:20 CST 2015
 	- Fixed perf markers, the last marker wasn't being sent
 	- Fix for restarts. See patches/perf_restart_markers.README. If you don't
