@@ -1,0 +1,38 @@
+Todo
+====
+* many of these use UberFTP
+
+1) Installation documenation. Need to update INSTALL and post updates to wiki.
+
+2) Directory listing testing. Type, size, owner, group, recursive,
+   large directories (over 200 entries).
+
+3) Full file stor of various sizes. Checksum comparison for validation.
+	a) set debug mode: "debug"
+	b) turn on markers: "quote opts 'retr markers=1\;'"
+	c) turn on extended block mode: "mode e"
+	d) store files of various sizes. Should see:
+		*) constant perf + restart markers if perf marker patch not installed
+		*) constant perf markers + final restart marker if perf marker patch installed
+	e) compute checksum for comparison: "quote cksm md5 0 -1 <file>"
+
+4) Full file retr of various sizes. Checksum comparison for validation.
+	* Note, no markers on retrive.
+	a) retrieve files of various sizes.
+	b) compute checksum for comparison: "quote cksm md5 0 -1 <file>"
+
+** Add partial, append and restart tests in stream and extended block mode
+
+5) Checksums in UDA and markers. With config option set to on:
+    a) store 'large' file. 'large' meaning checkum requires many 10s of seconds
+       to compute.
+	b) enable debug mode: "debug"
+	c) enable checksum markers: "quote opts 'cksm markers=1\;'"
+    d) compute checksum, should see progress markers. Compare final checksum.
+	e) repeat (d) for same file, checksum should be returned immediatelly.
+
+6) Checksums not in UDA and markers. WIth config option set to off:
+	a) perform test #5 again. (e) should not be immediate.
+
+more ...
+	mkdir, rmdir, unlink, chmod, utimes, MLSC, parallel data channels
