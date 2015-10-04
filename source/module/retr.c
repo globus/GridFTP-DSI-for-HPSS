@@ -118,33 +118,35 @@ retr_get_free_buffer(retr_info_t *  RetrInfo,
 {
 	int all_buf_cnt  = 0;
 	int free_buf_cnt = 0;
+	int cur_conn_cnt = 0;
 
 	GlobusGFSName(retr_get_free_buffer);
-
-	/*
-	 * Check for the optimal number of concurrent writes.
-	 */
-	if (RetrInfo->ConnChkCnt++ == 0)
-		globus_gridftp_server_get_optimal_concurrency(RetrInfo->Operation,
-		                                             &RetrInfo->OptConnCnt);
-	if (RetrInfo->ConnChkCnt >= 100) RetrInfo->ConnChkCnt = 0;
 
 	/*
 	 * Wait for a free buffer or wait until conditions are right to create one.
 	 */
 	while (1)
 	{
+		/*
+		 * Check for the optimal number of concurrent writes.
+		 */
+		if (RetrInfo->ConnChkCnt++ == 0)
+			globus_gridftp_server_get_optimal_concurrency(RetrInfo->Operation,
+		                                             &RetrInfo->OptConnCnt);
+		if (RetrInfo->ConnChkCnt >= 100)
+			RetrInfo->ConnChkCnt = 0;
+
 		/* Check for error first. */
 		if (RetrInfo->Result)
 			return RetrInfo->Result;
 
+		/* We can exit the loop if we have less than OptConnCnt buffers in use. */
 		all_buf_cnt  = globus_list_size(RetrInfo->AllBufferList);
 		free_buf_cnt = globus_list_size(RetrInfo->FreeBufferList);
 
-		/* If we have a free buffer... */
-		if (free_buf_cnt) break;
-		/* If we can create another free buffer... */
-		if (all_buf_cnt < RetrInfo->OptConnCnt) break;
+		cur_conn_cnt = all_buf_cnt - free_buf_cnt;
+		if (cur_conn_cnt < RetrInfo->OptConnCnt)
+			break;
 
 		pthread_cond_wait(&RetrInfo->Cond, &RetrInfo->Mutex);
 	}

@@ -4,6 +4,7 @@ Version 2.0: Beta
 	- Added config options: QuotaSupport, UDAChecksumSupport
 	- Removed config options: --enable-quota_support, --enable-ncsa_features, 
 	  --enable-uda_checksum_support
+	- Limited used buffers on RETR to the optimal connection count
 
 Version 1.8: Tue Jan 20 09:53:20 CST 2015
 	- Fixed perf markers, the last marker wasn't being sent
