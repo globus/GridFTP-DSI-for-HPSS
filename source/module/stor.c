@@ -140,10 +140,10 @@ stor_open_for_writing(char        * Pathname,
 		}
     }
 
-	/* Determine the open flags. */
-	oflags = O_WRONLY;
+	/* Always use O_CREAT in support of S3 transfers. */
+	oflags = O_WRONLY|O_CREAT;
 	if (Truncate == GLOBUS_TRUE)
-		oflags |= O_CREAT|O_TRUNC;
+		oflags |= O_TRUNC;
 
 	/* Open the HPSS file. */
 	*FileFD = hpss_Open(Pathname,

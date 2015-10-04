@@ -296,6 +296,22 @@ commands_symlink(globus_gfs_operation_t      Operation,
 }
 
 void
+commands_truncate(globus_gfs_operation_t      Operation,
+                  globus_gfs_command_info_t * CommandInfo,
+                  commands_callback           Callback)
+{
+	globus_result_t result = GLOBUS_SUCCESS;
+
+	GlobusGFSName(commands_truncate);
+
+	int retval = hpss_Truncate(CommandInfo->from_pathname, CommandInfo->cksm_offset);
+	if (retval)
+		result = GlobusGFSErrorSystemError("hpss_Truncate", -retval);
+
+	Callback(Operation, result, NULL);
+}
+
+void
 commands_run(globus_gfs_operation_t      Operation,
              globus_gfs_command_info_t * CommandInfo,
              config_t                  * Config,
@@ -339,6 +355,9 @@ commands_run(globus_gfs_operation_t      Operation,
 	case GLOBUS_GFS_HPSS_CMD_SITE_STAGE:
 		stage(Operation, CommandInfo, Callback);
 		break;
+	case GLOBUS_GFS_CMD_TRNC:
+		commands_truncate(Operation, CommandInfo, Callback);
+		break;
 
 	case GLOBUS_GFS_CMD_SITE_AUTHZ_ASSERT:
 	case GLOBUS_GFS_CMD_SITE_RDEL:
@@ -350,7 +369,6 @@ commands_run(globus_gfs_operation_t      Operation,
 	case GLOBUS_GFS_CMD_HTTP_PUT:
 	case GLOBUS_GFS_CMD_HTTP_GET:
 	case GLOBUS_GFS_CMD_HTTP_CONFIG:
-	case GLOBUS_GFS_CMD_TRNC:
 	case GLOBUS_GFS_CMD_SITE_TASKID:
 	default:
 		return Callback(Operation, GlobusGFSErrorGeneric("Not Supported"), NULL);
