@@ -5,4 +5,4 @@ Known Issues
 Items missing from this list does not mean the DSI is ready for wide use. It means
 that testing has not completed and has not yet discovered issues.
 
-
+(1) cancelling a curent transfer will cause the process to hang possibly consuming resources
