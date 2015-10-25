@@ -7,6 +7,7 @@ Version 2.0: Beta
 	- Limited used buffers on RETR to the optimal connection count
 	- Added support for SITE TRNC
 	- On STOR, always use O_CREAT in support of S3 transfers
+	- DSI version should now be corrected returned to the client on FEAT.
 
 Version 1.8: Tue Jan 20 09:53:20 CST 2015
 	- Fixed perf markers, the last marker wasn't being sent
