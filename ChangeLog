@@ -1,4 +1,7 @@
-Version 2.0: Beta
+Version 2.1: Fri Apr  8 11:49:43 CDT 2016
+	- Fix for OOM on STOR when there is a speed mismatch
+
+Version 2.0: 
 	- Added support for env vars HPSS_API_DEBUG, HPSS_API_DEBUG_PATH
 	- Removed config options: ProjectFile, FamilyFile, CosFile, Admin
 	- Added config options: QuotaSupport, UDAChecksumSupport

@@ -95,11 +95,6 @@ typedef struct stor_info {
 	globus_list_t * ReadyBufferList;
 	globus_list_t * FreeBufferList;
 
-	struct pio_callout {
-		stor_buffer_t * Buffer;
-		globus_off_t    NeededOffset;
-	} PioCallout;
-
 } stor_info_t;
 
 void
