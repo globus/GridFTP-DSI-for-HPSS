@@ -280,8 +280,8 @@ stor_copy_out_buffers(stor_info_t * StorInfo,
 			length_to_copy = stor_buffer->BufferLength;
 
 			/* Limit to length that DS3 is asking for. */
-			if (length_to_copy > Length)
-				length_to_copy = Length;
+			if (length_to_copy > (Length - copied_length))
+				length_to_copy = (Length - copied_length);
 
 			memcpy(Buffer + copied_length,
 			       stor_buffer->Buffer + stor_buffer->BufferOffset,
