@@ -70,6 +70,9 @@ typedef struct {
 	globus_off_t       TransferOffset; // Moves as BufferOffset moves
 	globus_off_t       BufferLength;   // Moves as BufferOffset moves
 	struct stor_info * StorInfo;
+#define VALID_TAG   0xDEADBEEF
+#define INVALID_TAG 0x00000000
+	int                Valid; // Debug Entry
 } stor_buffer_t;
 
 typedef struct stor_info {

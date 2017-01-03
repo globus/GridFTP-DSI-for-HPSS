@@ -184,8 +184,8 @@ assert(*Length <= retr_info->BlockSize);
 		result = retr_get_free_buffer(retr_info, &free_buffer);
 		if (result)
 		{
-			rc = 1; /* Signal to shutdown. */
 			if (!retr_info->Result) retr_info->Result = result;
+			rc = PIO_END_TRANSFER; /* Signal to shutdown. */
 			goto cleanup;
 		}
 
@@ -201,8 +201,8 @@ assert(*Length <= retr_info->BlockSize);
 
 		if (result)
 		{
-			rc = 1; /* Signal to shutdown. */
 			if (!retr_info->Result) retr_info->Result = result;
+			rc = PIO_END_TRANSFER; /* Signal to shutdown. */
 			goto cleanup;
 		}
 
@@ -269,10 +269,15 @@ retr_transfer_complete_callback (globus_result_t Result,
 
 	GlobusGFSName(retr_transfer_complete_callback);
 
-	if (!Result)
-		retr_wait_for_gridftp(retr_info);
+	/* Prefer our error over PIO's */
+	if (retr_info->Result)
+		result = retr_info->Result;
 
-	if (!result) result = retr_info->Result;
+	if (result)
+	{
+		retr_wait_for_gridftp(retr_info);
+		result = retr_info->Result;
+	}
 
 	rc = hpss_Close(retr_info->FileFD);
 	if (rc && !result)

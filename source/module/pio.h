@@ -56,6 +56,8 @@
  */
 #include <hpss_api.h>
 
+#define PIO_END_TRANSFER 0xDEADBEEF
+
 typedef int
 (*pio_data_callout)(char     * Buffer,
                     uint32_t * Length, /* IN / OUT */

@@ -117,7 +117,7 @@ pio_coordinator_thread(void * Arg)
 		                     &gap_info,
 		                     &bytes_moved);
 
-		if (rc != 0)
+		if (rc != 0 && rc != 0xDEADBEEF)
 			pio->CoordinatorResult = GlobusGFSErrorSystemError("hpss_PIOExecute", -rc);
 
 		/*
@@ -138,7 +138,7 @@ pio_coordinator_thread(void * Arg)
 	} while (!rc && !eot);
 
 	rc = hpss_PIOEnd(pio->CoordinatorSG);
-	if (rc && pio->CoordinatorResult == GLOBUS_SUCCESS)
+	if (rc != 0 && rc != PIO_END_TRANSFER && pio->CoordinatorResult == GLOBUS_SUCCESS)
 		pio->CoordinatorResult = GlobusGFSErrorSystemError("hpss_PIOEnd", -rc);
 
 	return NULL;
@@ -197,7 +197,7 @@ pio_thread(void * Arg)
 	                      pio->ParticipantSG,
 	                      pio_register_callback,
 	                      pio);
-	if (rc)
+	if (rc != 0 && rc != PIO_END_TRANSFER)
 		result = GlobusGFSErrorSystemError("hpss_PIORegister", -rc);
 	safe_to_end_pio = 1;
 
@@ -205,7 +205,7 @@ cleanup:
 	if (safe_to_end_pio)
 	{
 		rc = hpss_PIOEnd(pio->ParticipantSG);
-		if (rc && !result)
+		if (rc != 0 && rc != PIO_END_TRANSFER && !result)
 			result = GlobusGFSErrorSystemError("hpss_PIOEnd", -rc);
 	}
 

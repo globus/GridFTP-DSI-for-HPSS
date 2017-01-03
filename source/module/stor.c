@@ -206,6 +206,9 @@ stor_gridftp_callout(globus_gfs_operation_t Operation,
 	stor_buffer_t * stor_buffer = UserArg;
 	stor_info_t   * stor_info   = stor_buffer->StorInfo;
 
+	if (stor_buffer->Valid != VALID_TAG) return;
+//	assert(stor_buffer->Valid == VALID_TAG);
+
 	// Make sure we have the right buffer / UserArg combo
 	assert(stor_buffer->Buffer == (char *)Buffer);
 
@@ -347,6 +350,7 @@ stor_launch_gridftp_reads(stor_info_t * StorInfo)
 				break;
 			}
 			stor_buffer->StorInfo = StorInfo;
+			stor_buffer->Valid = VALID_TAG;
 			globus_list_insert(&StorInfo->AllBufferList, stor_buffer);
 		}
 
@@ -433,7 +437,7 @@ stor_pio_callout(char     * Buffer,
 		if (result)
 		{
 			if (!stor_info->Result) stor_info->Result = result;
-			rc = 1; /* Signal to shutdown. */
+			rc = PIO_END_TRANSFER; /* Signal to shutdown. */
 		}
 	}
 	pthread_mutex_unlock(&stor_info->Mutex);
@@ -485,6 +489,14 @@ assert(*Length <= stor_info->RangeLength);
 	}
 }
 
+int
+invalidate_buffers(void * Datum, void * Arg)
+{
+	((stor_buffer_t *)Datum)->Valid = INVALID_TAG;
+
+	return 0;
+}
+
 void
 stor_transfer_complete_callback(globus_result_t Result,
                                 void          * UserArg)
@@ -495,9 +507,15 @@ stor_transfer_complete_callback(globus_result_t Result,
 
 	GlobusGFSName(stor_transfer_complete_callback);
 
-	if (!result) result = stor_info->Result;
-	if (!result) stor_wait_for_gridftp(stor_info);
-	result = stor_info->Result;
+	/* Prefer our error over PIO's. */
+	if (stor_info->Result)
+		result = stor_info->Result;
+
+	if (!result)
+	{
+		stor_wait_for_gridftp(stor_info);
+		result = stor_info->Result;
+	}
 	
 	rc = hpss_Close(stor_info->FileFD);
 	if (rc && !result)
@@ -509,6 +527,8 @@ stor_transfer_complete_callback(globus_result_t Result,
 	pthread_cond_destroy(&stor_info->Cond);
 	globus_list_free(stor_info->FreeBufferList);
 	globus_list_free(stor_info->ReadyBufferList);
+
+globus_list_search_pred(stor_info->AllBufferList, invalidate_buffers, NULL);
 	globus_list_destroy_all(stor_info->AllBufferList, free);
 	free(stor_info);
 }
@@ -561,6 +581,22 @@ stor(globus_gfs_operation_t       Operation,
 	globus_gridftp_server_get_write_range(Operation, &offset, &stor_info->RangeLength);
 	if (stor_info->RangeLength == -1)
 		stor_info->RangeLength = TransferInfo->alloc_size;
+
+	/* when alloc_size is 0, pio_start/stor_transfer_complete_callback will
+	 * call globus_gridftp_server_finished_transfer with success, but
+	 * without reading EOF from gridftp.  launch gridftp read now to
+	 * to prevent that.  without this, legitimate zero byte stors will  
+	 * cause the next transfer to fail.
+	 */
+	if (stor_info->RangeLength == 0)
+	{
+		pthread_mutex_lock(&stor_info->Mutex);
+		{
+			result = stor_launch_gridftp_reads(stor_info);
+		}
+		pthread_mutex_unlock(&stor_info->Mutex);
+		if (result) goto cleanup;
+	}
 
 	/*
 	 * Setup PIO
