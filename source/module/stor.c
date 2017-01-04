@@ -489,10 +489,11 @@ assert(*Length <= stor_info->RangeLength);
 	}
 }
 
-int
-invalidate_buffers(void * Datum, void * Arg)
+static int
+release_buffer(void * Datum, void * Arg)
 {
 	((stor_buffer_t *)Datum)->Valid = INVALID_TAG;
+	free(((stor_buffer_t *)Datum)->Buffer);
 
 	return 0;
 }
@@ -528,7 +529,7 @@ stor_transfer_complete_callback(globus_result_t Result,
 	globus_list_free(stor_info->FreeBufferList);
 	globus_list_free(stor_info->ReadyBufferList);
 
-globus_list_search_pred(stor_info->AllBufferList, invalidate_buffers, NULL);
+	globus_list_search_pred(stor_info->AllBufferList, release_buffer, NULL);
 	globus_list_destroy_all(stor_info->AllBufferList, free);
 	free(stor_info);
 }

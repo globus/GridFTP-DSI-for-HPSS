@@ -96,13 +96,16 @@ retr_gridftp_callout(globus_gfs_operation_t Operation,
                      globus_size_t          Length,
                      void                 * UserArg)
 {
-	retr_info_t * retr_info = UserArg;
+	retr_buffer_t * retr_buffer = UserArg;
+	retr_info_t   * retr_info   = retr_buffer->RetrInfo;
+
+	if (retr_buffer->Valid != VALID_TAG) return;
 
 	pthread_mutex_lock(&retr_info->Mutex);
 	{
 		if (Result && !retr_info->Result) retr_info->Result = Result;
 
-		globus_list_insert(&retr_info->FreeBufferList, (char *)Buffer);
+		globus_list_insert(&retr_info->FreeBufferList, retr_buffer);
 assert(Length  <= retr_info->BlockSize);
 		pthread_cond_signal(&retr_info->Cond);
 	}
@@ -113,8 +116,8 @@ assert(Length  <= retr_info->BlockSize);
  * Called locked.
  */
 globus_result_t
-retr_get_free_buffer(retr_info_t *  RetrInfo,
-                     char        ** FreeBuffer)
+retr_get_free_buffer(retr_info_t   *  RetrInfo,
+                     retr_buffer_t ** FreeBuffer)
 {
 	int all_buf_cnt  = 0;
 	int free_buf_cnt = 0;
@@ -157,9 +160,14 @@ retr_get_free_buffer(retr_info_t *  RetrInfo,
 		return GLOBUS_SUCCESS;
 	}
 
-	*FreeBuffer = malloc(RetrInfo->BlockSize);
+	*FreeBuffer = malloc(sizeof(retr_info_t));
 	if (!*FreeBuffer)
 		return GlobusGFSErrorMemory("free_buffer");
+	(*FreeBuffer)->Buffer = malloc(RetrInfo->BlockSize);
+	if (!(*FreeBuffer)->Buffer)
+		return GlobusGFSErrorMemory("free_buffer");
+	(*FreeBuffer)->RetrInfo = RetrInfo;
+	(*FreeBuffer)->Valid    = VALID_TAG;
 	globus_list_insert(&RetrInfo->AllBufferList, *FreeBuffer);
 	return GLOBUS_SUCCESS;
 }
@@ -171,7 +179,7 @@ retr_pio_callout(char     * ReadyBuffer,
                  void     * CallbackArg)
 {
 	int             rc           = 0;
-	char          * free_buffer  = NULL;
+	retr_buffer_t * free_buffer  = NULL;
 	retr_info_t   * retr_info    = CallbackArg;
 	globus_result_t result       = GLOBUS_SUCCESS;
 
@@ -189,15 +197,15 @@ assert(*Length <= retr_info->BlockSize);
 			goto cleanup;
 		}
 
-		memcpy(free_buffer, ReadyBuffer, *Length);
+		memcpy(free_buffer->Buffer, ReadyBuffer, *Length);
 
 		result = globus_gridftp_server_register_write(retr_info->Operation,
-		                                              (globus_byte_t *)free_buffer,
+		                                              (globus_byte_t *)free_buffer->Buffer,
 		                                              *Length,
 		                                              Offset,
 		                                              -1,
 		                                              retr_gridftp_callout,
-		                                              retr_info);
+		                                              free_buffer);
 
 		if (result)
 		{
@@ -259,6 +267,15 @@ retr_range_complete_callback(globus_off_t * Offset,
 	}
 }
 
+static int
+release_buffer(void * Datum, void * Arg)
+{
+	((retr_buffer_t *)Datum)->Valid = INVALID_TAG;
+	free(((retr_buffer_t *)Datum)->Buffer);
+
+	return 0;
+}
+
 void
 retr_transfer_complete_callback (globus_result_t Result,
                                  void          * UserArg)
@@ -288,6 +305,7 @@ retr_transfer_complete_callback (globus_result_t Result,
 	pthread_mutex_destroy(&retr_info->Mutex);
 	pthread_cond_destroy(&retr_info->Cond);
 	globus_list_free(retr_info->FreeBufferList);
+	globus_list_search_pred(retr_info->AllBufferList, release_buffer, NULL);
 	globus_list_destroy_all(retr_info->AllBufferList, free);
 	free(retr_info);
 }

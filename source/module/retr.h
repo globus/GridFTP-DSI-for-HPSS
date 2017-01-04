@@ -57,7 +57,17 @@
  */
 #include "pio.h"
 
+struct retr_info;
+
 typedef struct {
+    char             * Buffer;
+    struct retr_info * RetrInfo;
+#define VALID_TAG   0xDEADBEEF
+#define INVALID_TAG 0x00000000
+    int                Valid; // Debug Entry
+} retr_buffer_t;
+
+typedef struct retr_info {
 	globus_gfs_operation_t       Operation;
 	globus_gfs_transfer_info_t * TransferInfo;
 
