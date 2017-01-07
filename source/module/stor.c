@@ -508,21 +508,18 @@ stor_transfer_complete_callback(globus_result_t Result,
 
 	GlobusGFSName(stor_transfer_complete_callback);
 
+	globus_gridftp_server_finished_transfer(stor_info->Operation, result);
+	stor_wait_for_gridftp(stor_info);
+
 	/* Prefer our error over PIO's. */
 	if (stor_info->Result)
 		result = stor_info->Result;
-
 	if (!result)
-	{
-		stor_wait_for_gridftp(stor_info);
 		result = stor_info->Result;
-	}
 	
 	rc = hpss_Close(stor_info->FileFD);
 	if (rc && !result)
 		result = GlobusGFSErrorSystemError("hpss_Close", -rc);
-
-	globus_gridftp_server_finished_transfer(stor_info->Operation, result);
 
 	pthread_mutex_destroy(&stor_info->Mutex);
 	pthread_cond_destroy(&stor_info->Cond);

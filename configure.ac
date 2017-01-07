@@ -40,7 +40,7 @@ dnl  DEALINGS WITH THE SOFTWARE.
 dnl
 
 AC_REVISION($Revision: 2.2 $)
-AC_INIT([GridFTP HPSS DSI], [2.2], [Jason Alt <jalt@ncsa.illinois.edu>])
+AC_INIT([GridFTP HPSS DSI], [2.3], [Jason Alt <jalt@ncsa.illinois.edu>])
 AM_INIT_AUTOMAKE
 AC_PROG_LIBTOOL
 AC_PROG_CXX

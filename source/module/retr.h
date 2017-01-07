@@ -77,6 +77,7 @@ typedef struct retr_info {
 	globus_result_t Result;
 	globus_size_t   BlockSize;
 	globus_off_t    RangeLength;
+	globus_off_t    CurrentOffset;
 
 	pthread_mutex_t Mutex;
 	pthread_cond_t  Cond;
