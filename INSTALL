@@ -4,13 +4,10 @@ BUILD AND INSTALL HPSS
 
 Building HPSS is beyond the scope of this guide but you should have a working 
 HPSS installation. This version of the DSI was tested against HPSS 7.4.2. The
-DSI requires either a full HPSS build or a 'clnt' HPSS build. Note whether the
-HPSS build is 32bit or 64bit; you'll need to build GridFTP and the DSI that same
-way.
+DSI requires either a full HPSS build or a 'clnt' HPSS build. 
 
 POINTS OF INTEREST ON THIS VERSION
 ==================================
-* This DSI is likely to have 64bit-ism and so 64bit is recommended. 
 * This DSI requires UDA support in HPSS for checksums and quotas.
 * The format of the stored checksums are compatible with 7.4.2 but
   not necessarily with earlier versions.
@@ -19,8 +16,6 @@ POINTS OF INTEREST ON THIS VERSION
 * Checkout the README.xdr if you want to understand why the DSI
   loading sequence is setup as it is
 * Because of the XDR issue, this DSI most likely only works on Linux
-* Restarts are not supported until Globus supplies a way to decouple
-  restart from performance markers. See http://jira.globus.org/browse/GT-517.
 
 
 CONFIGURATION OPTIONS
@@ -124,41 +119,24 @@ not well behavad, the DSI will act as though a zero length transfer is about to
 occur and will handle it as such. So you'll know if the client is not doing the 
 right thing.
 
-GRIDFTP PATCHES
-===============
-These are fixed in Globus Toolkit 5.2.4:
-  GT-297 globus_ftp_control_data_query_channels() SIGSEGV on proxy expiration
+INSTALL GLOBUS CONNECT SERVER
+=============================
 
-Still believed to exist in GT 5.2.5:
-  GT-296 globus_ftp_control_data_read() race condition
-  GT-376 globus_ftp_control_data_query_channels() SIGSEGV on ABRT
-  GT-377 abort() in globus_ftp_control_handle_destroy() -> globus_list_remove()
-  GT-378 abort() in globus_i_gfs_data_session_stop()
-  GT-379 Abort() in globus_i_gfs_data_request_recv()
-  GT-380 Abort in globus_l_gfs_new_server_cb()
-
-INSTALL GRIDFTP
-===============
-
-In order to build the module, you'll need to install the globus-gridftp-server-devel
-and libgssglue-devel rpms. In order to run the HPSS GridFTP server, you'll need to
-install the globus-gridftp-server RPM. This DSI is only tested against 64 bit builds.
-
-See the GT documentation for installing from RPM.
-
-http://toolkit.globus.org/toolkit/docs/5.2/5.2.5/admin/install/#install-bininst
+https://docs.globus.org/globus-connect-server-installation-guide/
 
 BUILD AND INSTALL THE DSI
 =========================
+
+Install the development GridFTP libraries:
+
+  globus-gridftp-server-devel
+  globus-gridftp-server-control-devel
 
 Build the HPSS DSI with the following options. Set the value of '--libdir' to the
 directory where you want to place the DSI. For your sanity, I recommend putting it
 in a new directory with the version information stored in the name. 
 Ex. /usr/local/gridftp_hpss_dsi-1.0. You can then set the environment variable
 LD_LIBRARY_PATH to this location so that the GridFTP server can find the DSI.
-
-If you use Globus RPMs, you shoudn't need to specify --with-globus because it 
-defaults to /usr/
 
 ./configure --with-hpss=/opt/hpss -libdir=/usr/local/gridftp_hpss_dsi-<version>.
 
@@ -182,77 +160,68 @@ HPSS has a special privileged user named 'hpssftp' which has the necessary permi
 and special code within HPSS to not allow it to bypass the Gate Keeper callouts. Thus
 we recommend that you use the 'hpssftp' user in gridftp.conf.
 
-You will however want the GridFTP process to run as a non privileged user. For this
-reasons, we run the GridFTP server as local UNIX user 'gridftp' but configure it to
-use hpssftp's credentials to log into HPSS.
+[root]# /opt/hpss/bin/hpss_unix_keytab -f /var/hpss/etc/gridftp.keytab add hpssftp
 
-Add the new user 'gridftp' to the system password file. Your entry should look
-something like the following:
-
-gridftp:x:316:316:GridFTP Server:/home/gridftp:/bin/bash
-
-Now you'll need to create a keytab file for the gridftp user. This will be used
-by the DSI in order to authenticate to HPSS. For sites using unix
-authentication with HPSS (rather than kerberos):
-
-[root@hpss gridftp_hpss_dsi_0_1]# /opt/hpss/bin/hpss_unix_keytab -f /var/hpss/etc/gridftp.keytab add hpssftp
+For unix authentication sites, make sure the HPSS account 'hpssftp' is included and valid
+within a HPSS keytab file (typically located in /var/hpss/etc/).
 
 For sites using kerberos authentication with HPSS, you'll need to create
 and use a kerberos keytab file (rather than a unix keytab). The kerberos
 utility 'ktutil' can be used for that purpose.
 
-CONFIGURING XINETD
-==================
+#CONFIGURING XINETD
+#==================
+#
+#The globus gridftp server does not need to run as a privileged user. You should
+#create a system account for this purpose. It is important to make sure that both
+#the keytab files generated above and the GSI host key are both owned by this
+#system account. In the following example, I will use the system account
+#'gridftp'. Since our HPSS installation currently uses the system password file
+#(instead of the HPSS specific password file) this is the same account created
+#earlier for authentication to HPSS. However, if your site uses the HPSS specific
+#password file, you will need to create a separate system account for the GridFTP
+#server process (they may both have the same name).
+#
+#Add an entry to /etc/services for the default gsiftp port:
+#
+#gsiftp 2811/tcp # GSI FTP
+#
+#Here's an example xinetd entry (/etc/xinetd.d/gridftp). Note that the DSI
+#requires that the server run with threads so you must use -threads with a value
+#of 2 or greater.
+#
+#service gsiftp
+#
+#{
+#	flags       = IPv4
+#	wait        = no
+#	user        = gridftp
+#	# You may need to set group depending upon the account chosen
+#	group       = gridftp
+#	server      = /usr/local/globus/sbin/globus-gridftp-server
+#	# auth-level 6 = 2 for frontend default + 4 for no-change-uid/gid
+#	#  0 - Disables all authorization checks
+#	#  1 - Authorize identity
+#	#  2 - Authorize all file/resource accesses (Default for fronend)
+#	#  4 - Disable changing process uid to authenticated user
+#	server_args = -inetd -threads 2 -auth-level 7 -dsi hpss_local -disable-command-list SCKS,APPE,REST
+#	env         = GRIDMAP=/etc/grid-security/grid-mapfile
+#	env         = LD_LIBRARY_PATH=/opt/hpss/lib:/usr/local/gridftp_hpss_dsi-<version>
+#	socket_type = stream
+#	per_source  = 100
+#}
 
-The globus gridftp server does not need to run as a privileged user. You should
-create a system account for this purpose. It is important to make sure that both
-the keytab files generated above and the GSI host key are both owned by this
-system account. In the following example, I will use the system account
-'gridftp'. Since our HPSS installation currently uses the system password file
-(instead of the HPSS specific password file) this is the same account created
-earlier for authentication to HPSS. However, if your site uses the HPSS specific
-password file, you will need to create a separate system account for the GridFTP
-server process (they may both have the same name).
-
-Add an entry to /etc/services for the default gsiftp port:
-
-gsiftp 2811/tcp # GSI FTP
-
-Here's an example xinetd entry (/etc/xinetd.d/gridftp). Note that the DSI
-requires that the server run with threads so you must use -threads with a value
-of 2 or greater.
-
-service gsiftp
-
-{
-	flags       = IPv4
-	wait        = no
-	user        = gridftp
-	# You may need to set group depending upon the account chosen
-	group       = gridftp
-	server      = /usr/local/globus/sbin/globus-gridftp-server
-	# auth-level 6 = 2 for frontend default + 4 for no-change-uid/gid
-	#  0 - Disables all authorization checks
-	#  1 - Authorize identity
-	#  2 - Authorize all file/resource accesses (Default for fronend)
-	#  4 - Disable changing process uid to authenticated user
-	server_args = -inetd -threads 2 -auth-level 7 -dsi hpss_local -disable-command-list SCKS,APPE,REST
-	env         = GRIDMAP=/etc/grid-security/grid-mapfile
-	env         = LD_LIBRARY_PATH=/opt/hpss/lib:/usr/local/gridftp_hpss_dsi-<version>
-	socket_type = stream
-	per_source  = 100
-}
-
-CONFIGURING WITHOUT XINETD
-==========================
+CONFIGURING THE DSI
+===================
 
 If you are launching GridFTP without xinetd (for example, a Globus Connect Server install),
 you can configure the server as follows.
 
-Add these lines to /etc/gridftp.d/extra:
-	auth_level 7
+Add these lines to /etc/gridftp.d/hpss:
+	auth_level 3
 	load_dsi_module hpss_local
 	disable_command_list SCKS,APPE,REST
+	threads 2
 
 Also, in order for the GridFTP server to find the HPSS DSI, you must edit your start script
 to include: LD_LIBRARY_PATH="<path to DSI install dir>". For example, if you launch GridFTP
@@ -271,8 +240,7 @@ DSI will use the following search order for locating the configuration file:
  2) /var/hpss/etc/gridftp.conf
 
 Make sure the configuration file's permissions allow for the GridFTP process to
-read it. For example, if you chose to run the GridFTP server as user 'gridftp',
-make sure the user 'gridftp' has read access to the configuration file.
+read it. 
 
 HPSS Configuration Files
 ========================
