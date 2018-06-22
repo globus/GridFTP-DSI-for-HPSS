@@ -1,1 +1,3 @@
-Version 2 is the preferred version for production. Use at your own risk.
+GridFTP-DSI-for-HPSS is a Globus Connect Server Connector which allows HPSS service administrators to create Globus Endpoints for HPSS installations.
+
+For the most recent install instructions, go to https://docs.globus.org/premium-storage-connectors/hpss/.
