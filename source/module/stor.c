@@ -410,14 +410,12 @@ stor_pio_callout(char     * Buffer,
 			                                       offset_needed,
 			                                       *Length - copied_length);
 
-			if (stor_info->Eof)
+			if (stor_info->Eof && stor_info->CurConnCnt == 0)
 			{
 				if (copied_length != *Length && (copied_length + offset_needed) != stor_info->TransferInfo->alloc_size)
 					result = GlobusGFSErrorGeneric("Premature end of data transfer");
 				break;
 			}
-
-//			result = stor_check_for_parallel_conns(stor_info, Offset + copied_length);
 
 			if (!result)
 				result = stor_launch_gridftp_reads(stor_info);
