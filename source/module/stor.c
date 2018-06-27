@@ -401,7 +401,7 @@ stor_pio_callout(char     * Buffer,
 
 	pthread_mutex_lock(&stor_info->Mutex);
 	{
-		while (!result && copied_length != *Length && !stor_info->Result)
+		while (copied_length != *Length && !stor_info->Result)
 		{
 			offset_needed = Offset + copied_length;
 
@@ -417,12 +417,11 @@ stor_pio_callout(char     * Buffer,
 				break;
 			}
 
-//			result = stor_check_for_parallel_conns(stor_info, Offset + copied_length);
-
-			if (!result)
+			if (!stor_info->Eof)
 				result = stor_launch_gridftp_reads(stor_info);
+			if (result) break;
 
-			if (!result && copied_length != *Length)
+			if (copied_length != *Length)
 				pthread_cond_wait(&stor_info->Cond, &stor_info->Mutex);
 		}
 
