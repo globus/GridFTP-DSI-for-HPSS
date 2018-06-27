@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2015 NCSA.  All rights reserved.
+ * Copyright Â© 2015 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -410,7 +410,7 @@ stor_pio_callout(char     * Buffer,
 			                                       offset_needed,
 			                                       *Length - copied_length);
 
-			if (stor_info->Eof)
+			if (stor_info->Eof && stor_info->CurConnCnt == 0)
 			{
 				if (copied_length != *Length && (copied_length + offset_needed) != stor_info->TransferInfo->alloc_size)
 					result = GlobusGFSErrorGeneric("Premature end of data transfer");
