@@ -1,7 +1,7 @@
 /*
  * University of Illinois/NCSA Open Source License
  *
- * Copyright © 2015 NCSA.  All rights reserved.
+ * Copyright Â© 2015 NCSA.  All rights reserved.
  *
  * Developed by:
  *
@@ -401,7 +401,7 @@ stor_pio_callout(char     * Buffer,
 
 	pthread_mutex_lock(&stor_info->Mutex);
 	{
-		while (!result && copied_length != *Length && !stor_info->Result)
+		while (copied_length != *Length && !stor_info->Result)
 		{
 			offset_needed = Offset + copied_length;
 
@@ -417,10 +417,11 @@ stor_pio_callout(char     * Buffer,
 				break;
 			}
 
-			if (!result)
+			if (!stor_info->Eof)
 				result = stor_launch_gridftp_reads(stor_info);
+			if (result) break;
 
-			if (!result && copied_length != *Length)
+			if (copied_length != *Length)
 				pthread_cond_wait(&stor_info->Cond, &stor_info->Mutex);
 		}
 
