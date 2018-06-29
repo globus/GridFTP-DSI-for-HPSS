@@ -46,7 +46,7 @@
  */
 #include <globus_gridftp_server.h>
 
-#define DEFAULT_CONFIG_FILE   "/var/hpss/etc/gridftp.conf"
+#define DEFAULT_CONFIG_FILE   "/var/hpss/etc/gridftp_hpss_dsi.conf"
 
 typedef struct config {
 	char * LoginName;

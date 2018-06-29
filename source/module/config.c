@@ -63,8 +63,8 @@
 /*
  * The config file search order is:
  *   1) env HPSS_DSI_CONFIG_FILE=<path>
- *   2) $HPSS_PATH_ETC/gridftp.conf
- *   3) DEFAULT_CONFIG_FILE (/var/hpss/etc/gridftp.conf)
+ *   2) $HPSS_PATH_ETC/gridftp_hpss_dsi.conf
+ *   3) DEFAULT_CONFIG_FILE (/var/hpss/etc/gridftp_hpss_dsi.conf)
  */
 globus_result_t
 config_find_config_file(char ** ConfigFilePath)
@@ -101,7 +101,7 @@ config_find_config_file(char ** ConfigFilePath)
 	if (hpss_path_etc != NULL)
 	{
 		/* Construct the full path. */
-		*ConfigFilePath = globus_common_create_string("%s/gridftp.conf", hpss_path_etc);
+		*ConfigFilePath = globus_common_create_string("%s/gridftp_hpss_dsi.conf", hpss_path_etc);
 		if (!*ConfigFilePath)
 		{
 			result = GlobusGFSErrorMemory("config file path");
