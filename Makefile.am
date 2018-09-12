@@ -43,3 +43,4 @@
 # the list of subdirectories that have Makefile.am's
 SUBDIRS=source
 
+ACLOCAL_AMFLAGS= -I m4
