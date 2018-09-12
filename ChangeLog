@@ -1,4 +1,4 @@
-Version 2.5 (PRE): Wed Jun 27 11:48:59 CDT 2018
+Version 2.5: Wed Sep 12 09:30:29 CDT 2018
 	- issue 14: the DSI config file was renamed to gridftp_hpss_dsi.conf
 	            the default LoginName in gridftp_hpss_dsi.conf is now 'hpssftp'
 	- issue 15: Error on STOR: "Premature end of data transfer"
