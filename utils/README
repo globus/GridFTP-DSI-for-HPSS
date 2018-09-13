@@ -1,0 +1,24 @@
+dsi_client is intended to be a test program to drive the HPSS DSI as a 
+standalone client without the need for the Globus GridFTP server. It does
+this by mocking the GridFTP server routines and driving the latest DSI
+shared module against your HPSS installation as though it is a 
+client/server architecture.
+
+In order to operate dsi_client, you must have all of the requirements of the
+deployed DSI *except* configuration details in /etc. You must have 
+/var/hpss/etc/gridftp_hpss_dsi.conf and the associated keytab file for
+the hpssftp user and these files must be accessible to your current shell
+UID. When executing dsi_client, your shell UID must be equal the target
+UID in HPSS.
+
+Currently, it supports two commands: 'stat' which behaves like 'ls' and
+'stor' which will copy local files into HPSS. The 'stor' command has this
+syntax:
+
+dsi_client stor [-l <length> | -c <concurrency> | -b blocksize ] <src_local_file> <dst_hpss_file>
+
+An example execution purposes may be to read from memory and write 30GiB into HPSS:
+
+[user$ ] ./dsi_client stor -l  32212254720 /dev/zero <hpss_target_path>
+
+The -l option specifies the length of the entire transfer, only necessary when reading from devices like /dev/zero. -c specifies the number of simultaneous buffers to use in the transfer. -b specifies the size of each buffer.
