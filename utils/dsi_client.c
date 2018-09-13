@@ -37,6 +37,8 @@ struct globus_l_gfs_data_operation_s {
 	// Client's callback arg, supplied through the DSI's init_func()
 	//
 	void * session_arg;
+	// Result from initialization routine
+	globus_result_t init_result;
 
 	//
 	// stat_func() state information.
@@ -497,6 +499,12 @@ main(int argc, char * argv[])
 	globus_gfs_session_info_t session_info = {.username = username};
 	hpss_local_dsi_iface.init_func(&op, &session_info);
 
+	if (op.init_result != GLOBUS_SUCCESS)
+	{
+		print_result(op.init_result);
+		return 1;
+	}
+
 	cmd_t c = parse_command(argv[optind]);
 	switch (c)
 	{
@@ -559,6 +567,7 @@ globus_gridftp_server_finished_session_start(
 	{
 		// Copy out the response
 		op->session_arg = session_arg;
+		op->init_result = result;
 		// Notify the control logic
 		pthread_cond_signal(&op->cond);
 	}
