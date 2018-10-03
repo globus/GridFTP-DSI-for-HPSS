@@ -45,6 +45,11 @@
 #include <assert.h>
 
 /*
+ * HPSS includes.
+ */
+#include <hpss_version.h>
+
+/*
  * Local includes
  */
 #include "cksm.h"
@@ -455,7 +460,16 @@ checksum_get_file_sum(char * Pathname, config_t * Config, char ** ChecksumString
 		attr_list.Pair[2].Key   = "/hpss/user/cksum/state";
 		attr_list.Pair[2].Value = state;
 
-		retval = hpss_UserAttrGetAttrs(Pathname, &attr_list, UDA_API_VALUE);
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
+		retval = hpss_UserAttrGetAttrs(Pathname,
+		                               &attr_list,
+		                               UDA_API_VALUE,
+		                               HPSS_XML_SIZE-1);
+#else
+		retval = hpss_UserAttrGetAttrs(Pathname,
+		                               &attr_list,
+		                               UDA_API_VALUE);
+#endif
 
 		switch (retval)
 		{

@@ -56,6 +56,7 @@
  * HPSS includes
  */
 #include <hpss_api.h>
+#include <hpss_version.h>
 
 /*
  * Local includes
@@ -247,7 +248,11 @@ stage_file(char * Pathname, int Timeout, stage_file_residency * Residency)
 	globus_result_t  result = GLOBUS_SUCCESS;
 	hpss_xfileattr_t xfileattr;
 	hpss_reqid_t     reqid;
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
+	bfs_bitfile_obj_handle_t bitfile_id;
+#else
 	hpssoid_t        bitfile_id;
+#endif
 	time_t           start_time = time(NULL);
 	int              retval;
 
@@ -272,7 +277,12 @@ stage_file(char * Pathname, int Timeout, stage_file_residency * Residency)
 	switch (*Residency)
 	{
 	case STAGE_FILE_RESIDENT:
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
+		stage_rm_bfid_from_list(&xfileattr.Attrs.BitfileObj.BfId);
+#else
+
 		stage_rm_bfid_from_list(&xfileattr.Attrs.BitfileId);
+#endif
 	case STAGE_FILE_TAPE_ONLY:
 		goto cleanup;
 	case STAGE_FILE_ARCHIVED:
@@ -282,9 +292,13 @@ stage_file(char * Pathname, int Timeout, stage_file_residency * Residency)
 	/*
 	 * Need to stage file.
 	 */
-
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
+	if (stage_check_bfid_in_list(&xfileattr.Attrs.BitfileObj.BfId))
+		goto cleanup;
+#else
 	if (stage_check_bfid_in_list(&xfileattr.Attrs.BitfileId))
 		goto cleanup;
+#endif
 
 	/*
 	 * We use hpss_StageCallBack() so that we do not block while the
@@ -321,7 +335,13 @@ stage_file(char * Pathname, int Timeout, stage_file_residency * Residency)
 
 	stage_check_residency(&xfileattr, Residency);
 	if (*Residency != STAGE_FILE_ARCHIVED)
+	{
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
+		stage_add_bfid_to_list(&xfileattr.Attrs.BitfileObj.BfId);
+#else
 		stage_add_bfid_to_list(&xfileattr.Attrs.BitfileId);
+#endif
+	}
 
 cleanup:
 	stage_free_xfileattr(&xfileattr);
