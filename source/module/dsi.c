@@ -65,6 +65,9 @@
 #include "stor.h"
 #include "retr.h"
 
+/* This is used to define the debug print statements. */
+GlobusDebugDefine(GLOBUS_GRIDFTP_SERVER_HPSS);
+
 void
 dsi_init(globus_gfs_operation_t      Operation,
          globus_gfs_session_info_t * SessionInfo)
@@ -75,6 +78,8 @@ dsi_init(globus_gfs_operation_t      Operation,
 	sec_cred_t      user_cred;
 
 	GlobusGFSName(dsi_init);
+
+	GlobusDebugInit(GLOBUS_GRIDFTP_SERVER_HPSS, TRACE_STAGING);
 
 	/*
 	 * Read in the config.
@@ -155,8 +160,6 @@ dsi_send(globus_gfs_operation_t       Operation,
          globus_gfs_transfer_info_t * TransferInfo,
          void                       * UserArg)
 {
-	globus_result_t result = GLOBUS_SUCCESS;
-
 	GlobusGFSName(dsi_send);
 
 	retr(Operation, TransferInfo);

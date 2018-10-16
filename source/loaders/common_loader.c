@@ -60,9 +60,6 @@
  */
 #include <globus_gridftp_server.h>
 
-/* This is used to define the debug print statements. */
-GlobusDebugDefine(GLOBUS_GRIDFTP_SERVER_HPSS);
-
 /* Our handle reference which we hold between activate / deactivate. */
 static void * _real_module_handle = NULL;
 
@@ -119,9 +116,6 @@ loader_activate(const char                 * DsiName,
 	                              DsiName,
 	                              Module,
 	                              dsi_interface);
-
-	GlobusDebugInit(GLOBUS_GRIDFTP_SERVER_HPSS,
-	                ERROR WARNING TRACE INTERNAL_TRACE INFO STATE INFO_VERBOSE);
 
 	return GLOBUS_SUCCESS;
 }

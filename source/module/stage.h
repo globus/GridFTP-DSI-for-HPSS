@@ -50,14 +50,10 @@
  * Local includes
  */
 #include "commands.h"
-#include "stage.h"
 
-typedef enum {
-	STAGE_FILE_RESIDENT,
-	STAGE_FILE_TAPE_ONLY,
-	STAGE_FILE_ARCHIVED,
-} stage_file_residency;
-
+/*
+ * PUBLIC INTERFACE
+ */
 void
 stage(globus_gfs_operation_t      Operation,
       globus_gfs_command_info_t * CommandInfo,

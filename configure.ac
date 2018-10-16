@@ -39,7 +39,7 @@ dnl  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 dnl  DEALINGS WITH THE SOFTWARE.
 dnl
 
-AC_INIT([GridFTP HPSS DSI], [2.5.2], [Globus <support@globus.org>])
+AC_INIT([GridFTP HPSS DSI], [2.6], [Globus <support@globus.org>])
 AM_INIT_AUTOMAKE
 AC_PROG_LIBTOOL
 AC_PROG_CXX
@@ -143,4 +143,5 @@ AC_CONFIG_FILES([source/Makefile])
 AC_CONFIG_FILES([source/loaders/Makefile])
 AC_CONFIG_FILES([source/loaders/version.h])
 AC_CONFIG_FILES([source/module/Makefile])
+AC_CONFIG_FILES([test/module/Makefile])
 AC_OUTPUT
