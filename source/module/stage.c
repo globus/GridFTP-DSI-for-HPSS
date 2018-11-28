@@ -45,6 +45,7 @@
 #include <sys/select.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 /*
@@ -96,7 +97,12 @@ check_request_status(bitfile_id_t * BitfileID, int * Status)
 	return GLOBUS_SUCCESS;
 }
 
-//int s = -1;
+int
+min(size_t x, size_t y)
+{
+	if (x < y) return x;
+	return y;
+}
 
 STATIC globus_result_t
 submit_stage_request(const char * Pathname)
@@ -106,18 +112,61 @@ submit_stage_request(const char * Pathname)
 	if (retval)
 		return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
 
-	bitfile_id_t bitfile_id;
-
 	bfs_callback_addr_t callback_addr;
 	memset(&callback_addr, 0, sizeof(callback_addr));
+
+	const char * callback_addr_str = getenv("ASYNC_CALLBACK_ADDR");
+	if (callback_addr_str)
+	{
+		char node[NI_MAXHOST];
+		char serv[NI_MAXSERV];
+
+		memset(node, 0, sizeof(node));
+		memset(serv, 0, sizeof(serv));
+
+		char * colon;
+		if (colon = strchr(callback_addr_str, ':'))
+		{
+			strncpy(node,
+			        callback_addr_str,
+			        min(sizeof(node)-1, colon-callback_addr_str));
+			strncpy(serv, colon+1, sizeof(serv));
+		} else
+		{
+			strncpy(node, callback_addr_str, sizeof(node)-1);
+		}
+
+		char errbuf[HPSS_NET_MAXBUF];
+		retval = hpss_net_getaddrinfo(node,
+		                              serv,
+		                              0,
+		                              HPSS_IPPROTO_TCP,
+		                              &callback_addr.sockaddr,
+		                              errbuf,
+		                              sizeof(errbuf));
+
+		if (retval)
+		{
+			DEBUG(("Failed to set stage callback address %s: %d (%s) - %s",
+			      callback_addr_str,
+			      retval,
+			      gai_strerror(retval),
+			      errbuf));
+
+			return GlobusGFSErrorGeneric("Failed to set stage callback address");
+		}
+	}
+
 	callback_addr.id = 0xDEADBEEF;
 
 	DEBUG(("Requesting stage for ", Pathname));
+
 	/*
 	 * We use hpss_StageCallBack() so that we do not block while the
 	 * stage completes. We could use hpss_Open(O_NONBLOCK) and then
 	 * hpss_Stage(BFS_ASYNCH_CALL) but then we block in hpss_Close().
 	 */
+	bitfile_id_t bitfile_id;
 	retval = hpss_StageCallBack(Pathname,
 	                            cast64m(0),
 	                            fattrs.Attrs.DataLength,
