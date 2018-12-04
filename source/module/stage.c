@@ -49,6 +49,11 @@
 #include <time.h>
 
 /*
+ * HPSS includes
+ */
+#include <hpss_net.h>
+
+/*
  * Local includes
  */
 #include "stage.h"
