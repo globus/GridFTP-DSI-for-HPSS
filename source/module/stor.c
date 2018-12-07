@@ -207,11 +207,9 @@ stor_gridftp_callout(globus_gfs_operation_t Operation,
 	stor_info_t   * stor_info   = stor_buffer->StorInfo;
 
 	if (stor_buffer->Valid != VALID_TAG) return;
-//	assert(stor_buffer->Valid == VALID_TAG);
 
 	// Make sure we have the right buffer / UserArg combo
 	assert(stor_buffer->Buffer == (char *)Buffer);
-
 
 	pthread_mutex_lock(&stor_info->Mutex);
 	{
@@ -317,6 +315,9 @@ stor_launch_gridftp_reads(stor_info_t * StorInfo)
 
 	GlobusGFSName(stor_launch_gridftp_reads);
 
+	if (StorInfo->Eof)
+		return GLOBUS_SUCCESS;
+
 	if (StorInfo->ConnChkCnt++ == 0)
 		globus_gridftp_server_get_optimal_concurrency(StorInfo->Operation,
 		                                             &StorInfo->OptConnCnt);
@@ -370,21 +371,6 @@ stor_launch_gridftp_reads(stor_info_t * StorInfo)
 	return result;
 }
 
-/* Called locked. */
-//globus_result_t
-//stor_check_for_parallel_conns(stor_info_t * StorInfo, uint64_t Offset)
-//{
-//	GlobusGFSName(stor_check_for_parallel_conns);
-//	if (globus_list_size(StorInfo->ReadyBufferList) > 0)
-//	{
-//		if (globus_list_search_pred(StorInfo->ReadyBufferList, stor_find_buffer, &Offset) == NULL)
-//		{
-//			return GlobusGFSErrorGeneric("Out of order buffer offsets detected. Please disable parallel data channels.");
-//		}
-//	}
-//	return GLOBUS_SUCCESS;
-//}
-
 int
 stor_pio_callout(char     * Buffer,
                  uint32_t * Length,
@@ -417,9 +403,8 @@ stor_pio_callout(char     * Buffer,
 				break;
 			}
 
-			if (!stor_info->Eof)
-				result = stor_launch_gridftp_reads(stor_info);
-			if (result) break;
+			if ((result = stor_launch_gridftp_reads(stor_info)))
+				break;
 
 			if (copied_length != *Length)
 				pthread_cond_wait(&stor_info->Cond, &stor_info->Mutex);
@@ -507,6 +492,22 @@ stor_transfer_complete_callback(globus_result_t Result,
 
 	GlobusGFSName(stor_transfer_complete_callback);
 
+	// issue #37: insist on reading EOF before calling finished
+	if (result == GLOBUS_SUCCESS)
+	{
+		pthread_mutex_lock(&stor_info->Mutex);
+		{
+			while (!result && ! stor_info->Result && !stor_info->Eof)
+			{
+				result = stor_launch_gridftp_reads(stor_info);
+				if (result)
+					break;
+				pthread_cond_wait(&stor_info->Cond, &stor_info->Mutex);
+			}
+		}
+		pthread_mutex_unlock(&stor_info->Mutex);
+	}
+
 	globus_gridftp_server_finished_transfer(stor_info->Operation, result);
 	stor_wait_for_gridftp(stor_info);
 
@@ -578,22 +579,6 @@ stor(globus_gfs_operation_t       Operation,
 	globus_gridftp_server_get_write_range(Operation, &offset, &stor_info->RangeLength);
 	if (stor_info->RangeLength == -1)
 		stor_info->RangeLength = TransferInfo->alloc_size;
-
-	/* when alloc_size is 0, pio_start/stor_transfer_complete_callback will
-	 * call globus_gridftp_server_finished_transfer with success, but
-	 * without reading EOF from gridftp.  launch gridftp read now to
-	 * to prevent that.  without this, legitimate zero byte stors will  
-	 * cause the next transfer to fail.
-	 */
-	if (stor_info->RangeLength == 0)
-	{
-		pthread_mutex_lock(&stor_info->Mutex);
-		{
-			result = stor_launch_gridftp_reads(stor_info);
-		}
-		pthread_mutex_unlock(&stor_info->Mutex);
-		if (result) goto cleanup;
-	}
 
 	/*
 	 * Setup PIO
