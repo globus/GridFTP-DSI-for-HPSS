@@ -1,5 +1,8 @@
-Version 2.7(pre): Tue Nov 27 12:16:57 EST 2018
+Version 2.7: Mon Jan 14 16:08:11 UTC 2019
 	- issue 35: Async stage requests cause red-ball-of-doom
+	- issue 37: Timeout on stor of zero length files
+	- removed patches/ directory, contents were out of date
+	- moved important notices from the public documentation to README.md
 
 Version 2.6: Mon Oct 29 16:23:47 CDT 2018
 	- issue 32: Support for HPSS 7.5.1. Tested on RHEL 6.8
