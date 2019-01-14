@@ -4,7 +4,7 @@ GridFTP-DSI-for-HPSS is a Globus Connect Server Connector which allows HPSS admi
 ### Important Status Details 
 
 ##### BZ7883 prevents transfers larger than 4GiB on 7.5.2
-HPSS bug BZ7883 prevents successful transfers of files over 4GiB on HPSS versions 7.5.2+. Due to what appears to be a transfer length calculation error, transfer of files larger than 4GiB generate an EIO error at the 4GiB mark and the transfer terminates. This bug impacts all HPSS clients using the HPSS PIO interface. It is recommended to not use the DSI with HPSS versions 7.5.2+ until a fix is provided.
+HPSS bug BZ7883 prevents successful transfers of files over 4GiB on HPSS versions 7.5.2+. Due to what appears to be a transfer length calculation error, transfer of files larger than 4GiB generate an EIO error at the 4GiB mark and the transfer terminates. This bug impacts all HPSS clients using the HPSS PIO interface. Upgrade to HPSS 7.5.2u5 / HPSS 7.5.3u1 to resolve this issue.
 
 ##### Workaround for [issue35](https://github.com/JasonAlt/GridFTP-DSI-for-HPSS/issues/35) "Async stage requests cause red-ball-of-doom"
 Recent changes to make use of the async stage request API for HPSS in order to avoid inundating the core server with duplicate stage requests has exposed a deficiency for the DSI use case of HPSS. The HPSS async stage API expects the call to be available long term in order to receive stage completion messages. However, the GridFTP/DSI use case is a short-lived transient environment; the GridFTP process can not wait minutes/hours/days for stage completion messages. Users of DSI versions 2.6+ will see the impact as a 'red-ball-of-doom' indicator in the HPSS GUI console. The warning is innocuous and can be ignored. IBM is aware of this issue and a CR has been created. 
