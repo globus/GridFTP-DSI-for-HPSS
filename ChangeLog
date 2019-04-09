@@ -1,3 +1,6 @@
+Version 2.8: Tue Apr  9 14:47:53 EDT 2019
+	- issue 40: Modification timestamps are zero
+
 Version 2.7: Mon Jan 14 16:08:11 UTC 2019
 	- issue 35: Async stage requests cause red-ball-of-doom
 	- issue 37: Timeout on stor of zero length files

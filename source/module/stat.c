@@ -218,9 +218,19 @@ stat_translate_dir_entry(ns_ObjHandle_t    * ParentObjHandle,
 	GFSStat->gid   = DirEntry->Attrs.GID;
 	GFSStat->dev   = 0;
 
-	GFSStat->atime = DirEntry->Attrs.TimeLastRead;
-	GFSStat->mtime = DirEntry->Attrs.TimeLastWritten;
-	GFSStat->ctime = DirEntry->Attrs.TimeCreated;
+	timestamp_sec_t hpss_atime;
+	timestamp_sec_t hpss_mtime;
+	timestamp_sec_t hpss_ctime;
+
+	API_ConvertTimeToPosixTime(&DirEntry->Attrs,
+	                           &hpss_atime,
+	                           &hpss_mtime,
+	                           &hpss_ctime);
+
+	GFSStat->atime = hpss_atime;
+	GFSStat->mtime = hpss_mtime;
+	GFSStat->ctime = hpss_ctime;
+
 	GFSStat->ino   = 0; // XXX
 	GFSStat->size  = DirEntry->Attrs.DataLength;
 
