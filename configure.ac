@@ -46,83 +46,41 @@ AC_PROG_CXX
 AC_PROG_CC
 AC_CONFIG_MACRO_DIR([m4])
 
-#
-# For checksums
-#
-AC_CHECK_HEADERS([openssl/md5.h], [MD5_HEADER="yes"], [AC_MSG_ERROR(Missing openssl/md5.h)])
+PKG_CHECK_MODULES([OPENSSL],[openssl])
+PKG_CHECK_MODULES([GLOBUS], [globus-gridftp-server])
+
+# hpss-clnt-devel-7.5 has a pkg config but 7.3, 7.4 does not
+HPSS_CFLAGS="-DLINUX -DLITTLEEND -I/opt/hpss/include"
+HPSS_LDFLAGS="-L/opt/hpss/lib -Wl,-rpath,/opt/hpss/lib"
+
+SAVE_CPPFLAGS="${CPPFLAGS}"
+CPPFLAGS="${HPSS_CFLAGS}"
+AC_CHECK_HEADERS([hpss_String.h \
+                  hpss_errno.h \
+                  hpss_mech.h \
+                  hpss_api.h \
+                  hpss_version.h \
+                  hpss_xml.h \
+                  hpss_Getenv.h \
+                  hpss_net.h \
+                  hpss_stat.h],
+                 [], 
+                 [AC_MSG_ERROR(hpss-lib-devel is not installed)])
+CPPFLAGS="${SAVE_CPPFLAGS}"
+
+AC_CHECK_LIB(hpss, hpss_Lstat, [hpss-lib-devel is not installed])
 
 #
-# Globus Setup
+# IU and NERSC report that using krb fails because libhpssgss.so doesn't link against
+# libhpsskrbauth.so. NERSC reported that libhpssunixauth.so was necessary in their
+# environment. It is necessary to link these here; the XDR/libtirpc issue causes the
+# runtime dynamic linking to fail without this.
 #
-AC_ARG_WITH(globus,
-	[  --with-globus=value     location of Globus installation, defaults to /usr],
-	[  globus_location="$withval" ],
-	[  globus_location="/usr" ]
-)
+HPSS_LIBS="-lhpsskrb5auth -lhpssunixauth -lhpss -lhpsscs"
+AC_SUBST(HPSS_CFLAGS)
+AC_SUBST(HPSS_LDFLAGS)
+AC_SUBST(HPSS_LIBS)
 
-#
-# globus_common.h depends on globus_config.h, so do it first
-#
-if test "x$globus_location" == "x/usr" ; then
-	# RPM installation
-	CPPFLAGS="-I$globus_location/lib64/globus/include -I/usr/include/globus"
-	AC_CHECK_HEADERS([globus_config.h],
-	                 [GLOBUS_CONFIG_CPPFLAGS="$CPPFLAGS"],
-	                 [AC_MSG_ERROR([globus_config.h not found, install globus-core])])
-else
-	# Source installation
-	CPPFLAGS=-I$globus_location/include/globus/gcc64dbg
-	AC_CHECK_HEADERS([globus_config.h],
-	                 [GLOBUS_CONFIG_CPPFLAGS="$CPPFLAGS"],
-	                 [AC_MSG_ERROR(globus_config.h not found in $globus_location)])
-fi
-
-#
-# Now check for globus_common.h using globus_config.h's location
-#
-CPPFLAGS="-I$globus_location/include/globus $GLOBUS_CONFIG_CPPFLAGS"
-AC_CHECK_HEADERS([globus_common.h],
-                 [GLOBUS_COMMON_CPPFLAGS="-I$globus_location/include/globus"],
-                 [AC_MSG_ERROR(globus_common.h not found)])
-
-#
-# Sum up all the Globus CPPFLAGS
-#
-GLOBUS_CPPFLAGS=$GLOBUS_CONFIG_CPPFLAGS
-if test "${GLOBUS_CONFIG_CPPFLAGS}" != "${GLOBUS_COMMON_CPPFLAGS}"; then
-	GLOBUS_CPPFLAGS="$GLOBUS_CPPFLAGS $GLOBUS_COMMON_CPPFLAGS"
-fi
-
-#
-# Now check for globus_gridftp_server.h
-#
-CPPFLAGS="${GLOBUS_CPPFLAGS}"
-AC_CHECK_HEADERS([globus_gridftp_server.h],
-                 [],
-                 [AC_MSG_ERROR(globus_gridftp_server.h not found)])
-
-AC_SUBST(GLOBUS_CPPFLAGS)
-
-#
-# Find the needed Globus libraries
-#
-LDFLAGS="-L$globus_location/lib64/"
-AC_CHECK_LIB([globus_gridftp_server],
-             [globus_gridftp_server_begin_transfer],
-             [GLOBUS_LDFLAGS=-L$globus_location/lib64],
-             [AC_MSG_ERROR(libglobus_gridftp_server.so not found)])
-
-AC_SUBST(GLOBUS_LDFLAGS)
-
-dnl
-dnl Find the HPSS installation
-dnl
-hpss_location=/opt/hpss
-AC_ARG_WITH(hpss, AC_HELP_STRING([--with-hpss=dir],\
-   [location of HPSS installation, defaults to /opt/hpss]),
-   [hpss_location=$withval],
-   [])
-AC_SUBST(HPSS_LOCATION, $hpss_location)
 
 dnl
 dnl These values are hardcoded for now, until I can get the packaging stuff working again
