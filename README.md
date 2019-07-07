@@ -25,3 +25,44 @@ These HPSS issues severely impact performance so the patches are highly recommen
 
 **BZ2856** - Enabling HPSS_API_REUSE_CONNECTIONS returns address already in use. This one sets a limit on how many active connections we can have. GridFTP and HPSS make considerable use of ephemeral TCP ports. Quick, successive file transfers can lead the system to run out of available ports. There is no fix for this HPSS issue at this time. The number of ephemeral ports can be increased and the amount of time a socket spends in timed wait can be decreased to help avoid this issue.
 
+
+### Dependencies
+
+#### Build
+
+Header File   | Package(s)
+------------- | ----------
+hpss_String.h  | hpss-lib-devel-7.4 hpss-lib-7.5
+hpss_Getenv.h  | hpss-lib-devel-7.4 hpss-lib-7.5       hpss-clnt-devel-7.5
+hpss_net.h     | hpss-lib-devel-7.4 hpss-lib-7.5       hpss-clnt-devel-7.5
+hpss_errno.h   | hpss-lib-devel-7.4 hpss-lib-devel-7.5 hpss-clnt-devel-7.5
+hpss_api.h     | hpss-lib-devel-7.4 hpss-lib-devel-7.5 hpss-clnt-devel-7.5
+hpss_version.h | hpss-lib-devel-7.4 hpss-lib-devel-7.5 hpss-clnt-devel-7.5
+hpss_xml.h     | hpss-lib-devel-7.4 hpss-lib-devel-7.5 hpss-clnt-devel-7.5
+hpss_stat.h    | hpss-lib-devel-7.4 hpss-lib-devel-7.5 hpss-clnt-devel-7.5
+hpss_mech.h    | hpss-lib-devel-7.4 hpss-lib-devel-7.5
+
+There is a direct build-time dependency on libhpsskrb5auth.so and libhpssunixauth.so because of the XDR 'fix'. These libraries are supposed to be dynamically loaded as configured in /var/hpss/etc/auth.conf.
+
+#### Runtime
+
+Library | Package
+------- | -------
+libhpss.so | hpss-lib
+libhpsscs.so | hpss-lib
+libhpsskrb5auth.so | hpss-lib
+libhpssunixauth.so | hpss-lib
+
+#### pkg-config in hpss-clnt-devel 7.5
+```
+prefix=/opt/hpss
+exec_prefix=${prefix}
+includedir=${prefix}/include
+libdir=${prefix}/lib
+
+Name: libHPSS
+Description: HPSS Client Library for applications
+Version: 7.5.1.2.0
+Cflags: -I/usr/include/tirpc -I/opt/hpss/include -D_GNU_SOURCE -D_THREAD_SAFE -DLINUX -DHAVE_GETIFADDRS -DHPSS_ALLOW_RAIT -Wpointer-arith -ltirpc -pthread -m64 -ltirpc -pthread -Wl,-rpath-link,${prefix}/lib -Wl,-rpath,/usr/lib64 -Wl,-rpath-link,${prefix}/db2/lib64 -Wl,-rpath=/hpss_src/hpss-7.5.1.2-20190116.u9.el6/lib -Wl,-rpath=/hpss_src/hpss-7.5.1.2-20190116.u9.el6/db2/lib64 -Wl,-rpath=/opt/hpss/lib -Wl,-rpath=/opt/hpss/db2/lib64 -DLITTLEEND
+Libs: -L${libdir} -lhpss -lhpsscs
+```
