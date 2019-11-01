@@ -51,21 +51,30 @@
 /*
  * HPSS includes
  */
+#include <hpss_api.h>
 #include <hpss_net.h>
+#include <hpss_version.h>
 
 /*
  * Local includes
  */
 #include "stage.h"
-#include "stage_test.h"
 
-GlobusDebugDeclare(GLOBUS_GRIDFTP_SERVER_HPSS);
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) ||                     \
+    HPSS_MAJOR_VERSION >= 8
+#define bitfile_id_t bfs_bitfile_obj_handle_t
+#define ATTR_TO_BFID(x) (x.Attrs.BitfileObj.BfId)
+#else
+#define bitfile_id_t hpssoid_t
+#define ATTR_TO_BFID(x) (x.Attrs.BitfileId)
+#endif
 
-// Fragile. Defined in ../loaders/common_loader.c
-#define TRACE 1 /* TRACE_STAGING */
-
-#define DEBUG(message)                                                         \
-    GlobusDebugPrintf(GLOBUS_GRIDFTP_SERVER_HPSS, TRACE, message)
+typedef enum
+{
+    ARCHIVED,
+    RESIDENT,
+    TAPE_ONLY,
+} residency_t;
 
 /*
  * Use a constant request number for stage requests so that we can
@@ -73,8 +82,8 @@ GlobusDebugDeclare(GLOBUS_GRIDFTP_SERVER_HPSS);
  */
 static hpss_reqid_t REQUEST_ID = 0xDEADBEEF;
 
-STATIC globus_result_t
-       check_request_status(bitfile_id_t *BitfileID, int *Status)
+static globus_result_t
+check_request_status(bitfile_id_t *BitfileID, int *Status)
 {
 #if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) ||                     \
     HPSS_MAJOR_VERSION >= 8
@@ -89,13 +98,10 @@ STATIC globus_result_t
     switch (*Status)
     {
     case HPSS_STAGE_STATUS_UNKNOWN:
-        DEBUG(("Stage request status UNKNOWN"));
         break;
     case HPSS_STAGE_STATUS_ACTIVE:
-        DEBUG(("Stage request status ACTIVE"));
         break;
     case HPSS_STAGE_STATUS_QUEUED:
-        DEBUG(("Stage request status QUEUED"));
         break;
     }
 
@@ -110,8 +116,8 @@ min(size_t x, size_t y)
     return y;
 }
 
-STATIC globus_result_t
-       submit_stage_request(const char *Pathname)
+static globus_result_t
+submit_stage_request(const char *Pathname)
 {
     hpss_fileattr_t fattrs;
     int             retval = hpss_FileGetAttributes(Pathname, &fattrs);
@@ -153,20 +159,12 @@ STATIC globus_result_t
 
         if (retval)
         {
-            DEBUG(("Failed to set stage callback address %s: %d (%s) - %s",
-                   callback_addr_str,
-                   retval,
-                   gai_strerror(retval),
-                   errbuf));
-
             return GlobusGFSErrorGeneric(
                 "Failed to set stage callback address");
         }
     }
 
     callback_addr.id = 0xDEADBEEF;
-
-    DEBUG(("Requesting stage for ", Pathname));
 
     /*
      * We use hpss_StageCallBack() so that we do not block while the
@@ -188,8 +186,8 @@ STATIC globus_result_t
     return GLOBUS_SUCCESS;
 }
 
-STATIC residency_t
-       check_xattr_residency(hpss_xfileattr_t *XFileAttr)
+static residency_t
+check_xattr_residency(hpss_xfileattr_t *XFileAttr)
 {
     /* Check if this is a regular file. */
     if (XFileAttr->Attrs.Type != NS_OBJECT_TYPE_FILE &&
@@ -238,7 +236,7 @@ STATIC residency_t
     return RESIDENT;
 }
 
-STATIC void
+static void
 free_xfileattr(hpss_xfileattr_t *XFileAttr)
 {
     int level    = 0;
@@ -258,8 +256,8 @@ free_xfileattr(hpss_xfileattr_t *XFileAttr)
     }
 }
 
-STATIC globus_result_t
-       check_file_residency(const char *Pathname, residency_t *Residency)
+static globus_result_t
+check_file_residency(const char *Pathname, residency_t *Residency)
 {
     int              retval = 0;
     hpss_xfileattr_t xattr;
@@ -289,23 +287,20 @@ STATIC globus_result_t
     switch (*Residency)
     {
     case ARCHIVED:
-        DEBUG(("File is ARCHIVED: %s", Pathname));
         break;
     case RESIDENT:
-        DEBUG(("File is RESIDENT: %s", Pathname));
         break;
     case TAPE_ONLY:
-        DEBUG(("File is TAPE_ONLY: %s", Pathname));
         break;
     }
 
     return GLOBUS_SUCCESS;
 }
 
-STATIC globus_result_t
-       stage_get_timeout(globus_gfs_operation_t     Operation,
-                         globus_gfs_command_info_t *CommandInfo,
-                         int *                      Timeout)
+static globus_result_t
+stage_get_timeout(globus_gfs_operation_t     Operation,
+                  globus_gfs_command_info_t *CommandInfo,
+                  int *                      Timeout)
 {
     globus_result_t result;
     char **         argv   = NULL;
@@ -332,8 +327,8 @@ STATIC globus_result_t
     return GLOBUS_SUCCESS;
 }
 
-STATIC globus_result_t
-       get_bitfile_id(const char *Pathname, bitfile_id_t *bitfile_id)
+static globus_result_t
+get_bitfile_id(const char *Pathname, bitfile_id_t *bitfile_id)
 {
     hpss_fileattr_t attrs;
     int             retval = hpss_FileGetAttributes(Pathname, &attrs);
@@ -344,7 +339,7 @@ STATIC globus_result_t
     return GLOBUS_SUCCESS;
 }
 
-STATIC char *
+static char *
 generate_output(const char *Pathname, residency_t Residency)
 {
     if (Residency == RESIDENT)
@@ -360,7 +355,7 @@ generate_output(const char *Pathname, residency_t Residency)
 }
 
 /* Returns 1 if Timeout has elapsed, 0 otherwise. */
-STATIC int
+static int
 pause_1_second(time_t StartTime, int Timeout)
 {
     if ((time(NULL) - StartTime) > Timeout)
@@ -375,8 +370,8 @@ pause_1_second(time_t StartTime, int Timeout)
     return 0;
 }
 
-STATIC globus_result_t
-       stage_internal(const char *Path, int Timeout, residency_t *Residency)
+static globus_result_t
+stage_internal(const char *Path, int Timeout, residency_t *Residency)
 {
     int             time_elapsed = 0;
     time_t          start_time   = time(NULL);
@@ -429,8 +424,6 @@ stage(globus_gfs_operation_t     Operation,
     globus_result_t result;
 
     GlobusGFSName(stage);
-
-    DEBUG(("Stage request for ", CommandInfo->pathname));
 
     result = stage_get_timeout(Operation, CommandInfo, &timeout);
     if (result)

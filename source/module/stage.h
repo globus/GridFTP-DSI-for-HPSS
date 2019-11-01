@@ -51,9 +51,6 @@
  */
 #include "commands.h"
 
-/*
- * PUBLIC INTERFACE
- */
 void
 stage(globus_gfs_operation_t     Operation,
       globus_gfs_command_info_t *CommandInfo,

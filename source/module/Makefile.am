@@ -19,7 +19,6 @@ SOURCES = authenticate.c \
           retr.h         \
           stage.c        \
           stage.h        \
-          stage_test.h   \
           stat.c         \
           stat.h         \
           stor.c         \
