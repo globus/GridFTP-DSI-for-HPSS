@@ -143,5 +143,4 @@ AC_CONFIG_FILES([source/Makefile])
 AC_CONFIG_FILES([source/loaders/Makefile])
 AC_CONFIG_FILES([source/loaders/version.h])
 AC_CONFIG_FILES([source/module/Makefile])
-AC_CONFIG_FILES([test/module/Makefile])
 AC_OUTPUT
