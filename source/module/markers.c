@@ -52,32 +52,34 @@
 /*
  * Local includes.
  */
-#include "markers.h"
 #include "dl.h"
+#include "markers.h"
 
-typedef void (*globus_perf_markers_func_t) (globus_gfs_operation_t Operation,
-                                            globus_off_t           Length);
+typedef void (*globus_perf_markers_func_t)(globus_gfs_operation_t Operation,
+                                           globus_off_t           Length);
 
-typedef void (*globus_restart_markers_func_t) (globus_gfs_operation_t Operation,
-                                               globus_off_t           Offset,
-                                               globus_off_t           Length);
+typedef void (*globus_restart_markers_func_t)(globus_gfs_operation_t Operation,
+                                              globus_off_t           Offset,
+                                              globus_off_t           Length);
 
 static globus_restart_markers_func_t _globus_restart_markers = NULL;
-static globus_perf_markers_func_t    _globus_perf_markers = NULL;
+static globus_perf_markers_func_t    _globus_perf_markers    = NULL;
 
 static void
 _load_symbols()
 {
-		_globus_restart_markers = dl_find_symbol("globus_gridftp_server_update_range_recvd");
-		_globus_perf_markers = dl_find_symbol("globus_gridftp_server_update_bytes_recvd");
+    _globus_restart_markers =
+        dl_find_symbol("globus_gridftp_server_update_range_recvd");
+    _globus_perf_markers =
+        dl_find_symbol("globus_gridftp_server_update_bytes_recvd");
 }
 
 static void
 _init_symbols()
 {
-	static pthread_once_t once_control = PTHREAD_ONCE_INIT;
+    static pthread_once_t once_control = PTHREAD_ONCE_INIT;
 
-	pthread_once(&once_control, _load_symbols);
+    pthread_once(&once_control, _load_symbols);
 }
 
 void
@@ -85,12 +87,12 @@ markers_update_perf_markers(globus_gfs_operation_t Operation,
                             globus_off_t           Offset,
                             globus_off_t           Length)
 {
-	_init_symbols();
+    _init_symbols();
 
-	if (_globus_perf_markers)
-		_globus_perf_markers(Operation, Length);
-	else
-		globus_gridftp_server_update_bytes_written(Operation, Offset, Length);
+    if (_globus_perf_markers)
+        _globus_perf_markers(Operation, Length);
+    else
+        globus_gridftp_server_update_bytes_written(Operation, Offset, Length);
 }
 
 void
@@ -98,15 +100,15 @@ markers_update_restart_markers(globus_gfs_operation_t Operation,
                                globus_off_t           Offset,
                                globus_off_t           Length)
 {
-	_init_symbols();
+    _init_symbols();
 
-	if (_globus_restart_markers)
-		_globus_restart_markers(Operation, Offset, Length);
+    if (_globus_restart_markers)
+        _globus_restart_markers(Operation, Offset, Length);
 }
 
 int
 markers_restart_supported()
 {
-	_init_symbols();
-	return (_globus_restart_markers != NULL);
+    _init_symbols();
+    return (_globus_restart_markers != NULL);
 }

@@ -52,25 +52,24 @@
 #include <ns_ObjHandle.h>
 
 globus_result_t
-stat_object(char * Pathname, globus_gfs_stat_t *);
+stat_object(char *Pathname, globus_gfs_stat_t *);
 
 globus_result_t
-stat_link(char * Pathname, globus_gfs_stat_t *);
+stat_link(char *Pathname, globus_gfs_stat_t *);
 
 globus_result_t
-stat_directory_entries(ns_ObjHandle_t    * ObjHandle,        // IN
-                       uint64_t            OffsetIn,         // IN
-                       uint32_t            GFSStatCountIn,   // IN
-                       uint32_t          * End,              // OUT
-                       uint64_t          * OffsetOut,        // OUT
-                       globus_gfs_stat_t * GFSStatArray,     // OUT
-                       uint32_t          * GFSStatCountOut); // OUT
+stat_directory_entries(ns_ObjHandle_t *   ObjHandle,      // IN
+                       uint64_t           OffsetIn,       // IN
+                       uint32_t           GFSStatCountIn, // IN
+                       uint32_t *         End,            // OUT
+                       uint64_t *         OffsetOut,      // OUT
+                       globus_gfs_stat_t *GFSStatArray,   // OUT
+                       uint32_t *         GFSStatCountOut);        // OUT
 
 void
 stat_destroy(globus_gfs_stat_t *);
 
 void
 stat_destroy_array(globus_gfs_stat_t *, int Count);
-
 
 #endif /* HPSS_DSI_STAT_H */
