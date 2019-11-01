@@ -46,13 +46,13 @@
 #ifndef HPSS_DSI_DL_H
 #define HPSS_DSI_DL_H
 
-#include <stdlib.h>
 #include <dlfcn.h>
+#include <stdlib.h>
 
 int
-dl_symbol_avail(const char * Symbol);
+dl_symbol_avail(const char *Symbol);
 
 void *
-dl_find_symbol(const char * Symbol);
+dl_find_symbol(const char *Symbol);
 
 #endif /* HPSS_DSI_DL_H */

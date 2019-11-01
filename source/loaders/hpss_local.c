@@ -47,32 +47,30 @@
 /*
  * Local includes.
  */
-#include "version.h"
 #include "common_loader.h"
+#include "version.h"
 
 GlobusExtensionDeclareModule(globus_gridftp_server_hpss_local);
 
 int
 activate(void)
 {
-	return loader_activate("hpss_local", 
-	                       "hpss_local_dsi_iface",
-	                       GlobusExtensionMyModule(globus_gridftp_server_hpss_local));
+    return loader_activate(
+        "hpss_local",
+        "hpss_local_dsi_iface",
+        GlobusExtensionMyModule(globus_gridftp_server_hpss_local));
 }
 
 int
 deactivate(void)
 {
-	return loader_deactivate("hpss_local");
+    return loader_deactivate("hpss_local");
 }
 
-GlobusExtensionDefineModule(globus_gridftp_server_hpss_local) =
-{
+GlobusExtensionDefineModule(globus_gridftp_server_hpss_local) = {
     "globus_gridftp_server_hpss_local",
     activate,
     deactivate,
     GLOBUS_NULL,
     GLOBUS_NULL,
-    &version
-};
-
+    &version};

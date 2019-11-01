@@ -51,21 +51,22 @@
  */
 #include "config.h"
 
-enum {
-	GLOBUS_GFS_HPSS_CMD_SITE_STAGE = GLOBUS_GFS_MIN_CUSTOM_CMD,
+enum
+{
+    GLOBUS_GFS_HPSS_CMD_SITE_STAGE = GLOBUS_GFS_MIN_CUSTOM_CMD,
 };
 
 globus_result_t
 commands_init(globus_gfs_operation_t Operation);
 
-typedef void (*commands_callback)(globus_gfs_operation_t  Operation,
-                                  globus_result_t         Result,
-                                  char                  * CommandResponse);
+typedef void (*commands_callback)(globus_gfs_operation_t Operation,
+                                  globus_result_t        Result,
+                                  char *                 CommandResponse);
 
 void
-commands_run(globus_gfs_operation_t      Operation,
-             globus_gfs_command_info_t * CommandInfo,
-             config_t                  * Config,
-             commands_callback           Callback);
+commands_run(globus_gfs_operation_t     Operation,
+             globus_gfs_command_info_t *CommandInfo,
+             config_t *                 Config,
+             commands_callback          Callback);
 
 #endif /* HPSS_DSI_COMMANDS_H */

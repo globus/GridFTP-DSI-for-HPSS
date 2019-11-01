@@ -64,45 +64,47 @@
  */
 struct stor_info;
 
-typedef struct {
-	char             * Buffer;
-	globus_off_t       BufferOffset;   // Moves as buffer is consumed
-	globus_off_t       TransferOffset; // Moves as BufferOffset moves
-	globus_off_t       BufferLength;   // Moves as BufferOffset moves
-	struct stor_info * StorInfo;
-#define VALID_TAG   0xDEADBEEF
+typedef struct
+{
+    char *            Buffer;
+    globus_off_t      BufferOffset;   // Moves as buffer is consumed
+    globus_off_t      TransferOffset; // Moves as BufferOffset moves
+    globus_off_t      BufferLength;   // Moves as BufferOffset moves
+    struct stor_info *StorInfo;
+#define VALID_TAG 0xDEADBEEF
 #define INVALID_TAG 0x00000000
-	int                Valid; // Debug Entry
+    int Valid; // Debug Entry
 } stor_buffer_t;
 
-typedef struct stor_info {
-	globus_gfs_operation_t       Operation;
-	globus_gfs_transfer_info_t * TransferInfo;
+typedef struct stor_info
+{
+    globus_gfs_operation_t      Operation;
+    globus_gfs_transfer_info_t *TransferInfo;
 
-	int FileFD;
+    int FileFD;
 
-	globus_result_t Result;
-	globus_size_t   BlockSize;
+    globus_result_t Result;
+    globus_size_t   BlockSize;
 
-	pthread_mutex_t Mutex;
-	pthread_cond_t  Cond;
+    pthread_mutex_t Mutex;
+    pthread_cond_t  Cond;
 
-	globus_off_t    RangeLength; // Current range transfer length
-	globus_bool_t   Eof;
+    globus_off_t  RangeLength; // Current range transfer length
+    globus_bool_t Eof;
 
-	int OptConnCnt;
-	int ConnChkCnt;
-	int CurConnCnt;
+    int OptConnCnt;
+    int ConnChkCnt;
+    int CurConnCnt;
 
-	globus_list_t * AllBufferList;
-	globus_list_t * ReadyBufferList;
-	globus_list_t * FreeBufferList;
+    globus_list_t *AllBufferList;
+    globus_list_t *ReadyBufferList;
+    globus_list_t *FreeBufferList;
 
 } stor_info_t;
 
 void
-stor(globus_gfs_operation_t       Operation,
-     globus_gfs_transfer_info_t * TransferInfo,
-     config_t                   * Config);
+stor(globus_gfs_operation_t      Operation,
+     globus_gfs_transfer_info_t *TransferInfo,
+     config_t *                  Config);
 
 #endif /* HPSS_DSI_STOR_H */

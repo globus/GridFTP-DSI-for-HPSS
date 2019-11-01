@@ -46,8 +46,8 @@
 /*
  * System includes
  */
-#include <stdlib.h>
 #include <dlfcn.h>
+#include <stdlib.h>
 
 /*
  * Local includes
@@ -55,34 +55,34 @@
 #include "dl.h"
 
 int
-dl_symbol_avail(const char * Symbol)
+dl_symbol_avail(const char *Symbol)
 {
-	void * dl_handle    = NULL;
-	void * dl_sym       = NULL;
-	int    symbol_found = 0;
+    void *dl_handle    = NULL;
+    void *dl_sym       = NULL;
+    int   symbol_found = 0;
 
-	dl_handle = dlopen(NULL, RTLD_NOW);
-	if (dl_handle)
-	{
-		dl_sym = dlsym(dl_handle, Symbol);
-		if (dl_sym)
-			symbol_found = 1;
+    dl_handle = dlopen(NULL, RTLD_NOW);
+    if (dl_handle)
+    {
+        dl_sym = dlsym(dl_handle, Symbol);
+        if (dl_sym)
+            symbol_found = 1;
 
-		dlclose(dl_handle);
-	}
+        dlclose(dl_handle);
+    }
 
-	return symbol_found;
+    return symbol_found;
 }
 
 void *
-dl_find_symbol(const char * Symbol)
+dl_find_symbol(const char *Symbol)
 {
-	void * dl_handle    = NULL;
-	void * dl_sym       = NULL;
+    void *dl_handle = NULL;
+    void *dl_sym    = NULL;
 
-	dl_handle = dlopen(NULL, RTLD_NOW);
-	if (dl_handle)
-		dl_sym = dlsym(dl_handle, Symbol);
+    dl_handle = dlopen(NULL, RTLD_NOW);
+    if (dl_handle)
+        dl_sym = dlsym(dl_handle, Symbol);
 
-	return dl_sym;
+    return dl_sym;
 }
