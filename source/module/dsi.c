@@ -266,18 +266,11 @@ dsi_stat(globus_gfs_operation_t  Operation,
     globus_gridftp_server_finished_stat(Operation, result, NULL, 0);
 }
 
-/* Can request ordered data in globus-gridftp-server 11.x, removing the need to
- * force transfers to a single stream */
-#ifdef GLOBUS_GFS_DSI_DESCRIPTOR_REQUIRES_ORDERED_DATA
-#define HPSS_DESC                                                              \
-    GLOBUS_GFS_DSI_DESCRIPTOR_SENDER |                                         \
-        GLOBUS_GFS_DSI_DESCRIPTOR_REQUIRES_ORDERED_DATA
-#else
-#define HPSS_DESC GLOBUS_GFS_DSI_DESCRIPTOR_SENDER
-#endif
+globus_gfs_storage_iface_t hpss_dsi_iface = {
+    /* Descriptor       */
+    GLOBUS_GFS_DSI_DESCRIPTOR_SENDER | GLOBUS_GFS_DSI_DESCRIPTOR_BLOCKING |
+        GLOBUS_GFS_DSI_DESCRIPTOR_REQUIRES_ORDERED_DATA,
 
-globus_gfs_storage_iface_t hpss_local_dsi_iface = {
-    HPSS_DESC,   /* Descriptor       */
     dsi_init,    /* init_func        */
     dsi_destroy, /* destroy_func     */
     NULL,        /* list_func        */
