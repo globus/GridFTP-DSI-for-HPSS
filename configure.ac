@@ -60,5 +60,6 @@ AC_CONFIG_FILES([source/Makefile])
 AC_CONFIG_FILES([source/loader/Makefile])
 AC_CONFIG_FILES([source/loader/version.h])
 AC_CONFIG_FILES([source/module/Makefile])
+AC_CONFIG_FILES([packaging/fedora/globus-gridftp-server-hpss.spec])
 
 AC_OUTPUT

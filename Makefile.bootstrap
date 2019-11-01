@@ -12,3 +12,6 @@ srcpkg: dist
 develop:
 	@[ -f configure ] || autoreconf -i
 	@[ -f Makefile  ] || CFLAGS="-Wall -ggdb3" ./configure
+
+release: dist
+	@make package
