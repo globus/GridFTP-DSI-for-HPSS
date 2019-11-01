@@ -1,6 +1,6 @@
 lib_LTLIBRARIES = libglobus_gridftp_server_hpss_local.la   
 
-SOURCES = common_loader.c common_loader.h hpss_local.c
+SOURCES = hpss.c
 
 libglobus_gridftp_server_hpss_local_la_SOURCES=$(SOURCES)
 
