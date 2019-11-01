@@ -60,7 +60,6 @@
 #include "authenticate.h"
 #include "commands.h"
 #include "config.h"
-#include "markers.h"
 #include "retr.h"
 #include "stat.h"
 #include "stor.h"
@@ -175,7 +174,7 @@ dsi_recv(globus_gfs_operation_t      Operation,
 
     GlobusGFSName(dsi_recv);
 
-    if (dsi_restart_transfer(TransferInfo) && !markers_restart_supported())
+    if (dsi_restart_transfer(TransferInfo))
     {
         result = GlobusGFSErrorGeneric("Restarts are not supported");
         globus_gridftp_server_finished_transfer(Operation, result);

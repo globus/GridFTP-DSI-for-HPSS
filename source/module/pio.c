@@ -47,7 +47,6 @@
 /*
  * Local includes
  */
-#include "markers.h"
 #include "pio.h"
 
 globus_result_t
