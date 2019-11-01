@@ -57,8 +57,8 @@ AC_SUBST(HPSS_MINOR)
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([source/Makefile])
-AC_CONFIG_FILES([source/loaders/Makefile])
-AC_CONFIG_FILES([source/loaders/version.h])
+AC_CONFIG_FILES([source/loader/Makefile])
+AC_CONFIG_FILES([source/loader/version.h])
 AC_CONFIG_FILES([source/module/Makefile])
 
 AC_OUTPUT

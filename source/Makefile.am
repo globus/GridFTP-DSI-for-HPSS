@@ -1,1 +1,1 @@
-SUBDIRS=loaders module
+SUBDIRS=loader module
