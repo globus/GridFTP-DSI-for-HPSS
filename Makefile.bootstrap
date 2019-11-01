@@ -1,0 +1,14 @@
+all: 
+
+help: all
+
+dist:
+	@[ -f configure ] || autoreconf -i
+	@[ -f Makefile  ] || PKG_CONFIG=true ./configure
+	@make dist
+
+srcpkg: dist
+
+develop:
+	@[ -f configure ] || autoreconf -i
+	@[ -f Makefile  ] || CFLAGS="-Wall -ggdb3" ./configure
