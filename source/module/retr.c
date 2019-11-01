@@ -47,7 +47,6 @@
 /*
  * Local includes
  */
-#include "markers.h"
 #include "pio.h"
 #include "retr.h"
 
@@ -221,7 +220,7 @@ retr_pio_callout(char *    ReadyBuffer,
         }
 
         /* Update perf markers */
-        markers_update_perf_markers(retr_info->Operation, Offset, *Length);
+        globus_gridftp_server_update_bytes_recvd(retr_info->Operation, *Length);
     }
 cleanup:
     pthread_mutex_unlock(&retr_info->Mutex);

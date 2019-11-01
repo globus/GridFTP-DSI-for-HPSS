@@ -8,11 +8,7 @@ SOURCES = authenticate.c \
           commands.h     \
           config.c       \
           config.h       \
-          dl.c           \
-          dl.h           \
           dsi.c          \
-          markers.c      \
-          markers.h      \
           pio.c          \
           pio.h          \
           retr.c         \

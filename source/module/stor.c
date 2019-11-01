@@ -50,7 +50,6 @@
  */
 #include "cksm.h"
 #include "config.h"
-#include "markers.h"
 #include "pio.h"
 #include "stor.h"
 
@@ -415,8 +414,8 @@ stor_pio_callout(char *    Buffer,
         }
 
         if (copied_length)
-            markers_update_perf_markers(
-                stor_info->Operation, Offset, copied_length);
+            globus_gridftp_server_update_bytes_recvd(stor_info->Operation,
+                                                     copied_length);
 
         if (!stor_info->Result)
             stor_info->Result = result;
@@ -463,7 +462,9 @@ stor_range_complete_callback(globus_off_t *Offset,
 {
     stor_info_t *stor_info = UserArg;
 
-    markers_update_restart_markers(stor_info->Operation, *Offset, *Length);
+    globus_gridftp_server_update_range_recvd(stor_info->Operation,
+                                             *Offset, 
+                                             *Length);
 
     assert(*Length <= stor_info->RangeLength);
 
