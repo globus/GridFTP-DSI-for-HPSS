@@ -1,4 +1,4 @@
-SUBDIRS=source
+SUBDIRS=source test
 
 package:: rpm
 

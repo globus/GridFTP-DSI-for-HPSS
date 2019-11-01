@@ -1,0 +1,11 @@
+TESTING_DIST=_display.c \
+                _display.h \
+                _events.c  \
+                _events.h  \
+                _expectations.c \
+                _expectations.h \
+                mocking.h \
+                testing.c \
+                testing.h
+
+EXTRA_DIST = $(TESTING_DIST) driver.c
