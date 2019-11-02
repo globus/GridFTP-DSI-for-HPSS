@@ -42,8 +42,8 @@
 /*
  * System includes.
  */
-#include <pwd.h>
 #include <sys/types.h>
+#include <pwd.h>
 
 /*
  * Globus includes
@@ -71,8 +71,6 @@ authenticate_get_uid(char *UserName, int *Uid)
     char           buffer[1024];
     int            retval = 0;
 
-    GlobusGFSName(authenticate_get_uid);
-
     /* Find the passwd entry. */
     retval = getpwnam_r(UserName, &passwd_buf, buffer, sizeof(buffer), &passwd);
     if (retval != 0)
@@ -88,68 +86,64 @@ authenticate_get_uid(char *UserName, int *Uid)
 }
 
 globus_result_t
-authenticate(char *LoginName,
-             char *AuthenticationMech,
-             char *Authenticator,
-             char *UserName)
+authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
+             char * AuthenticationMech, // Location of credentials
+             char * Authenticator, // <type>:<path>
+             char * UserName) // User to switch to
 {
-    int                  uid           = -1;
-    char *               authenticator = NULL;
-    globus_result_t      result        = GLOBUS_SUCCESS;
-    hpss_rpc_auth_type_t auth_type;
-    api_config_t         api_config;
+    hpss_authn_mech_t authn_mech; // enum {krb5, unix, gsi, spkm}
 
-    GlobusGFSName(authenticate);
+    char * authn_mech_string = AuthenticationMech;
+    if (!authn_mech_string)
+        authn_mech_string = hpss_Getenv("HPSS_API_AUTHN_MECH");
+    if (!authn_mech_string)
+        authn_mech_string = hpss_Getenv("HPSS_PRIMARY_AUTHN_MECH");
 
-    /* Get the current HPSS client configuration. */
-    int retval = hpss_GetConfiguration(&api_config);
-    if (retval != HPSS_E_NOERROR)
-        return GlobusGFSErrorSystemError("hpss_GetConfiguration", -retval);
-
-    /* Translate the authentication mechanism. */
-    retval =
-        hpss_AuthnMechTypeFromString(AuthenticationMech, &api_config.AuthnMech);
+    int retval = hpss_AuthnMechTypeFromString(authn_mech_string, &authn_mech);
     if (retval != HPSS_E_NOERROR)
         return GlobusGFSErrorSystemError("hpss_AuthnMechTypeFromString()",
                                          -retval);
 
-    /* Parse the authenticator. */
-    retval = hpss_ParseAuthString(Authenticator,
-                                  &api_config.AuthnMech,
+    char * authenticator_string = Authenticator;
+    if (!authenticator_string)
+        authenticator_string = hpss_Getenv("HPSS_PRIMARY_AUTHENTICATOR");
+
+    hpss_rpc_auth_type_t auth_type; // enum {invalid, krb5, unix, gsi, spkm}
+    char * authenticator;
+    retval = hpss_ParseAuthString(authenticator_string,
+                                  &authn_mech,
                                   &auth_type,
                                   (void **)&authenticator);
-    if (retval != HPSS_E_NOERROR)
-        return GlobusGFSErrorSystemError("hpss_ParseAuthString()", -retval);
 
-    /* Now set the current HPSS client configuration. */
-    //	api_config.Flags  =  API_USE_CONFIG;
-    //	retval = hpss_SetConfiguration(&api_config);
-    //	if (retval != HPSS_E_NOERROR)
-    //		return GlobusGFSErrorSystemError("hpss_SetConfiguration()",
-    //-retval);
+    if (!LoginName)
+        LoginName = "hpssftp";
 
     /* Now log into HPSS using our configured 'super user' */
     retval = hpss_SetLoginCred(LoginName,
-                               api_config.AuthnMech,
+                               authn_mech,
                                hpss_rpc_cred_client,
                                auth_type,
                                authenticator);
     if (retval != HPSS_E_NOERROR)
         return GlobusGFSErrorSystemError("hpss_SetLoginCred()", -retval);
 
-    result = authenticate_get_uid(UserName, &uid);
-    if (result)
-        return result;
+    if (UserName)
+    {
+        int uid = -1;
+        globus_result_t result = authenticate_get_uid(UserName, &uid);
+        if (result)
+            return result;
 
-    /*
-     * Now masquerade as this user. This will lookup uid in our realm and
-     * set our credential to that user. The lookup is determined by the
-     * /var/hpss/etc/auth.conf, authz.conf files.
-     */
-    retval = hpss_LoadDefaultThreadState(uid, hpss_Umask(0), NULL);
-    if (retval != HPSS_E_NOERROR)
-        return GlobusGFSErrorSystemError("hpss_LoadDefaultThreadState()",
-                                         -retval);
+        /*
+         * Now masquerade as this user. This will lookup uid in our realm and
+         * set our credential to that user. The lookup is determined by the
+         * /var/hpss/etc/auth.conf, authz.conf files.
+         */
+        retval = hpss_LoadDefaultThreadState(uid, hpss_Umask(0), NULL);
+        if (retval != HPSS_E_NOERROR)
+            return GlobusGFSErrorSystemError("hpss_LoadDefaultThreadState()",
+                                             -retval);
+    }
 
     return GLOBUS_SUCCESS;
 }
