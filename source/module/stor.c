@@ -48,6 +48,7 @@
 /*
  * Local includes
  */
+#include "logging.h"
 #include "cksm.h"
 #include "config.h"
 #include "pio.h"
@@ -462,6 +463,7 @@ stor_range_complete_callback(globus_off_t *Offset,
 {
     stor_info_t *stor_info = UserArg;
 
+    INFO(("Restart marker sent: %lld, %lld\n", *Offset, *Length));
     globus_gridftp_server_update_range_recvd(stor_info->Operation,
                                              *Offset, 
                                              *Length);

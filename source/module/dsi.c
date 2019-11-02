@@ -59,13 +59,11 @@
  */
 #include "authenticate.h"
 #include "commands.h"
+#include "logging.h"
 #include "config.h"
 #include "retr.h"
 #include "stat.h"
 #include "stor.h"
-
-/* This is used to define the debug print statements. */
-GlobusDebugDefine(GLOBUS_GRIDFTP_SERVER_HPSS);
 
 void
 dsi_init(globus_gfs_operation_t     Operation,
@@ -78,7 +76,7 @@ dsi_init(globus_gfs_operation_t     Operation,
 
     GlobusGFSName(dsi_init);
 
-    GlobusDebugInit(GLOBUS_GRIDFTP_SERVER_HPSS, TRACE_STAGING);
+    logging_init();
 
     /*
      * Read in the config.
@@ -204,6 +202,8 @@ dsi_stat(globus_gfs_operation_t  Operation,
 
     globus_result_t   result = GLOBUS_SUCCESS;
     globus_gfs_stat_t gfs_stat;
+
+    INFO(("List or stat of %s\n", StatInfo->pathname));
 
     switch (StatInfo->use_symlink_info)
     {
