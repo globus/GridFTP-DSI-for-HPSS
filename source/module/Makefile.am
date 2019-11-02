@@ -9,6 +9,7 @@ SOURCES = authenticate.c \
           config.c       \
           config.h       \
           dsi.c          \
+          hooks.c        \
           logging.c      \
           logging.h      \
           pio.c          \
@@ -20,7 +21,9 @@ SOURCES = authenticate.c \
           stat.c         \
           stat.h         \
           stor.c         \
-          stor.h
+          stor.h         \
+          test.c         \
+          test.h
 
 libglobus_gridftp_server_hpss_real_la_SOURCES=$(SOURCES)
 
@@ -29,7 +32,10 @@ AM_CPPFLAGS=$(TIRPC_CFLAGS) $(OPENSSL_CFLAGS) $(GLOBUS_CFLAGS) $(HPSS_CFLAGS)
 AM_LDFLAGS=$(TIRPC_LDFLAGS)   \
            $(OPENSSL_LDFLAGS) \
            $(GLOBUS_LDFLAGS)  \
-           $(HPSS_LDFLAGS)
+           $(HPSS_LDFLAGS)    \
+           -Wl,--wrap=hpss_PIOExecute \
+           -Wl,--wrap=globus_gridftp_server_begin_transfer \
+           -Wl,--wrap=globus_gridftp_server_finished_transfer
 
 #
 # IU and NERSC report that using krb fails because libhpssgss.so doesn't link
