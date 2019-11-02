@@ -61,6 +61,7 @@
  */
 #include "cksm.h"
 #include "commands.h"
+#include "logging.h"
 #include "config.h"
 #include "stage.h"
 
@@ -93,6 +94,7 @@ commands_mkdir(globus_gfs_operation_t     Operation,
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
+    INFO(("mdkir %s\n", CommandInfo->pathname));
     GlobusGFSName(commands_mkdir);
 
     int retval = hpss_Mkdir(CommandInfo->pathname,
@@ -110,6 +112,7 @@ commands_rmdir(globus_gfs_operation_t     Operation,
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
+    INFO(("rmdir %s\n", CommandInfo->pathname));
     GlobusGFSName(commands_rmdir);
 
     int retval = hpss_Rmdir(CommandInfo->pathname);
@@ -126,6 +129,7 @@ commands_unlink(globus_gfs_operation_t     Operation,
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
+    INFO(("ulink %s\n", CommandInfo->pathname));
     GlobusGFSName(commands_unlink);
 
     int retval = hpss_Unlink(CommandInfo->pathname);
@@ -144,6 +148,9 @@ commands_rename(globus_gfs_operation_t     Operation,
     int             retval = 0;
     globus_result_t result = GLOBUS_SUCCESS;
 
+    INFO(("rename %s to %s\n",
+           CommandInfo->from_pathname,
+           CommandInfo->pathname));
     GlobusGFSName(commands_rename);
 
     if (Config->QuotaSupport)
@@ -303,6 +310,7 @@ commands_truncate(globus_gfs_operation_t     Operation,
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
+    INFO(("truncate %s\n", CommandInfo->pathname));
     GlobusGFSName(commands_truncate);
 
     int retval =

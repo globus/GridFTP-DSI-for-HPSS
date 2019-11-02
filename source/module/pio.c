@@ -48,6 +48,7 @@
  * Local includes
  */
 #include "pio.h"
+#include "logging.h"
 
 globus_result_t
 pio_launch_detached(void *(*ThreadEntry)(void *Arg), void *Arg)

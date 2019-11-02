@@ -55,6 +55,7 @@
 #include "cksm.h"
 #include "pio.h"
 #include "stat.h"
+#include "logging.h"
 
 int
 cksm_pio_callout(char *    Buffer,
@@ -286,6 +287,8 @@ cksm(globus_gfs_operation_t     Operation,
     hpss_stat_t     hpss_stat_buf;
 
     GlobusGFSName(cksm);
+
+    INFO(("CKSM of %s\n", CommandInfo->pathname));
 
     if (CommandInfo->cksm_offset == 0 && CommandInfo->cksm_length == -1)
     {

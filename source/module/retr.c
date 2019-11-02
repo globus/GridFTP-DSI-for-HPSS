@@ -47,6 +47,7 @@
 /*
  * Local includes
  */
+#include "logging.h"
 #include "pio.h"
 #include "retr.h"
 
@@ -379,6 +380,12 @@ retr(globus_gfs_operation_t Operation, globus_gfs_transfer_info_t *TransferInfo)
         goto cleanup;
 
     globus_gridftp_server_begin_transfer(Operation, 0, NULL);
+
+    INFO(("RETR of %s:  Offset: %lld  Length: %lld Filesize: %lld\n",
+           TransferInfo->pathname,
+           retr_info->CurrentOffset,
+           retr_info->RangeLength,
+           retr_info->FileSize));
 
     globus_gridftp_server_get_read_range(
         Operation, &retr_info->CurrentOffset, &retr_info->RangeLength);

@@ -59,6 +59,7 @@
  * Local includes
  */
 #include "stage.h"
+#include "logging.h"
 
 #if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) ||                     \
     HPSS_MAJOR_VERSION >= 8
@@ -98,10 +99,13 @@ check_request_status(bitfile_id_t *BitfileID, int *Status)
     switch (*Status)
     {
     case HPSS_STAGE_STATUS_UNKNOWN:
+        WARN(("Stage request status UNKNOWN\n"));
         break;
     case HPSS_STAGE_STATUS_ACTIVE:
+        DEBUG(("Stage request status ACTIVE\n"));
         break;
     case HPSS_STAGE_STATUS_QUEUED:
+        DEBUG(("Stage request status QUEUED\n"));
         break;
     }
 
@@ -159,12 +163,20 @@ submit_stage_request(const char *Pathname)
 
         if (retval)
         {
+            ERROR(("Failed to set stage callback address %s: %d (%s) - %s\n",
+                   callback_addr_str,
+                   retval,
+                   gai_strerror(retval),
+                   errbuf));
+
             return GlobusGFSErrorGeneric(
                 "Failed to set stage callback address");
         }
     }
 
     callback_addr.id = 0xDEADBEEF;
+
+    INFO(("Requesting stage for %s\n", Pathname));
 
     /*
      * We use hpss_StageCallBack() so that we do not block while the
@@ -287,10 +299,13 @@ check_file_residency(const char *Pathname, residency_t *Residency)
     switch (*Residency)
     {
     case ARCHIVED:
+        INFO(("File is ARCHIVED: %s\n", Pathname));
         break;
     case RESIDENT:
+        INFO(("File is RESIDENT: %s\n", Pathname));
         break;
     case TAPE_ONLY:
+        INFO(("File is TAPE_ONLY: %s\n", Pathname));
         break;
     }
 
@@ -424,6 +439,8 @@ stage(globus_gfs_operation_t     Operation,
     globus_result_t result;
 
     GlobusGFSName(stage);
+
+    INFO(("Stage request for %s\n", CommandInfo->pathname));
 
     result = stage_get_timeout(Operation, CommandInfo, &timeout);
     if (result)

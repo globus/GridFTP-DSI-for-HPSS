@@ -9,6 +9,8 @@ SOURCES = authenticate.c \
           config.c       \
           config.h       \
           dsi.c          \
+          logging.c      \
+          logging.h      \
           pio.c          \
           pio.h          \
           retr.c         \
