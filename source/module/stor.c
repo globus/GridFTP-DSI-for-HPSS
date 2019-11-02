@@ -42,6 +42,7 @@
 /*
  * System includes
  */
+#include <stdbool.h>
 #include <assert.h>
 #include <stddef.h>
 
@@ -49,10 +50,10 @@
  * Local includes
  */
 #include "logging.h"
-#include "cksm.h"
 #include "config.h"
-#include "pio.h"
 #include "stor.h"
+#include "cksm.h"
+#include "pio.h"
 
 globus_result_t
 stor_can_change_cos(char *Pathname, int *can_change_cos)
@@ -542,6 +543,28 @@ stor_transfer_complete_callback(globus_result_t Result, void *UserArg)
     free(stor_info);
 }
 
+static bool
+this_is_a_restart(globus_off_t Offset)
+{
+    return (Offset != 0);
+}
+
+static globus_result_t
+validate_restart(const char * Pathname,
+                 globus_off_t Offset,
+                 globus_off_t Length)
+{
+    hpss_stat_t hpss_stat_buf;
+    int retval = hpss_Lstat((char *)Pathname, &hpss_stat_buf);
+    if (retval)
+        return GlobusGFSErrorSystemError("hpss_Lstat", -retval);
+
+    if (hpss_stat_buf.st_size < Offset)
+        return globus_error_put(GlobusGFSErrorObjAppendNotSupported(GlobusGFSErrorObjGeneric("Bad restart marker found.")));
+
+    return GLOBUS_SUCCESS;
+}
+
 void
 stor(globus_gfs_operation_t      Operation,
      globus_gfs_transfer_info_t *TransferInfo,
@@ -551,8 +574,6 @@ stor(globus_gfs_operation_t      Operation,
     globus_result_t result            = GLOBUS_SUCCESS;
     int             file_stripe_width = 0;
     globus_off_t    offset            = 0;
-
-    GlobusGFSName(stor);
 
     /*
      * Create our structure.
@@ -587,13 +608,32 @@ stor(globus_gfs_operation_t      Operation,
     if (result)
         goto cleanup;
 
-    globus_gridftp_server_begin_transfer(Operation, 0, NULL);
-
+    // Write_range() must occur before begin_transfer() so that
+    // offsets are correct for DSIs that require ordered offsets
     globus_gridftp_server_get_write_range(
         Operation, &offset, &stor_info->RangeLength);
+
+    globus_gridftp_server_begin_transfer(Operation, 0, NULL);
+
+    INFO(("STOR of %s:  Offset: %lld  Length: %lld Allo: %lld\n",
+           TransferInfo->pathname,
+           offset, 
+           stor_info->RangeLength,
+           TransferInfo->alloc_size));
+
     if (stor_info->RangeLength == -1)
         stor_info->RangeLength = TransferInfo->alloc_size;
 
+    if (this_is_a_restart(offset))
+    {
+        globus_off_t length = stor_info->RangeLength;
+        result = validate_restart(TransferInfo->pathname, offset, length);
+        if (result)
+            goto cleanup;
+    }
+
+// XXX if offset is non zero, then this is a restart. The file must exist
+// and the file can not be shorter than offset.
     /*
      * Setup PIO
      */

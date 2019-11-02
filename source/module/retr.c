@@ -48,8 +48,8 @@
  * Local includes
  */
 #include "logging.h"
-#include "pio.h"
 #include "retr.h"
+#include "pio.h"
 
 globus_result_t
 retr_open_for_reading(char *Pathname, int *FileFD, int *FileStripeWidth)
@@ -379,6 +379,9 @@ retr(globus_gfs_operation_t Operation, globus_gfs_transfer_info_t *TransferInfo)
     if (result)
         goto cleanup;
 
+    globus_gridftp_server_get_read_range(
+        Operation, &retr_info->CurrentOffset, &retr_info->RangeLength);
+
     globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
     INFO(("RETR of %s:  Offset: %lld  Length: %lld Filesize: %lld\n",
@@ -387,8 +390,6 @@ retr(globus_gfs_operation_t Operation, globus_gfs_transfer_info_t *TransferInfo)
            retr_info->RangeLength,
            retr_info->FileSize));
 
-    globus_gridftp_server_get_read_range(
-        Operation, &retr_info->CurrentOffset, &retr_info->RangeLength);
     if (retr_info->RangeLength == -1)
         retr_info->RangeLength = retr_info->FileSize - retr_info->CurrentOffset;
 

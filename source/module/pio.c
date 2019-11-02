@@ -45,6 +45,11 @@
 #include <pthread.h>
 
 /*
+ * HPSS includes.
+ */
+#include <hpss_errno.h>
+
+/*
  * Local includes
  */
 #include "pio.h"
@@ -106,10 +111,13 @@ pio_coordinator_thread(void *Arg)
 
     GlobusGFSName(pio_coordinator_thread);
 
+// XXX we only support a single range except when we encounter a gap
+// during RETR. So this can all be simplified.
     do
     {
-        bytes_moved = 0;
         memset(&gap_info, 0, sizeof(gap_info));
+#define NoValue64 0xDEADBEEF
+        bytes_moved = NoValue64;
 
         /* Call pio execute. */
         rc = hpss_PIOExecute(pio->FD,
@@ -119,21 +127,28 @@ pio_coordinator_thread(void *Arg)
                              &gap_info,
                              &bytes_moved);
 
-        if (rc != 0 && rc != 0xDEADBEEF)
+        switch (bytes_moved)
+        {
+        case NoValue64:
+            length = 0;
+            WARN(("Your HPSS installation does not support BZ4719 "
+                  "and so restart markers are not supported on error "
+                  "conditions.\n"));
+            break;
+
+        default:
+            length = bytes_moved + gap_info.Length;
+            break;
+        }
+
+        if (gap_info.Length > 0)
+            INFO(("Gap in file. Offset:%llu Length:%llu\n",
+                   gap_info.Offset, 
+                   gap_info.Length));
+
+        if (rc != 0)
             pio->CoordinatorResult =
                 GlobusGFSErrorSystemError("hpss_PIOExecute", -rc);
-
-        /*
-         * It appears that gap_info.offset is relative to offset. So you
-         * must add the two to get the real offset of the gap. Also, if
-         * there is a gap, bytes_moved = gap_info.offset since bytes_moved
-         * is also relative to offset.
-         */
-
-        /* Add in any hole we may have found. */
-        length = bytes_moved;
-        if (neqz64m(gap_info.Length))
-            length = add64m(gap_info.Offset, gap_info.Length);
 
         do
         {
@@ -142,9 +157,15 @@ pio_coordinator_thread(void *Arg)
     } while (!rc && !eot);
 
     rc = hpss_PIOEnd(pio->CoordinatorSG);
-    if (rc != 0 && rc != PIO_END_TRANSFER &&
-        pio->CoordinatorResult == GLOBUS_SUCCESS)
-        pio->CoordinatorResult = GlobusGFSErrorSystemError("hpss_PIOEnd", -rc);
+    /*
+     * The returned value from hpss_PIOEnd() is not very useful. It doesn't
+     * have anything to do with the data we already transfered. If there is
+     * an error from hpss_PIOEnd(), it _is_ because we passed a bad arg which
+     * means a programming error and the transfer is likely to hang. All we 
+     * can really do is log a warning and hope the admin sees it.
+     */
+    if (rc != HPSS_E_NOERROR)
+        WARN(("hpss_PIOEnd() returned %d\n", rc));
 
     return NULL;
 }
