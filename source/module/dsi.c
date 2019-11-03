@@ -74,8 +74,6 @@ dsi_init(globus_gfs_operation_t     Operation,
     char *          home   = NULL;
     sec_cred_t      user_cred;
 
-    GlobusGFSName(dsi_init);
-
     logging_init();
 
     /*
@@ -172,8 +170,6 @@ dsi_stat(globus_gfs_operation_t  Operation,
          globus_gfs_stat_info_t *StatInfo,
          void *                  Arg)
 {
-    GlobusGFSName(dsi_stat);
-
     globus_result_t   result = GLOBUS_SUCCESS;
     globus_gfs_stat_t gfs_stat;
 

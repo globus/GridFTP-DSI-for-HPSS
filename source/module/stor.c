@@ -63,8 +63,6 @@ stor_can_change_cos(char *Pathname, int *can_change_cos)
     ns_FilesetAttrBits_t fileset_attr_bits;
     ns_FilesetAttrs_t    fileset_attr;
 
-    GlobusGFSName(stor_can_change_cos);
-
     memset(&fileattr, 0, sizeof(hpss_fileattr_t));
     retval = hpss_FileGetAttributes(Pathname, &fileattr);
     if (retval)
@@ -100,8 +98,6 @@ stor_open_for_writing(char *        Pathname,
     hpss_cos_hints_t      hints_in;
     hpss_cos_hints_t      hints_out;
     hpss_cos_priorities_t priorities;
-
-    GlobusGFSName(stor_open_for_writing);
 
     *FileFD = -1;
 
@@ -312,8 +308,6 @@ stor_launch_gridftp_reads(stor_info_t *StorInfo)
     stor_buffer_t * stor_buffer = NULL;
     globus_result_t result      = GLOBUS_SUCCESS;
 
-    GlobusGFSName(stor_launch_gridftp_reads);
-
     if (StorInfo->Eof)
         return GLOBUS_SUCCESS;
 
@@ -384,8 +378,6 @@ stor_pio_callout(char *    Buffer,
     uint64_t        copied_length = 0;
     stor_info_t *   stor_info     = CallbackArg;
     globus_result_t result        = GLOBUS_SUCCESS;
-
-    GlobusGFSName(stor_pio_callout);
 
     pthread_mutex_lock(&stor_info->Mutex);
     {
@@ -501,8 +493,6 @@ stor_transfer_complete_callback(globus_result_t Result, void *UserArg)
     globus_result_t result    = Result;
     stor_info_t *   stor_info = UserArg;
     int             rc        = 0;
-
-    GlobusGFSName(stor_transfer_complete_callback);
 
     // issue #37: insist on reading EOF before calling finished
     if (result == GLOBUS_SUCCESS)

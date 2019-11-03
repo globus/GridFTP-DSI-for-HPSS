@@ -274,8 +274,6 @@ check_file_residency(const char *Pathname, residency_t *Residency)
     int              retval = 0;
     hpss_xfileattr_t xattr;
 
-    GlobusGFSName(check_file_residency);
-
     memset(&xattr, 0, sizeof(hpss_xfileattr_t));
 
     /*
@@ -321,8 +319,6 @@ stage_get_timeout(globus_gfs_operation_t     Operation,
     char **         argv   = NULL;
     int             argc   = 0;
     int             retval = 0;
-
-    GlobusGFSName(stage_get_timeout);
 
     /* Get the command arguments. */
     result = globus_gridftp_server_query_op_info(Operation,
@@ -395,8 +391,6 @@ stage_internal(const char *Path, int Timeout, residency_t *Residency)
 
     *Residency = ARCHIVED;
 
-    GlobusGFSName(stage);
-
     result = get_bitfile_id(Path, &bitfile_id);
     if (result)
         goto cleanup;
@@ -437,8 +431,6 @@ stage(globus_gfs_operation_t     Operation,
     char *          command_output = NULL;
     residency_t     residency      = ARCHIVED;
     globus_result_t result;
-
-    GlobusGFSName(stage);
 
     INFO(("Stage request for %s\n", CommandInfo->pathname));
 

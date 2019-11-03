@@ -61,8 +61,6 @@ stat_translate_stat(char *             Pathname,
                     hpss_stat_t *      HpssStat,
                     globus_gfs_stat_t *GFSStat)
 {
-    GlobusGFSName(stat_translate_stat);
-
     GFSStat->mode  = HpssStat->st_mode;
     GFSStat->nlink = HpssStat->st_nlink;
     GFSStat->uid   = HpssStat->st_uid;
@@ -127,8 +125,6 @@ stat_translate_stat(char *             Pathname,
 globus_result_t
 stat_object(char *Pathname, globus_gfs_stat_t *GFSStat)
 {
-    GlobusGFSName(stat_object);
-
     memset(GFSStat, 0, sizeof(globus_gfs_stat_t));
 
     hpss_stat_t hpss_stat_buf;
@@ -149,8 +145,6 @@ stat_object(char *Pathname, globus_gfs_stat_t *GFSStat)
 globus_result_t
 stat_link(char *Pathname, globus_gfs_stat_t *GFSStat)
 {
-    GlobusGFSName(stat_link);
-
     memset(GFSStat, 0, sizeof(globus_gfs_stat_t));
 
     hpss_stat_t hpss_stat_buf;
@@ -166,8 +160,6 @@ stat_translate_dir_entry(ns_ObjHandle_t *   ParentObjHandle,
                          ns_DirEntry_t *    DirEntry,
                          globus_gfs_stat_t *GFSStat)
 {
-    GlobusGFSName(stat_translate_dir_entry);
-
     GFSStat->mode = 0;
     if (DirEntry->Attrs.UserPerms & NS_PERMS_RD)
         GFSStat->mode |= S_IRUSR;
@@ -275,8 +267,6 @@ stat_directory_entries(ns_ObjHandle_t *   ObjHandle,      // IN
     globus_result_t result;
     int             i;
     int             retval;
-
-    GlobusGFSName(stat_directory_entries);
 
     ns_DirEntry_t *dir_entry_buffer = NULL;
 

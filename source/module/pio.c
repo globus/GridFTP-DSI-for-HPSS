@@ -64,8 +64,6 @@ pio_launch_detached(void *(*ThreadEntry)(void *Arg), void *Arg)
     pthread_attr_t  attr;
     globus_result_t result = GLOBUS_SUCCESS;
 
-    GlobusGFSName(pio_launch_detached);
-
     /*
      * Launch a detached thread.
      */
@@ -87,8 +85,6 @@ pio_launch_attached(void *(*ThreadEntry)(void *Arg),
 {
     int rc = 0;
 
-    GlobusGFSName(pio_launch_attached);
-
     /*
      * Launch a detached thread.
      */
@@ -108,8 +104,6 @@ pio_coordinator_thread(void *Arg)
     globus_off_t       offset      = pio->InitialOffset;
     uint64_t           bytes_moved = 0;
     hpss_pio_gapinfo_t gap_info;
-
-    GlobusGFSName(pio_coordinator_thread);
 
 // XXX we only support a single range except when we encounter a gap
 // during RETR. So this can all be simplified.
@@ -197,8 +191,6 @@ pio_thread(void *Arg)
     pthread_t       thread_id;
     char *          buffer = NULL;
 
-    GlobusGFSName(pio_thread);
-
     buffer = malloc(pio->BlockSize);
     if (!buffer)
     {
@@ -268,8 +260,6 @@ pio_start(hpss_pio_operation_t           PioOpType,
     void *            group_buffer  = NULL;
     unsigned int      buffer_length = 0;
     int               eot           = 0;
-
-    GlobusGFSName(pio_start);
 
     /* No zero length transfers. */
     while (Length == 0)
