@@ -123,7 +123,7 @@ loader_activate(const char *                DsiName,
     }
 
     globus_extension_registry_add(
-        GLOBUS_GFS_DSI_REGISTRY, DsiName, Module, dsi_interface);
+        GLOBUS_GFS_DSI_REGISTRY, (char *)DsiName, Module, dsi_interface);
 
     return GLOBUS_SUCCESS;
 }
@@ -134,7 +134,7 @@ loader_activate(const char *                DsiName,
 int
 loader_deactivate(const char *DsiName)
 {
-    globus_extension_registry_remove(GLOBUS_GFS_DSI_REGISTRY, DsiName);
+    globus_extension_registry_remove(GLOBUS_GFS_DSI_REGISTRY, (char *)DsiName);
 
     globus_module_deactivate(GLOBUS_COMMON_MODULE);
 

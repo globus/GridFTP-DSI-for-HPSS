@@ -260,7 +260,7 @@ retr_range_complete_callback(globus_off_t *Offset,
     char *buffer = calloc(1, retr_info->BlockSize);
     while (retr_info->CurrentOffset < (*Length + *Offset))
     {
-        globus_off_t fill_size = retr_info->CurrentOffset - (*Length + *Offset);
+        uint32_t fill_size = retr_info->CurrentOffset - (*Length + *Offset);
         if (fill_size > retr_info->BlockSize)
             fill_size = retr_info->BlockSize;
 
