@@ -73,8 +73,6 @@ config_find_config_file(char **ConfigFilePath)
     char *          hpss_path_etc = NULL;
     int             retval        = 0;
 
-    GlobusGFSName(config_find_config_file);
-
     /* Initialize the return value. */
     *ConfigFilePath = NULL;
 
@@ -176,8 +174,6 @@ cleanup:
 static void
 config_find_next_word(char *Buffer, char **Word, int *Length)
 {
-    GlobusGFSName(config_find_next_word);
-
     *Word   = NULL;
     *Length = 0;
 
@@ -232,8 +228,6 @@ config_parse_file(char *ConfigFilePath, config_t *Config)
     char *          value        = NULL;
     char            buffer[1024];
     globus_result_t result = GLOBUS_SUCCESS;
-
-    GlobusGFSName(config_parse_file);
 
     /*
      * Open the config file.
@@ -320,8 +314,6 @@ config_process_env()
     char *       env_value = NULL;
     api_config_t api_config;
 
-    GlobusGFSName(config_process_env);
-
     /*
      * Get the current HPSS client configuration.
      */
@@ -349,8 +341,6 @@ config_init(config_t **Config)
 {
     char *          config_file_path = NULL;
     globus_result_t result           = GLOBUS_SUCCESS;
-
-    GlobusGFSName(config_init);
 
     *Config = NULL;
 

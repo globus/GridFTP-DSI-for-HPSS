@@ -68,8 +68,6 @@
 globus_result_t
 commands_init(globus_gfs_operation_t Operation)
 {
-    GlobusGFSName(commands_init);
-
     globus_result_t result =
         globus_gridftp_server_add_command(Operation,
                                           "SITE STAGE",
@@ -95,7 +93,6 @@ commands_mkdir(globus_gfs_operation_t     Operation,
     globus_result_t result = GLOBUS_SUCCESS;
 
     INFO(("mdkir %s\n", CommandInfo->pathname));
-    GlobusGFSName(commands_mkdir);
 
     int retval = hpss_Mkdir(CommandInfo->pathname,
                             S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
@@ -113,7 +110,6 @@ commands_rmdir(globus_gfs_operation_t     Operation,
     globus_result_t result = GLOBUS_SUCCESS;
 
     INFO(("rmdir %s\n", CommandInfo->pathname));
-    GlobusGFSName(commands_rmdir);
 
     int retval = hpss_Rmdir(CommandInfo->pathname);
     if (retval)
@@ -130,7 +126,6 @@ commands_unlink(globus_gfs_operation_t     Operation,
     globus_result_t result = GLOBUS_SUCCESS;
 
     INFO(("ulink %s\n", CommandInfo->pathname));
-    GlobusGFSName(commands_unlink);
 
     int retval = hpss_Unlink(CommandInfo->pathname);
     if (retval)
@@ -151,7 +146,6 @@ commands_rename(globus_gfs_operation_t     Operation,
     INFO(("rename %s to %s\n",
            CommandInfo->from_pathname,
            CommandInfo->pathname));
-    GlobusGFSName(commands_rename);
 
     if (Config->QuotaSupport)
     {
@@ -194,8 +188,6 @@ commands_chmod(globus_gfs_operation_t     Operation,
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
-    GlobusGFSName(commands_chmod);
-
     int retval = hpss_Chmod(CommandInfo->pathname, CommandInfo->chmod_mode);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Chmod", -retval);
@@ -210,8 +202,6 @@ session_get_gid(char *GroupName, int *Gid)
     struct group  group_buf;
     char          buffer[1024];
     int           retval = 0;
-
-    GlobusGFSName(session_get_gid);
 
     /* Find the passwd entry. */
     retval = getgrnam_r(GroupName, &group_buf, buffer, sizeof(buffer), &group);
@@ -234,8 +224,6 @@ commands_chgrp(globus_gfs_operation_t     Operation,
 {
     globus_result_t result = GLOBUS_SUCCESS;
     int             gid;
-
-    GlobusGFSName(commands_chgrp);
 
     hpss_stat_t hpss_stat_buf;
     int         retval = hpss_Stat(CommandInfo->pathname, &hpss_stat_buf);
@@ -273,8 +261,6 @@ commands_utime(globus_gfs_operation_t     Operation,
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
-    GlobusGFSName(commands_utime);
-
     struct utimbuf times;
     times.actime  = CommandInfo->utime_time;
     times.modtime = CommandInfo->utime_time;
@@ -293,8 +279,6 @@ commands_symlink(globus_gfs_operation_t     Operation,
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
-    GlobusGFSName(commands_symlink);
-
     int retval =
         hpss_Symlink(CommandInfo->from_pathname, CommandInfo->pathname);
     if (retval)
@@ -311,7 +295,6 @@ commands_truncate(globus_gfs_operation_t     Operation,
     globus_result_t result = GLOBUS_SUCCESS;
 
     INFO(("truncate %s\n", CommandInfo->pathname));
-    GlobusGFSName(commands_truncate);
 
     int retval =
         hpss_Truncate(CommandInfo->from_pathname, CommandInfo->cksm_offset);
@@ -327,8 +310,6 @@ commands_run(globus_gfs_operation_t     Operation,
              config_t *                 Config,
              commands_callback          Callback)
 {
-    GlobusGFSName(commands_run);
-
     switch (CommandInfo->command)
     {
     case GLOBUS_GFS_CMD_MKD:

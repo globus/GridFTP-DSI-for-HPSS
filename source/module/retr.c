@@ -58,8 +58,6 @@ retr_open_for_reading(char *Pathname, int *FileFD, int *FileStripeWidth)
     hpss_cos_hints_t      hints_out;
     hpss_cos_priorities_t priorities;
 
-    GlobusGFSName(retr_open_for_reading);
-
     *FileFD = -1;
 
     /* Initialize the hints in. */
@@ -122,8 +120,6 @@ retr_get_free_buffer(retr_info_t *RetrInfo, retr_buffer_t **FreeBuffer)
     int free_buf_cnt = 0;
     int cur_conn_cnt = 0;
 
-    GlobusGFSName(retr_get_free_buffer);
-
     /*
      * Wait for a free buffer or wait until conditions are right to create one.
      */
@@ -183,8 +179,6 @@ retr_pio_callout(char *    ReadyBuffer,
     retr_buffer_t * free_buffer = NULL;
     retr_info_t *   retr_info   = CallbackArg;
     globus_result_t result      = GLOBUS_SUCCESS;
-
-    GlobusGFSName(retr_pio_callout);
 
     assert(Offset == retr_info->CurrentOffset);
 
@@ -310,8 +304,6 @@ retr_transfer_complete_callback(globus_result_t Result, void *UserArg)
     retr_info_t *   retr_info = UserArg;
     int             rc        = 0;
 
-    GlobusGFSName(retr_transfer_complete_callback);
-
     globus_gridftp_server_finished_transfer(retr_info->Operation, result);
     retr_wait_for_gridftp(retr_info);
 
@@ -342,8 +334,6 @@ retr(globus_gfs_operation_t Operation, globus_gfs_transfer_info_t *TransferInfo)
     retr_info_t *   retr_info         = NULL;
     globus_result_t result            = GLOBUS_SUCCESS;
     hpss_stat_t     hpss_stat_buf;
-
-    GlobusGFSName(retr);
 
     rc = hpss_Stat(TransferInfo->pathname, &hpss_stat_buf);
     if (rc)

@@ -105,8 +105,6 @@ cksm_start_markers(cksm_marker_t **Marker, globus_gfs_operation_t Operation)
     globus_reltime_t delay;
     globus_result_t  result = GLOBUS_SUCCESS;
 
-    GlobusGFSName(cksm_start_markers);
-
     /* Get the frequency for maker updates. */
     globus_gridftp_server_get_update_interval(Operation, &marker_freq);
 
@@ -155,8 +153,6 @@ cksm_open_for_reading(char *Pathname, int *FileFD, int *FileStripeWidth)
     hpss_cos_hints_t      hints_out;
     hpss_cos_priorities_t priorities;
 
-    GlobusGFSName(cksm_open_for_reading);
-
     *FileFD = -1;
 
     /* Initialize the hints in. */
@@ -192,8 +188,6 @@ cksm_pio_callout(char *    Buffer,
 {
     int          rc        = 0;
     cksm_info_t *cksm_info = CallbackArg;
-
-    GlobusGFSName(cksm_pio_callout);
 
     assert(*Length <= cksm_info->BlockSize);
 
@@ -234,8 +228,6 @@ cksm_transfer_complete_callback(globus_result_t Result, void *UserArg)
     unsigned char   md5_digest[MD5_DIGEST_LENGTH];
     char            cksm_string[2 * MD5_DIGEST_LENGTH + 1];
     int             i;
-
-    GlobusGFSName(cksm_transfer_complete_callback);
 
     /* Give our error priority. */
     if (cksm_info->Result)
@@ -285,8 +277,6 @@ cksm(globus_gfs_operation_t     Operation,
     int             file_stripe_width = 0;
     char *          checksum_string   = NULL;
     hpss_stat_t     hpss_stat_buf;
-
-    GlobusGFSName(cksm);
 
     INFO(("CKSM of %s\n", CommandInfo->pathname));
 
@@ -399,8 +389,6 @@ cksm_set_checksum(char *Pathname, config_t *Config, char *Checksum)
     hpss_userattr_list_t attr_list;
     globus_gfs_stat_t    gfs_stat;
 
-    GlobusGFSName(checksum_set_file_sum);
-
     if (Config->UDAChecksumSupport)
     {
         result = stat_object(Pathname, &gfs_stat);
@@ -448,8 +436,6 @@ checksum_get_file_sum(char *Pathname, config_t *Config, char **ChecksumString)
     char                 checksum[HPSS_XML_SIZE];
     hpss_userattr_t      user_attrs[3];
     hpss_userattr_list_t attr_list;
-
-    GlobusGFSName(checksum_get_file_sum);
 
     *ChecksumString = NULL;
 
@@ -514,8 +500,6 @@ cksm_clear_checksum(char *Pathname, config_t *Config)
     int                  retval = 0;
     hpss_userattr_t      user_attrs[1];
     hpss_userattr_list_t attr_list;
-
-    GlobusGFSName(checksum_clear_file_sum);
 
     if (Config->UDAChecksumSupport)
     {
