@@ -124,7 +124,7 @@ static globus_result_t
 submit_stage_request(const char *Pathname)
 {
     hpss_fileattr_t fattrs;
-    int             retval = hpss_FileGetAttributes(Pathname, &fattrs);
+    int retval = hpss_FileGetAttributes((char *)Pathname, &fattrs);
     if (retval)
         return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
 
@@ -141,7 +141,7 @@ submit_stage_request(const char *Pathname)
         memset(serv, 0, sizeof(serv));
 
         char *colon;
-        if (colon = strchr(callback_addr_str, ':'))
+        if ((colon = strchr(callback_addr_str, ':')))
         {
             strncpy(node,
                     callback_addr_str,
@@ -184,7 +184,7 @@ submit_stage_request(const char *Pathname)
      * hpss_Stage(BFS_ASYNCH_CALL) but then we block in hpss_Close().
      */
     bitfile_id_t bitfile_id;
-    retval = hpss_StageCallBack(Pathname,
+    retval = hpss_StageCallBack((char *)Pathname,
                                 cast64m(0),
                                 fattrs.Attrs.DataLength,
                                 0,
@@ -280,7 +280,7 @@ check_file_residency(const char *Pathname, residency_t *Residency)
      * Stat the object. Without API_GET_XATTRS_NO_BLOCK, this call would hang
      * on any file moving between levels in its hierarchy (ie staging).
      */
-    retval = hpss_FileGetXAttributes(Pathname,
+    retval = hpss_FileGetXAttributes((char *)Pathname,
                                      API_GET_STATS_FOR_ALL_LEVELS |
                                          API_GET_XATTRS_NO_BLOCK,
                                      0,
@@ -342,7 +342,7 @@ static globus_result_t
 get_bitfile_id(const char *Pathname, bitfile_id_t *bitfile_id)
 {
     hpss_fileattr_t attrs;
-    int             retval = hpss_FileGetAttributes(Pathname, &attrs);
+    int retval = hpss_FileGetAttributes((char *)Pathname, &attrs);
     if (retval)
         return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
 
