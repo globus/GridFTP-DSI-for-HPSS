@@ -299,7 +299,7 @@ pio_start(hpss_pio_operation_t           PioOpType,
     pio_params.BlockSize       = BlockSize;
     pio_params.FileStripeWidth = FileStripeWidth;
     pio_params.IOTimeOutSecs   = 0;
-    pio_params.Transport       = HPSS_PIO_MVR_SELECT;
+    pio_params.Transport       = HPSS_PIO_TCPIP;
     pio_params.Options         = 0;
 
     int retval = hpss_PIOStart(&pio_params, &pio->CoordinatorSG);
