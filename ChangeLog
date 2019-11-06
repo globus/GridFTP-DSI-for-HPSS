@@ -1,5 +1,6 @@
 Version 2.9: Sat Nov  2 19:21:34 EDT 2019
 	- Issue #56: Large recursive directory listings with CLI fail
+	- Fixes 44: Support resumption of interrupted transfers
 	- New logging subsytem to support monitoring and debugging
 	- Added RPM packaging
 	- require globus-gridftp-server-devel version 12 or greater
