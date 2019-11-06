@@ -3,16 +3,26 @@ Name: @PACKAGE_NAME@-@HPSS_MAJOR@.@HPSS_MINOR@
 Version: @PACKAGE_VERSION@
 # release candidates have `Release` of 0.X.rc
 # releases have 'Release' of X
-Release: 0.1%{?dist}
+Release: 0.2%{?dist}
 License: ASL 2.0
 URL: https://github.com/JasonAlt/GridFTP-DSI-for-HPSS
 Source: @PACKAGE_NAME@-%{version}.tar.gz
 Group: System Environment/Libraries
 Packager: Jason Alt <jasonalt@globus.org>
 
+# Something is off with hpss-lib, RPM doesn't seem to know that it provides
+# the libraries we require. You can see this with `rpm -q --provides hpss-lib`.
+# That command should list the libraries it contains, but it does not list 
+# them. Note that this is the the _files_ it contains but rather the
+# _capabilities_ is contains, in this case, the libraries. So we use 'AutoReq'
+# to disable us from looking for hpss-lib libraries, instead we just check
+# that the hpss-lib is installed.
+#  For more details: http://ftp.rpm.org/max-rpm/s1-rpm-depend-auto-depend.html
+AutoReq: no
+
 Requires: globus-gridftp-server >= 12
 Requires: openssl
-Requires: hpss-lib-devel
+Requires: hpss-lib
 Requires: libtirpc
 
 BuildRequires: globus-gridftp-server-devel >= 12
