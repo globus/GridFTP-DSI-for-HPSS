@@ -5,7 +5,7 @@ Version 2.9: Sat Nov  2 19:21:34 EDT 2019
 	- require globus-gridftp-server-devel version 12 or greater
 	- Builds no longer require globus-gridftp-server-control-devel
 	  or libtirpc-devel
-	- Added test subsystem for inject failures for release verification
+	- Added test subsystem for injecting failures for release verification
 
 Version 2.8: Tue Apr  9 14:47:53 EDT 2019
 	- issue 40: Modification timestamps are zero
