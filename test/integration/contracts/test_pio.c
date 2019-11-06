@@ -747,7 +747,11 @@ test_pio_callout_fail(struct transfer * Transfer)
                      HPSS_PIO_WRITE,
                      RANGES(RANGE(0, 1024)));
 
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION == 4) 
     ASSERT(coordinator_return_value(Transfer) == HPSS_EIO);
+#else
+    ASSERT(coordinator_return_value(Transfer) == HPSS_ECONN);
+#endif
     ASSERT(participant_return_value(Transfer) == HPSS_EIO);
     ASSERT(pio_end_always_returns_success(Transfer));
     ASSERT(gap_info_not_set(Transfer));
@@ -870,6 +874,7 @@ test_pio_handle_gap(struct transfer * Transfer)
     ASSERT(participant_return_value(Transfer) == HPSS_E_NOERROR);
     ASSERT(pio_end_always_returns_success(Transfer));
     ASSERT(gap_info_set_to(Transfer, 0.5*1024*1024, 1024*1024));
+// This one is known to be broken in 7.4 and 7.5
     ASSERT(pio_callout_range(Transfer, RANGES(RANGE(0, 2*1024*1024))));
 
 }
@@ -878,11 +883,18 @@ test_pio_handle_gap(struct transfer * Transfer)
 int
 main()
 {
-    int retval = hpss_SetLoginCred("jasonalt",
-                                   hpss_authn_mech_unix,
+    // On kerberos systems, you should be able to point this at a kerberos
+    // keytab file. You can construct a kerberos keytab like this:
+    // > ktutil
+    // ktutil:  addent -password -p <username>@<domain> -k 1 -e aes256-cts
+    // Password for <username>@<domain>: [enter your password]
+    // ktutil:  wkt <keytab_file>
+    // ktutil:  quit
+    int retval = hpss_SetLoginCred("jalt",
+                                   hpss_authn_mech_krb5, // hpss_authn_mech_unix
                                    hpss_rpc_cred_client,
                                    hpss_rpc_auth_type_keytab,
-                                   "/var/hpss/etc/jasonalt.kt");
+                                   "/home/local/jalt/hpss.keytab2");
     if (retval)
     {
         printf("hpss_SetLoginCred() failed\n");

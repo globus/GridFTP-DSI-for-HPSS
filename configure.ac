@@ -1,10 +1,12 @@
 AC_INIT([globus-gridftp-server-hpss], [2.9], [Globus <support@globus.org>])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
-AM_PROG_AR
+# automake 1.11.1 (RHEL 6.8) does not support AM_PROG_AR
+m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 AC_PROG_LIBTOOL
 AC_CONFIG_MACRO_DIR([m4])
 AC_PROG_CC
-CC="${CC} -std=gnu11"
+# -std=gnu99 is not supported on RHEL 6.8
+CC="${CC} -std=gnu99"
 
 PKG_CHECK_MODULES([OPENSSL],[openssl])
 PKG_CHECK_MODULES([GLOBUS], [globus-gridftp-server >= 12])
