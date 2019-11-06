@@ -23,5 +23,3 @@ rpm:: dist rpmmacros rpmbuild_dirs
 	@cp rpmbuild/RPMS/x86_64/* .
 
 EXTRA_DIST=data
-
-AM_CPPFLAGS = --std=gnu11
