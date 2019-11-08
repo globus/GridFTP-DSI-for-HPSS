@@ -1,0 +1,258 @@
+== Transfer Restart Testing
+This document serves to explain how admins and developers can verify transfer
+restart functionality when using the HPSS Connector. Historically, restarts
+were disabled when using this connector due to incompatible functionality in
+both the GridFTP server and the PIO API. This has since been resolved and so
+endpoint owners are cleared to enable this missing functionality. However, since
+correct operation of this feature is critical both to operations and to data
+integrity in general, this document will help to explain the issue in detail
+and how to ensure that your site is configured correctly.
+
+NOTE: HPSS DSI version 2.9 was designed to handle restart issues correctly
+regardless of HPSS versioning or patch level. Admins should feel confident
+to enable restarts without repeating the process below. These instructions are
+for release verification and for greater assurance for admins wanting to perform
+verification for themselves.
+
+=== The Issue with Transfer Restarts
+During data transfers, the GridFTP service reports two types of markers back
+to the Globus Transfer service: (1) performance markers and (2) restart markers.
+Performance markers are merely an indication that a certain amount of data has
+been writing within a given time interval. Restart markers indicate that the 
+written data range is safe on permanent media.
+
+Early implementations of the GridFTP service were predominantly POSIX-focused
+and, as such, writing a buffer to disk met the criteria of both markers; each
+buffer could serve as a indication of the performance at a point-in-time and
+it also served as a safe restart point for the transfer. Thus the GridFTP
+server API took advantage of this fact and supplied a single call that
+connectors could call to update both marker types.
+
+The HPSS Connector was possibly the first connector to operate against an API
+that did not ensure that each write was a sufficient restart point. HPSS PIO
+allows for the writing of exteremly large ranges of data without any indication
+of a restart point. When calling hpss_PIOExecute(), the caller supplies the
+range of the incoming data, followed by that data. It is not until
+hpss_PIOExecute() returns at the _end_ of the transfer that a valid restart
+point is known. Restart points in a HPSS transfer are determined by
+implementation details of the HPSS Storage Service and aren't clearly
+predictable.
+
+In addition, BZ4719 was found to cause hpss_PIOExecute() to return BytesMoved
+unmodified when an error condition occured. This meant that, on error, the
+restart point was not known. In the best case scenario, BytesMoved would have
+been previously initalized to a smaller-than-actual value and so the transfer
+could have restarted at an earlier offset. In the worst case, BytesMoved would
+have been initialize to a larger-than-actual value and the transfer would have
+created a gap in the destination file. This would have gone undetected for sites
+and users that do not enable checksums.
+
+This presented a couple problems. Installations using a much older version of
+the GridFTP server couldn't distinguish buffer writes from valid restart offsets
+and unpatched HPSS installations couldn't trust restart markers, period. That's
+where version 2.9 comes in; it is aimed at ensuring that this issues are
+resolved and that restart functionality can be safely enabled.
+
+=== The Solution for Transfer Restarts
+The separate of performance and restart markers has long since been provided by
+the GridFTP server; the installation need only guarantee that an updated version
+of the server is installed. Version 2.9 solves this issue by changing deployment
+to RPM format instead of source. By doing so, the installation of the RPM
+guarantees compatibility with dependent services.
+
+BZ4719 has also long since been released. However, it is not always obvious
+which patches are avilable on any given HPSS installation; patches certainly do
+not appear to be uniformly applied accross sites. In order to compensate, the
+connector has been modified to detect bad restart offsets returned by
+hpss_PIOExecute(). Restart markers are only sent on offsets that are believed to
+be correct with a high level of assurance. In the worst case, the connector will
+log a warning that BZ4719 is alive and well on that installation and the
+transfer will safely restart from an earlier point in the transfer.
+
+When sites transition to version 2.9, if they were previously using a _very_ old
+version of the GridFTP service, it is possible, although highly unlikely, that
+the transition occurs just as an inflight transfer is preparing to restart from
+a bad restart marker. To handle this, the connector will refuse to perform a
+transfer restart in which the initial offset is > the current size of the file
+as it exists already. This is 'gap' detection and is at the heart of the restart
+issue. A corresponding log message is also sent to information the admin and
+user. The Globus Transfer service will remedy this by retransferring this file
+in its entirety.
+
+=== Configure the Test Subsystem
+The HPSS Connector has a new test subsystem built into it that will allow for
+fault injection on a live system in order to simulate hard-to-produce scenerios.
+In normal operations, the test system is passive and has no impact on
+functionality. However, once initialized, it can invoke desired failure modes
+in order to verify correct functionality.
+
+NOTE: This testing interface is not stable, it is subject to change between
+releases as necessary.
+
+Test functionality is enabled by defining the environment variable
+`HPSS_API_DEBUG` which (currently) takes the following options:
+
+INJECT_TRANSFER_FAILURE:: This will inject HPSS_EFAULT into any non-restart
+transfer over 8 bytes in length. The failure will occur somewhere between 1/2 to
+3/4 of the total size of the file. The transfer will resume at the most recent
+restart marker. The restart transfer will not be interrupted.
+
+INJECT_BAD_RESTART_MARKER:: This will send an invalid restart marker whenever an
+error occurs during the transfer. This option is only useful in conjunction with
+`INJECT_TRANSFER_FAILURE`. The transfer will attempt to restart at an invalid
+offset and will be rejected causing the file to be retransferred in its
+entirely. Note that this will cause a failure loop; transferring the entire file
+will again trigger `INJECT_TRANSFER_FAILURE`.
+
+Configure the HPSS Connector for fault testing by adding the following to 
+`/etc/gridftp.d/hpss_debug`:
+
+  $HPSS_API_DEBUG "INJECT_TRANSFER_FAILURE|INJECT_BAD_RESTART_MARKER"
+
+Options to `HPSS_API_DEBUG` should be separated by '|';
+
+=== Monitoring Tests
+The HPSS Connector has a new logging subsystem that allows for monitoring of
+events during GridFTP operations. This will allow you to view restart handling
+and verify correct behavior. In order to enable this subsystem, add the follwing
+to `/etc/gridftp.d/hpss_debug`:
+
+  $GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG "ALL,/tmp/hpss_dsi.log"
+
+This will cause all events to be logged to the file `/tmp/hpss_dsi.log`. You can
+change the pathname to something more suitable to your environment. This log will
+continue to increase in size the longer it remains enabled; do not forget to 
+disable it or apply log rotation mechanisms.
+
+=== Verifying Correct Transfer Restart Functionality
+
+==== (1) Verify Successful File Store
+Disable `$HPSS_API_DEBUG` and store a file larger than 8 bytes using the webapp
+at globus.org. Depending upon the size of the file, you'll see one or more
+restart makers. Cumulatively, these markers should equal the entirety of the
+file. For example:
+
+ ### 3538: GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG ###
+ List or stat of /home/jasonalt
+ List or stat of /home/jasonalt/1M.dat
+ STOR of /home/jasonalt/1M.dat:  Offset: 0  Length: -1 Allo: 1000000
+ Restart marker sent: 0, 1000000
+
+==== (2) Verify File Store Restart
+Enable `$HPSS_API_DEBUG "INJECT_TRANSFER_FAILURE"` and store a file larger than
+8 bytes using the webapp at globus.org. Depending upon the size of the file,
+you'll see one or more restart makers. The test subsystem will notify you of the
+offset at which it will inject HPSS_EFAULT:
+
+ ### 4384: GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG ###
+ List or stat of /home/jasonalt
+ List or stat of /home/jasonalt/1M.dat
+ !!!DSI testing is enabled!!!
+ STOR of /home/jasonalt/1M.dat:  Offset: 0  Length: -1 Allo: 1000000
+ Current transfer will be truncated to 731770 bytes for testing purposes.
+ Injecting failure into current transfer
+ Restart marker sent: 0, 731770
+
+The transfer will fail as you can see from the WebApp under `Activity` -> 
+Transfer ID -> `Event Log` -> `endpoint error`:
+
+ Details: 451-GlobusError: v=1 c=INTERNAL_ERROR\r\n451-GridFTP-Errno: 14\r\n451-GridFTP-Reason: System error in hpss_PIOExecute\r\n451-GridFTP-Error-String: Bad address\r\n451 End.\r\n
+
+And then the transfer will restart at the offset marker and complete
+successfully:
+
+ ### 4433: GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG ###
+ List or stat of /home/jasonalt
+ List or stat of /home/jasonalt/1M.dat
+ !!!DSI testing is enabled!!!
+ STOR of /home/jasonalt/1M.dat:  Offset: 731770  Length: -1 Allo: 268230
+ Restart marker sent: 731770, 268230
+ CKSM of /home/jasonalt/1M.dat
+ List or stat of /home/jasonalt/1M.dat
+
+==== (3) Verify File Retreive Restart
+Verifying file restarts on retreives are a little more difficult because it is
+the receiving end of the transfer that is responisble for issueing restart
+markers. Choosing a remote POSIX endpoint as the destination will give us useful
+restart markers every 5 seconds. Since we plan to interrupt the transfer 
+approximately half way through, choose a file size large enough for 15-20
+second transfer.
+
+Enable `$HPSS_API_DEBUG "INJECT_TRANSFER_FAILURE"` and retreive a sufficiently
+large file using the webapp at globus.org. You will not see restart markers
+indicated in the initial transfer. The test subsystem will notify you of the
+offset at which it will inject HPSS_EFAULT:
+
+ ### 5222: GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG ###
+ List or stat of /home/jasonalt/1G.dat
+ !!!DSI testing is enabled!!!
+ RETR of /home/jasonalt/1G.dat:  Offset: 0  Length: -1 Filesize: 1000000000
+ Current transfer will be truncated to 720537559 bytes for testing purposes.
+ Injecting failure into current transfer
+
+The transfer will fail as you can see from the WebApp under `Activity` -> 
+Transfer ID -> `Event Log` -> `endpoint error`:
+
+ Details: 451-GlobusError: v=1 c=INTERNAL_ERROR\r\n451-GridFTP-Errno: 14\r\n451-GridFTP-Reason: System error in hpss_PIOExecute\r\n451-GridFTP-Error-String: Bad address\r\n451 End.\r\n
+
+If the transfer was large enough to allow the receiving end sufficient time to
+send a restart offset, you notice a non-zero `Offset` in the next transfer and 
+the transfer will complete successfully:
+
+ ### 5291: GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG ###
+ List or stat of /home/jasonalt/1G.dat
+ !!!DSI testing is enabled!!!
+ RETR of /home/jasonalt/1G.dat:  Offset: 720537559  Length: -1 Filesize: 1000000000
+ CKSM of /home/jasonalt/1G.dat
+
+==== (4) Verify Handling of Bad Restart Marker
+Enable `$HPSS_API_DEBUG "INJECT_TRANSFER_FAILURE|INJECT_BAD_RESTART_MARKER"` and
+store a file larger than 8 bytes using the webapp at globus.org. Depending upon
+the size of the file, you'll see one or more restart makers. The test subsystem
+will notify you of the offset at which it will inject HPSS_EFAULT and that it
+will inject a restart marker that is beyond the length of the successfully
+transferred range:
+
+ ### 7066: GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG ###
+ List or stat of /home/jasonalt
+ List or stat of /home/jasonalt/1M.dat
+ !!!DSI testing is enabled!!!
+ STOR of /home/jasonalt/1M.dat:  Offset: 0  Length: -1 Allo: 1000000
+ Current transfer will be truncated to 470150 bytes for testing purposes.
+ Injecting failure into current transfer
+ Injecting bad restart marker at offset 495388
+ Restart marker sent: 0, 495388
+
+The transfer will fail as you can see from the WebApp under `Activity` -> 
+Transfer ID -> `Event Log` -> `endpoint error`:
+
+ Details: 451-GlobusError: v=1 c=INTERNAL_ERROR\r\n451-GridFTP-Errno: 14\r\n451-GridFTP-Reason: System error in hpss_PIOExecute\r\n451-GridFTP-Error-String: Bad address\r\n451 End.\r\n
+
+The transfer will attempt to restart using the bad restart marker:
+
+ ### 7120: GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG ###
+ List or stat of /home/jasonalt
+ List or stat of /home/jasonalt/1M.dat
+ !!!DSI testing is enabled!!!
+ STOR of /home/jasonalt/1M.dat:  Offset: 495388  Length: -1 Allo: 504612
+ CKSM of /home/jasonalt/1M.dat
+
+The transfer will fail as you can see from the WebApp under `Activity` -> 
+Transfer ID -> `Event Log` -> `file system does not allow append`:
+
+ Details: 553-GlobusError: v=1 c=APPEND_NOT_SUPPORTED\r\n553-Bad restart marker found.\r\n553 End.\r\n
+
+The error code `APPEND_NOT_SUPPORTED` will cause the transfer to resume from the
+beginning of the file:
+
+ ### 7182: GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG ###
+ List or stat of /home/jasonalt
+ List or stat of /home/jasonalt/1M.dat
+ !!!DSI testing is enabled!!!
+ STOR of /home/jasonalt/1M.dat:  Offset: 0  Length: -1 Allo: 1000000
+ Current transfer will be truncated to 581449 bytes for testing purposes.
+ Injecting failure into current transfer
+ Injecting bad restart marker at offset 588396
+ Restart marker sent: 0, 588396
+
+The cycle will continue until you cancel the transfer.
