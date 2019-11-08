@@ -35,7 +35,7 @@ of a restart point. When calling hpss_PIOExecute(), the caller supplies the
 range of the incoming data, followed by that data. It is not until
 hpss_PIOExecute() returns at the _end_ of the transfer that a valid restart
 point is known. Restart points in a HPSS transfer are determined by
-implementation details of the HPSS Storage Service and aren't clearly
+implementation details of the HPSS Storage Service and aren't easily
 predictable.
 
 In addition, BZ4719 was found to cause hpss_PIOExecute() to return BytesMoved
@@ -50,11 +50,11 @@ and users that do not enable checksums.
 This presented a couple problems. Installations using a much older version of
 the GridFTP server couldn't distinguish buffer writes from valid restart offsets
 and unpatched HPSS installations couldn't trust restart markers, period. That's
-where version 2.9 comes in; it is aimed at ensuring that this issues are
+where version 2.9 comes in; it is aimed at ensuring that these issues are
 resolved and that restart functionality can be safely enabled.
 
 === The Solution for Transfer Restarts
-The separate of performance and restart markers has long since been provided by
+The separation of performance and restart markers has long since been provided by
 the GridFTP server; the installation need only guarantee that an updated version
 of the server is installed. Version 2.9 solves this issue by changing deployment
 to RPM format instead of source. By doing so, the installation of the RPM
@@ -75,9 +75,9 @@ the transition occurs just as an inflight transfer is preparing to restart from
 a bad restart marker. To handle this, the connector will refuse to perform a
 transfer restart in which the initial offset is > the current size of the file
 as it exists already. This is 'gap' detection and is at the heart of the restart
-issue. A corresponding log message is also sent to information the admin and
-user. The Globus Transfer service will remedy this by retransferring this file
-in its entirety.
+issue. A corresponding log message is also sent to inform the admin and user.
+The Globus Transfer service will remedy this by retransferring this file in its
+entirety.
 
 === Configure the Test Subsystem
 The HPSS Connector has a new test subsystem built into it that will allow for
@@ -98,18 +98,18 @@ transfer over 8 bytes in length. The failure will occur somewhere between 1/2 to
 restart marker. The restart transfer will not be interrupted.
 
 INJECT_BAD_RESTART_MARKER:: This will send an invalid restart marker whenever an
-error occurs during the transfer. This option is only useful in conjunction with
-`INJECT_TRANSFER_FAILURE`. The transfer will attempt to restart at an invalid
-offset and will be rejected causing the file to be retransferred in its
+error occurs during the transfer. The transfer will attempt to restart at an
+invalid offset and will be rejected causing the file to be retransferred in its
 entirely. Note that this will cause a failure loop; transferring the entire file
-will again trigger `INJECT_TRANSFER_FAILURE`.
+will again trigger a transfer failure.
+
+INJECT_BZ4719:: This will simulate the earlier bug in order to demonstrate the
+detection and warning associated with this error condition.
 
 Configure the HPSS Connector for fault testing by adding the following to 
 `/etc/gridftp.d/hpss_debug`:
 
-  $HPSS_API_DEBUG "INJECT_TRANSFER_FAILURE|INJECT_BAD_RESTART_MARKER"
-
-Options to `HPSS_API_DEBUG` should be separated by '|';
+  $HPSS_API_DEBUG "<option>"
 
 === Monitoring Tests
 The HPSS Connector has a new logging subsystem that allows for monitoring of
@@ -171,14 +171,14 @@ successfully:
  List or stat of /home/jasonalt/1M.dat
 
 ==== (3) Verify File Retreive Restart
-Verifying file restarts on retreives are a little more difficult because it is
-the receiving end of the transfer that is responisble for issueing restart
+Verifying file restarts on retrieves are a little more difficult because it is
+the receiving end of the transfer that is responsible for issueing restart
 markers. Choosing a remote POSIX endpoint as the destination will give us useful
 restart markers every 5 seconds. Since we plan to interrupt the transfer 
 approximately half way through, choose a file size large enough for 15-20
 second transfer.
 
-Enable `$HPSS_API_DEBUG "INJECT_TRANSFER_FAILURE"` and retreive a sufficiently
+Enable `$HPSS_API_DEBUG "INJECT_TRANSFER_FAILURE"` and retrieve a sufficiently
 large file using the webapp at globus.org. You will not see restart markers
 indicated in the initial transfer. The test subsystem will notify you of the
 offset at which it will inject HPSS_EFAULT:
@@ -206,7 +206,7 @@ the transfer will complete successfully:
  CKSM of /home/jasonalt/1G.dat
 
 ==== (4) Verify Handling of Bad Restart Marker
-Enable `$HPSS_API_DEBUG "INJECT_TRANSFER_FAILURE|INJECT_BAD_RESTART_MARKER"` and
+Enable `$HPSS_API_DEBUG "INJECT_BAD_RESTART_MARKER"` and
 store a file larger than 8 bytes using the webapp at globus.org. Depending upon
 the size of the file, you'll see one or more restart makers. The test subsystem
 will notify you of the offset at which it will inject HPSS_EFAULT and that it
@@ -256,3 +256,21 @@ beginning of the file:
  Restart marker sent: 0, 588396
 
 The cycle will continue until you cancel the transfer.
+
+==== (5) Verify Detection of BZ4719
+Enable `$HPSS_API_DEBUG "INJECT_BZ4719"` and store a
+file larger than 8 bytes using the webapp at globus.org. The test subsystem will
+notify you that it will inject BZ4719 at the end of the range followed by a
+warning issued by the DSI that it has detected BZ4719 and your system will not
+support restarts on error:
+
+ ### 3981: GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG ###
+ List or stat of /home/jasonalt
+ List or stat of /home/jasonalt/1M.dat
+ !!!DSI testing is enabled!!!
+ STOR of /home/jasonalt/1M.dat:  Offset: 0  Length: -1 Allo: 1000000
+ Current transfer will be truncated to 362124 bytes for testing purposes.
+ Injecting failure into current transfer
+ Injecting BZ4719
+ Your HPSS installation does not support BZ4719 and so restart markers are not supported on error conditions.
+ Restart marker sent: 0, 0

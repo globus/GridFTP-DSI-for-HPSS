@@ -22,7 +22,8 @@ struct test_event {
         struct pio_range_complete {
             uint64_t   Offset;
             uint64_t   Length;
-            uint64_t * BytesMoved;
+            uint64_t   BytesMovedIn;
+            uint64_t * BytesMovedOut;
             int      * ReturnValue;
         } PioRangeComplete;
     } _u;
@@ -45,13 +46,14 @@ struct test_event {
                  ._u.PioRangeBegin.Length = &LENGTH                \
               })
 
-#define TEST_EVENT_PIO_RANGE_COMPLETE(OFFSET,LENGTH,BYTES_MOVED,RETURN_VALUE) \
-    TestEventHandler(&(struct test_event){                                    \
-                 .TestEventType = TEST_EVENT_TYPE_PIO_RANGE_COMPLETE,         \
-                 ._u.PioRangeComplete.Offset = OFFSET,                        \
-                 ._u.PioRangeComplete.Length = LENGTH,                        \
-                 ._u.PioRangeComplete.BytesMoved = BYTES_MOVED,               \
-                 ._u.PioRangeComplete.ReturnValue = &RETURN_VALUE             \
+#define TEST_EVENT_PIO_RANGE_COMPLETE(OFF,LEN,BYTES_IN,BYTES_OUT,RETVAL) \
+    TestEventHandler(&(struct test_event){                               \
+                 .TestEventType = TEST_EVENT_TYPE_PIO_RANGE_COMPLETE,    \
+                 ._u.PioRangeComplete.Offset = OFF,                      \
+                 ._u.PioRangeComplete.Length = LEN,                      \
+                 ._u.PioRangeComplete.BytesMovedIn = BYTES_IN,           \
+                 ._u.PioRangeComplete.BytesMovedOut = BYTES_OUT,         \
+                 ._u.PioRangeComplete.ReturnValue = &RETVAL              \
               })
 
 void
