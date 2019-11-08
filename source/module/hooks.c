@@ -18,6 +18,8 @@ __wrap_hpss_PIOExecute(int                  Fd,
                        hpss_pio_gapinfo_t * GapInfo,
                        u_signed64         * BytesMoved)
 {
+    u_signed64 bytes_moved_in = *BytesMoved;
+
     TEST_EVENT_PIO_RANGE_BEGIN(FileOffset, Size);
     int retval =  __real_hpss_PIOExecute(Fd,
                                          FileOffset,
@@ -25,7 +27,11 @@ __wrap_hpss_PIOExecute(int                  Fd,
                                          StripeGroup,
                                          GapInfo,
                                          BytesMoved);
-    TEST_EVENT_PIO_RANGE_COMPLETE(FileOffset, Size, BytesMoved, retval);
+    TEST_EVENT_PIO_RANGE_COMPLETE(FileOffset,
+                                  Size,
+                                  bytes_moved_in,
+                                  BytesMoved,
+                                  retval);
     return retval;
 }
 

@@ -21,8 +21,9 @@ struct {
     bool InjectThisTransfer;
 
     enum {
-        INJECT_TRANSFER_FAILURE,
-        INJECT_BAD_RESTART_MARKER
+        INJECT_TRANSFER_FAILURE = 1,
+        INJECT_BAD_RESTART_MARKER,
+        INJECT_BZ4719
     } Flags;
 } static TestPlan;
 
@@ -53,20 +54,12 @@ TestInit()
 
     INFO(("!!!DSI testing is enabled!!!\n"));
 
-    char * string = strdup(plan);
-    char * tmp    = string;
-    char * token  = NULL;
-
-    while ((token = strtok(tmp, "|")) != NULL)
-    {
-        tmp = NULL;
-
-        if (strcmp(token, "INJECT_TRANSFER_FAILURE") == 0)
-            TestPlan.Flags |= INJECT_TRANSFER_FAILURE;
-        else if (strcmp(token, "INJECT_BAD_RESTART_MARKER") == 0)
-            TestPlan.Flags |= INJECT_BAD_RESTART_MARKER;
-    }
-    free(string);
+    if (strcmp(plan, "INJECT_TRANSFER_FAILURE") == 0)
+        TestPlan.Flags = INJECT_TRANSFER_FAILURE;
+    else if (strcmp(plan, "INJECT_BAD_RESTART_MARKER") == 0)
+        TestPlan.Flags = INJECT_BAD_RESTART_MARKER;
+    else if (strcmp(plan, "INJECT_BZ4719") == 0)
+        TestPlan.Flags = INJECT_BZ4719;
 }
 
 static bool
@@ -96,7 +89,7 @@ TestEventRangeBegin(struct pio_range_begin * PioRangeBegin)
 
     TestPlan.InjectThisTransfer = true;
 
-    if (TestPlan.Flags & INJECT_TRANSFER_FAILURE);
+    if (TestPlan.Flags)
     {
         // We want the error to happen somewhere between 1/4 - 3/4 of the
         // transfer. Errors at 0 don't demonstrate much and errors at the
@@ -132,25 +125,30 @@ TestEventRangeComplete(struct pio_range_complete * PioRangeComplete)
     if (TransferFailedOnItsOwn(*PioRangeComplete->ReturnValue))
         return;
 
-    if (TestPlan.Flags & INJECT_TRANSFER_FAILURE);
+    if (TestPlan.Flags == INJECT_TRANSFER_FAILURE)
     {
         INFO(("Injecting failure into current transfer\n"));
         *PioRangeComplete->ReturnValue = INJECTED_ERROR_VALUE;
+    } else if (TestPlan.Flags == INJECT_BAD_RESTART_MARKER)
+    {
+        // We know we transferred upto 3/4 of the file at this point.
+        // So we can adjust BytesMoved up to, at most, another 1/4
+        // of the file. Since we don't know the original length,
+        // we'll base it on 1/3 of *PioRangeComplete->Length.
+        uint64_t offset = *PioRangeComplete->BytesMovedOut;
+        uint64_t length = PioRangeComplete->Length / 3;
 
-        if (TestPlan.Flags & INJECT_BAD_RESTART_MARKER)
-        {
-            // We know we transferred upto 3/4 of the file at this point.
-            // So we can adjust BytesMoved up to, at most, another 1/4
-            // of the file. Since we don't know the original length,
-            // we'll base it on 1/3 of *PioRangeComplete->Length.
-            uint64_t offset = *PioRangeComplete->BytesMoved;
-            uint64_t length = PioRangeComplete->Length / 3;
+        *PioRangeComplete->BytesMovedOut = Random64InRange(offset, length);
+        *PioRangeComplete->ReturnValue = INJECTED_ERROR_VALUE;
 
-            *PioRangeComplete->BytesMoved = Random64InRange(offset, length);
-
-            INFO(("Injecting bad restart marker at offset %lu\n",
-                  *PioRangeComplete->BytesMoved));
-        }
+        INFO(("Injecting bad restart marker at offset %lu\n",
+              *PioRangeComplete->BytesMovedOut));
+    } else if (TestPlan.Flags == INJECT_BZ4719)
+    {
+        // Leave BytesMoved unchanged.
+        *PioRangeComplete->BytesMovedOut = PioRangeComplete->BytesMovedIn;
+        *PioRangeComplete->ReturnValue = INJECTED_ERROR_VALUE;
+        INFO(("Injecting BZ4719\n"));
     }
 }
 
