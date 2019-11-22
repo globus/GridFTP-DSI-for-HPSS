@@ -189,16 +189,22 @@ cleanup:
 }
 
 void
-stor_gridftp_callout(globus_gfs_operation_t Operation,
-                     globus_result_t        Result,
-                     globus_byte_t *        Buffer,
-                     globus_size_t          Length,
-                     globus_off_t           Offset,
-                     globus_bool_t          Eof,
-                     void *                 UserArg)
+stor_gridftp_callback(globus_gfs_operation_t Operation,
+                      globus_result_t        Result,
+                      globus_byte_t        * Buffer,
+                      globus_size_t          Length,
+                      globus_off_t           Offset,
+                      globus_bool_t          Eof,
+                      void                 * UserArg)
 {
     stor_buffer_t *stor_buffer = UserArg;
     stor_info_t *  stor_info   = stor_buffer->StorInfo;
+
+    TRACE(("%s: "
+           "Length: %zu "
+           "Offset: %"GLOBUS_OFF_T_FORMAT" "
+           "Eof: %d Error: %d\n", 
+           __func__, Length, Offset, Eof, Result != GLOBUS_SUCCESS));
 
     if (stor_buffer->Valid != VALID_TAG)
         return;
@@ -260,6 +266,10 @@ stor_copy_out_buffers(stor_info_t *StorInfo,
     uint64_t       copied_length  = 0;
     uint64_t       length_to_copy = 0;
 
+    TRACE(("%s (enter): "
+           "Offset: %"PRIu64" "
+           "Length: %"PRIu64"\n", __func__, Offset, Length));
+
     do
     {
         offset_needed = Offset + copied_length;
@@ -298,6 +308,7 @@ stor_copy_out_buffers(stor_info_t *StorInfo,
         }
     } while (copied_length != Length && buf_entry);
 
+    TRACE(("%s (exit): Copied Length: %"PRIu64"\n", __func__, copied_length));
     return copied_length;
 }
 
@@ -354,7 +365,7 @@ stor_launch_gridftp_reads(stor_info_t *StorInfo)
             StorInfo->Operation,
             (globus_byte_t *)stor_buffer->Buffer,
             StorInfo->BlockSize,
-            stor_gridftp_callout,
+            stor_gridftp_callback,
             stor_buffer);
 
         if (result)
@@ -368,16 +379,20 @@ stor_launch_gridftp_reads(stor_info_t *StorInfo)
 }
 
 int
-stor_pio_callout(char *    Buffer,
-                 uint32_t *Length,
-                 uint64_t  Offset,
-                 void *    CallbackArg)
+stor_pio_callout(char     * Buffer,
+                 uint32_t * Length,
+                 uint64_t   Offset,
+                 void     * CallbackArg)
 {
-    int             rc            = 0;
     uint64_t        offset_needed = 0;
     uint64_t        copied_length = 0;
     stor_info_t *   stor_info     = CallbackArg;
     globus_result_t result        = GLOBUS_SUCCESS;
+
+    TRACE(("%s (enter): "
+           "Length: %"PRIu32" "
+           "Offset: %"PRIu64"\n",
+           __func__, *Length, Offset));
 
     pthread_mutex_lock(&stor_info->Mutex);
     {
@@ -411,21 +426,22 @@ stor_pio_callout(char *    Buffer,
             globus_gridftp_server_update_bytes_recvd(stor_info->Operation,
                                                      copied_length);
 
-        if (!stor_info->Result)
+        // If no other error has occurred, store our error
+        if (stor_info->Result == GLOBUS_SUCCESS)
             stor_info->Result = result;
-        if (stor_info->Result)
-            copied_length = -1;
-
-        if (result)
-        {
-            if (!stor_info->Result)
-                stor_info->Result = result;
-            rc = PIO_END_TRANSFER; /* Signal to shutdown. */
-        }
+        // If we didn't have an error, copy out any other error
+        if (result == GLOBUS_SUCCESS)
+            result = stor_info->Result;
     }
     pthread_mutex_unlock(&stor_info->Mutex);
 
-    return rc;
+    int exit_code = !(result == GLOBUS_SUCCESS);
+// XXX copied_length == *Length if exit_code == 0 (ALWAYS)
+    TRACE(("%s (exit): "
+           "Copied Length: %"PRIu64" "
+           "Exit Code: 0x%X\n", 
+           __func__, copied_length, exit_code));
+    return exit_code;
 }
 
 void
@@ -622,8 +638,6 @@ stor(globus_gfs_operation_t      Operation,
             goto cleanup;
     }
 
-// XXX if offset is non zero, then this is a restart. The file must exist
-// and the file can not be shorter than offset.
     /*
      * Setup PIO
      */
