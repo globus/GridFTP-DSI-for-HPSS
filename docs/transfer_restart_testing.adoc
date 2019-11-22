@@ -172,7 +172,7 @@ successfully:
 
 ==== (3) Verify File Retreive Restart
 Verifying file restarts on retrieves are a little more difficult because it is
-the receiving end of the transfer that is responsible for issueing restart
+the receiving end of the transfer that is responsible for issuing restart
 markers. Choosing a remote POSIX endpoint as the destination will give us useful
 restart markers every 5 seconds. Since we plan to interrupt the transfer 
 approximately half way through, choose a file size large enough for 15-20
