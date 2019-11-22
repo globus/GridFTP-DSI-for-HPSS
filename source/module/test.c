@@ -161,11 +161,6 @@ TestEventTransferBegin()
 static void
 TestEventTransferFinished()
 {
-    // Work around until we get an update GridFTP server that will flush 
-    // the last restart marker
-
-    unsigned int marker_flush_interval = 5;
-    sleep(marker_flush_interval);
     TestPlan.TransferInProgress = false;
 }
 
