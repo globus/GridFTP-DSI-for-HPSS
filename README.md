@@ -8,11 +8,6 @@ None at this time. New issues will appear here before being incorporated into th
 ## Installation
 If you are an admin that is planning to install the HPSS connector for production use, go to [https://docs.globus.org/premium-storage-connectors/hpss/](https://docs.globus.org/premium-storage-connectors/hpss/) for the most recent installation instructions.  
 
-
-```shell
-$ make -f Makefile.bootstrap release
-```
-
 ## Development
 
 The repository includes a helpful build file, `Makefile.bootstrap`, the simplifies setting up the dev environment and cutting releases. In order configure the code base for development:
