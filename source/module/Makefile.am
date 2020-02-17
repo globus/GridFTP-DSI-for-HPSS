@@ -9,6 +9,8 @@ SOURCES = authenticate.c \
           config.c       \
           config.h       \
           dsi.c          \
+          fixups.c       \
+          fixups.h       \
           hooks.c        \
           logging.c      \
           logging.h      \

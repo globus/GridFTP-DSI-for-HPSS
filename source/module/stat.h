@@ -57,14 +57,14 @@ stat_object(char *Pathname, globus_gfs_stat_t *);
 globus_result_t
 stat_link(char *Pathname, globus_gfs_stat_t *);
 
+typedef globus_result_t (*stat_dir_cb)(globus_gfs_stat_t * Array,
+                                       uint32_t            ArrayLength,
+                                       void              * CallbackArg);
+
 globus_result_t
-stat_directory_entries(ns_ObjHandle_t *   ObjHandle,      // IN
-                       uint64_t           OffsetIn,       // IN
-                       uint32_t           GFSStatCountIn, // IN
-                       uint32_t *         End,            // OUT
-                       uint64_t *         OffsetOut,      // OUT
-                       globus_gfs_stat_t *GFSStatArray,   // OUT
-                       uint32_t *         GFSStatCountOut);        // OUT
+stat_directory(char      * Pathname,
+               stat_dir_cb Callback,
+               void      * CallbackArg);
 
 void
 stat_destroy(globus_gfs_stat_t *);

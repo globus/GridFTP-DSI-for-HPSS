@@ -102,20 +102,17 @@ commands_mkdir(globus_gfs_operation_t     Operation,
     Callback(Operation, result, NULL);
 }
 
-void
-commands_rmdir(globus_gfs_operation_t     Operation,
-               globus_gfs_command_info_t *CommandInfo,
-               commands_callback          Callback)
+globus_result_t
+commands_rmdir(char * Pathname)
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
-    INFO(("rmdir %s\n", CommandInfo->pathname));
+    INFO(("rmdir %s\n", Pathname));
 
-    int retval = hpss_Rmdir(CommandInfo->pathname);
-    if (retval)
+    int retval = hpss_Rmdir(Pathname);
+    if (retval != HPSS_E_NOERROR)
         result = GlobusGFSErrorSystemError("hpss_Rmdir", -retval);
-
-    Callback(Operation, result, NULL);
+    return result;
 }
 
 void
@@ -314,9 +311,6 @@ commands_run(globus_gfs_operation_t     Operation,
     {
     case GLOBUS_GFS_CMD_MKD:
         commands_mkdir(Operation, CommandInfo, Callback);
-        break;
-    case GLOBUS_GFS_CMD_RMD:
-        commands_rmdir(Operation, CommandInfo, Callback);
         break;
     case GLOBUS_GFS_CMD_DELE:
         commands_unlink(Operation, CommandInfo, Callback);

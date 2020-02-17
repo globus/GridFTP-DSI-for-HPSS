@@ -69,4 +69,12 @@ commands_run(globus_gfs_operation_t     Operation,
              config_t *                 Config,
              commands_callback          Callback);
 
+
+/*
+ * This command is the first of many to be broken out of the group so that
+ * they can be easily tested and have fixups applied.
+ */
+globus_result_t
+commands_rmdir(char * Pathname);
+
 #endif /* HPSS_DSI_COMMANDS_H */

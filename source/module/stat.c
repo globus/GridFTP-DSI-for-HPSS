@@ -48,6 +48,7 @@
  * HPSS includes
  */
 #include <hpss_api.h>
+#include <hpss_errno.h>
 #include <hpss_stat.h>
 #include <u_signed64.h>
 
@@ -117,28 +118,15 @@ stat_translate_stat(char *             Pathname,
     return GLOBUS_SUCCESS;
 }
 
-/*
- * It is possible to have a broken symbolic link and we don't want
- * that to cause complex operations to fail. So, we'll return
- * symlink information if the link is broken.
- */
 globus_result_t
 stat_object(char *Pathname, globus_gfs_stat_t *GFSStat)
 {
     memset(GFSStat, 0, sizeof(globus_gfs_stat_t));
 
     hpss_stat_t hpss_stat_buf;
-    int         retval = hpss_Lstat(Pathname, &hpss_stat_buf);
+    int retval = hpss_Stat(Pathname, &hpss_stat_buf);
     if (retval)
-        return GlobusGFSErrorSystemError("hpss_Lstat", -retval);
-
-    if (S_ISLNK(hpss_stat_buf.st_mode))
-    {
-        retval = hpss_Stat(Pathname, &hpss_stat_buf);
-        if (retval && retval != -ENOENT)
-            return GlobusGFSErrorSystemError("hpss_Stat", -retval);
-    }
-
+        return GlobusGFSErrorSystemError("hpss_Stat", -retval);
     return stat_translate_stat(Pathname, &hpss_stat_buf, GFSStat);
 }
 
@@ -151,7 +139,6 @@ stat_link(char *Pathname, globus_gfs_stat_t *GFSStat)
     int         retval = hpss_Lstat(Pathname, &hpss_stat_buf);
     if (retval)
         return GlobusGFSErrorSystemError("hpss_Lstat", -retval);
-
     return stat_translate_stat(Pathname, &hpss_stat_buf, GFSStat);
 }
 
@@ -256,54 +243,63 @@ stat_translate_dir_entry(ns_ObjHandle_t *   ParentObjHandle,
 }
 
 globus_result_t
-stat_directory_entries(ns_ObjHandle_t *   ObjHandle,      // IN
-                       uint64_t           OffsetIn,       // IN
-                       uint32_t           GFSStatCountIn, // IN
-                       uint32_t *         End,            // OUT
-                       uint64_t *         OffsetOut,      // OUT
-                       globus_gfs_stat_t *GFSStatArray,   // OUT
-                       uint32_t *         GFSStatCountOut)         // OUT
+stat_directory(char      * Pathname,
+               stat_dir_cb Callback,
+               void      * CallbackArg)
 {
-    globus_result_t result;
-    int             i;
-    int             retval;
+    globus_result_t result = GLOBUS_SUCCESS;
+    int retval;
 
-    ns_DirEntry_t *dir_entry_buffer = NULL;
+#define MAX_DIR_ENTRY 200
 
-    memset(GFSStatArray, 0, sizeof(globus_gfs_stat_t) * GFSStatCountIn);
-
-    dir_entry_buffer = malloc(sizeof(ns_DirEntry_t) * GFSStatCountIn);
-    if (!dir_entry_buffer)
-        return GlobusGFSErrorMemory("ns_DirEntry_t array");
-
-    retval = hpss_ReadAttrsHandle(ObjHandle,
-                                  OffsetIn,
-                                  NULL,
-                                  sizeof(ns_DirEntry_t) * GFSStatCountIn,
-                                  TRUE,
-                                  End,
-                                  OffsetOut,
-                                  dir_entry_buffer);
-    if (retval < 0)
+    hpss_fileattr_t dir_attrs;
+    if ((retval = hpss_FileGetAttributes(Pathname, &dir_attrs)) < 0)
     {
-        free(dir_entry_buffer);
-        return GlobusGFSErrorSystemError("hpss_ReadAttrsHandle", -retval);
+        result = GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
+        goto cleanup;
     }
 
-    *GFSStatCountOut = retval;
-    for (i = 0; i < *GFSStatCountOut; i++)
-    {
-        result = stat_translate_dir_entry(
-            ObjHandle, &dir_entry_buffer[i], &GFSStatArray[i]);
-        if (result)
+    uint64_t offset = 0;
+    unsigned32 end = 0;
+    do {
+
+        ns_DirEntry_t dir_entries[MAX_DIR_ENTRY];
+        int count = hpss_ReadAttrsHandle(&dir_attrs.ObjectHandle,
+                                         offset,
+                                         NULL,
+                                         sizeof(dir_entries),
+                                         TRUE,
+                                         &end,
+                                         &offset,
+                                         dir_entries);
+        if (count < 0)
         {
-            stat_destroy_array(GFSStatArray, i);
-            free(dir_entry_buffer);
-            return result;
+            result = GlobusGFSErrorSystemError("hpss_ReadAttrsHandle", -count);
+            goto cleanup;
         }
-    }
 
-    return GLOBUS_SUCCESS;
+        globus_gfs_stat_t gfs_stat_array[MAX_DIR_ENTRY];
+        for (int i = 0; i < count; i++)
+        {
+            result = stat_translate_dir_entry(&dir_attrs.ObjectHandle,
+                                              &dir_entries[i],
+                                              &gfs_stat_array[i]);
+            if (result)
+            {
+                stat_destroy_array(gfs_stat_array, i);
+                goto cleanup;
+            }
+        }
+
+        result = Callback(gfs_stat_array, count, CallbackArg);
+        stat_destroy_array(gfs_stat_array, count);
+        if (result != GLOBUS_SUCCESS)
+            goto cleanup;
+
+    } while (!end);
+
+cleanup:
+    return result;
 }
 
 void
@@ -315,6 +311,7 @@ stat_destroy(globus_gfs_stat_t *GFSStat)
             free(GFSStat->symlink_target);
         if (GFSStat->name != NULL)
             free(GFSStat->name);
+        memset(GFSStat, 0, sizeof(globus_gfs_stat_t));
     }
     return;
 }

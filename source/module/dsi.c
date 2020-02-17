@@ -61,6 +61,7 @@
 #include "commands.h"
 #include "logging.h"
 #include "config.h"
+#include "fixups.h"
 #include "retr.h"
 #include "stat.h"
 #include "stor.h"
@@ -159,80 +160,88 @@ dsi_command(globus_gfs_operation_t     Operation,
             globus_gfs_command_info_t *CommandInfo,
             void *                     UserArg)
 {
-    commands_run(Operation,
-                 CommandInfo,
-                 UserArg,
-                 globus_gridftp_server_finished_command);
+    globus_result_t result;
+
+    switch (CommandInfo->command)
+    {
+    case GLOBUS_GFS_CMD_RMD:
+        result = commands_rmdir(CommandInfo->pathname);
+        result = fixup_rmd(CommandInfo->pathname, result);
+        globus_gridftp_server_finished_command(Operation, result, NULL);
+        break;
+    default:
+        commands_run(Operation,
+                     CommandInfo,
+                     UserArg,
+                     globus_gridftp_server_finished_command);
+    }
+}
+
+struct _stat_dir_cb_arg {
+    globus_gfs_operation_t   Operation;
+    globus_gfs_stat_info_t * StatInfo;
+};
+
+static globus_result_t
+_stat_dir_callback(globus_gfs_stat_t * GFSStatArray,
+                   uint32_t            ArrayLength,
+                   void              * CallbackArg)
+{
+    struct _stat_dir_cb_arg * cb_arg = CallbackArg;
+
+    globus_result_t result;
+    result = fixup_stat_directory(cb_arg->StatInfo->pathname,
+                                  GFSStatArray,
+                                  &ArrayLength);
+
+    if (result != GLOBUS_SUCCESS)
+        return result;
+
+    if (ArrayLength > 0)
+        globus_gridftp_server_finished_stat_partial(cb_arg->Operation,
+                                                    GLOBUS_SUCCESS,
+                                                    GFSStatArray,
+                                                    ArrayLength);
+    return GLOBUS_SUCCESS;
 }
 
 void
-dsi_stat(globus_gfs_operation_t  Operation,
-         globus_gfs_stat_info_t *StatInfo,
-         void *                  Arg)
+dsi_stat(globus_gfs_operation_t   Operation,
+         globus_gfs_stat_info_t * StatInfo,
+         void *                   Arg)
 {
     globus_result_t   result = GLOBUS_SUCCESS;
-    globus_gfs_stat_t gfs_stat;
 
-    INFO(("List or stat of %s\n", StatInfo->pathname));
-
-    switch (StatInfo->use_symlink_info)
+    if (StatInfo->file_only)
     {
-    case 0:
-        result = stat_object(StatInfo->pathname, &gfs_stat);
-        break;
-    default:
-        result = stat_link(StatInfo->pathname, &gfs_stat);
-        break;
-    }
+        globus_gfs_stat_t gfs_stat;
 
-    if (result != GLOBUS_SUCCESS || StatInfo->file_only ||
-        !S_ISDIR(gfs_stat.mode))
-    {
+        switch (StatInfo->use_symlink_info)
+        {
+        case 0:
+            INFO(("stat() of %s\n", StatInfo->pathname));
+            result = stat_object(StatInfo->pathname, &gfs_stat);
+            result = fixup_stat_object(StatInfo->pathname, result, &gfs_stat);
+            break;
+        default:
+            INFO(("lstat() of %s\n", StatInfo->pathname));
+            result = stat_link(StatInfo->pathname, &gfs_stat);
+            break;
+        }
+
         globus_gridftp_server_finished_stat(Operation, result, &gfs_stat, 1);
-        stat_destroy(&gfs_stat);
+        if (result == GLOBUS_SUCCESS)
+            stat_destroy(&gfs_stat);
         return;
     }
 
-    stat_destroy(&gfs_stat);
-
-#define STAT_ENTRIES_PER_REPLY 200
     /*
      * Directory listing.
      */
+    INFO(("List stat of %s\n", StatInfo->pathname));
 
-    hpss_fileattr_t dir_attrs;
-
-    int retval;
-    if ((retval = hpss_FileGetAttributes(StatInfo->pathname, &dir_attrs)) < 0)
-    {
-        result = GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
-        globus_gridftp_server_finished_stat(Operation, result, NULL, 0);
-        return;
-    }
-
-    uint64_t offset = 0;
-    uint32_t end    = FALSE;
-    while (!end)
-    {
-        globus_gfs_stat_t gfs_stat_array[STAT_ENTRIES_PER_REPLY];
-        uint32_t          count_out;
-
-        result = stat_directory_entries(&dir_attrs.ObjectHandle,
-                                        offset,
-                                        STAT_ENTRIES_PER_REPLY,
-                                        &end,
-                                        &offset,
-                                        gfs_stat_array,
-                                        &count_out);
-        if (result)
-            break;
-
-        globus_gridftp_server_finished_stat_partial(
-            Operation, GLOBUS_SUCCESS, gfs_stat_array, count_out);
-
-        stat_destroy_array(gfs_stat_array, count_out);
-    }
-
+    struct _stat_dir_cb_arg cb_arg = {Operation, StatInfo};
+    result = stat_directory(StatInfo->pathname, _stat_dir_callback, &cb_arg);
     globus_gridftp_server_finished_stat(Operation, result, NULL, 0);
 }
 
