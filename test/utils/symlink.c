@@ -14,11 +14,6 @@
 #include <hpss_mech.h>
 
 /*
- * Local includes.
- */
-#include "error.h"
-
-/*
  * You need a keytab file in order to authenticate to HPSS. On systems
  * with unix authentication, use hpss_unix_keytab:
  * % hpss_unix_keytab -f <keytab file> -P [add | update] <principal>
@@ -32,7 +27,7 @@
  * ktutil:  quit
  */
 
-_error
+int
 authenticate(const char * LoginName, const char * KeytabFile)
 {
     // authn_mech_string = unix|krb5|gsi|spkm
@@ -44,7 +39,10 @@ authenticate(const char * LoginName, const char * KeytabFile)
     hpss_authn_mech_t authn_mech; 
     int retval = hpss_AuthnMechTypeFromString(authn_mech_string, &authn_mech);
     if (retval != HPSS_E_NOERROR)
-        return _ERROR("hpss_AuthnMechTypeFromString()", -retval);
+    {
+        fprintf(stderr, "hpss_AuthnMechTypeFromString(): %d\n", -retval);
+        return 1;
+    }
 
     /* Now log into HPSS using our configured 'super user' */
     retval = hpss_SetLoginCred((char *)LoginName,
@@ -55,11 +53,10 @@ authenticate(const char * LoginName, const char * KeytabFile)
 
     if (retval != HPSS_E_NOERROR)
     {
-        fprintf(stderr, "hpss_SetLoginCred()\n");
-        return _ERROR("hpss_SetLoginCred()", -retval);
+        fprintf(stderr, "hpss_SetLoginCred(): %d\n", -retval);
+        return 1;
     }
-
-    return _ERROR(NULL, 0);
+    return 0;
 }
 
 
@@ -74,15 +71,12 @@ main(int argc, char * argv[])
         return 1;
     }
 
-    _error e = authenticate(argv[1], argv[2]);
-    if (e.Value != 0)
-    {
-        fprintf(stderr, "failed\n");
+    int retval = authenticate(argv[1], argv[2]);
+    if (retval != 0)
         return 1;
-    }
 
     hpss_stat_t buf;       
-    int retval = hpss_Stat("/home/jasonalt/", &buf);
+    retval = hpss_Stat("/home/jasonalt/", &buf);
     if (retval != HPSS_E_NOERROR)
     {
         fprintf(stderr, "hpss_Stat() failed\n");
