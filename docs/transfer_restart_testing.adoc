@@ -120,9 +120,9 @@ to `/etc/gridftp.d/hpss_debug`:
   $GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG "ALL,/tmp/hpss_dsi.log"
 
 This will cause all events to be logged to the file `/tmp/hpss_dsi.log`. You can
-change the pathname to something more suitable to your environment. This log will
-continue to increase in size the longer it remains enabled; do not forget to 
-disable it or apply log rotation mechanisms.
+change the pathname to something more suitable to your environment. This log
+will continue to increase in size the longer it remains enabled; do not forget
+to disable it or apply log rotation mechanisms.
 
 === Verifying Correct Transfer Restart Functionality
 
