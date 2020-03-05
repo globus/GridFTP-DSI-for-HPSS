@@ -1,6 +1,0 @@
-#globus-gridftp-server-hpss-7.4-2.9-0.3.el7.x86_64.rpm
-FILE=globus-gridftp-server-hpss-7.4-debuginfo-2.9-0.3.el7.x86_64.rpm
-
-GITHUB_TOKEN=
-#curl https://api.github.com/repos/JasonAlt/GridFTP-DSI-for-HPSS/releases/tags/Prerelease_2_9-0_3_rc
-curl -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: $(file -b --mime-type $FILE)" --data-binary @$FILE "https://uploads.github.com/repos/JasonAlt/GridFTP-DSI-for-HPSS/releases/21373996/assets?name=$(basename $FILE)"

@@ -15,3 +15,11 @@ develop:
 
 release: dist
 	@make package
+
+venv:
+	python3 -m venv venv
+
+upload_release: venv
+	python3 scripts/upload_release.py globus-gridftp-server-hpss*.rpm
+
+.SILENT:
