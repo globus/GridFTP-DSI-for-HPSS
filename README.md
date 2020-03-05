@@ -37,7 +37,7 @@ All notable changes should be recorded in the ChangeLog.
 The `master` branch contains the latest stable version and is always releasable code. Features and fixes should follow the naming scheme `issue/<id>` where `<id>` is the tracking GitHub issue number. If the issue does not warrent a tracking GitHub issue, you can name the branch however you like _within your own forked copy of the repository_. New branches should fork the master or prelease branch as appropriate. Pull requests should be submitted against the target prelease branch. The master branch will be fast-forward-merged once the prelease is known to be stable and ready for release.
 
 ### Tagging Strategy
-All stable releases are tagged `Version_<major>_<minor>_<release>` on master. Preleases use `Prerelease_<major>_<minor>_<release>` to the release tag. Historically, this repository did not use `<release>` versioning; just assume that to have a value of `1` when no release value is given.
+All stable releases are tagged `Version_<major>_<minor>_<release>` on master. Prereleases use `Prerelease_<major>_<minor>_<release>` as the release tag. Historically, this repository did not use `<release>` versioning; just assume that to have a value of `1` when no release value is given.
 
 ### Release Process
 * Accept pull requests *only* against a prelease branch.
