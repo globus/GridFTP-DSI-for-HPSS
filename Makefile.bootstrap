@@ -18,8 +18,23 @@ release: dist
 
 venv:
 	python3 -m venv venv
+	./venv/bin/pip3 install -r requirements.txt
 
-upload_release: venv
-	python3 scripts/upload_release.py globus-gridftp-server-hpss*.rpm
+list_assets: venv
+	./venv/bin/python3 ./scripts/list_assets.py $(TAG)
+
+download_asset: venv
+	./venv/bin/python3 ./scripts/download_asset.py $(TAG) $(ASSET)
+
+sign_asset: venv
+	./venv/bin/python3 ./scripts/sign_asset.py $(ASSET)
+
+upload_asset: venv
+	./venv/bin/python3 ./scripts/upload_asset.py $(TAG) $(ASSET)
+
+down_sign_up: venv
+	./venv/bin/python3 ./scripts/download_asset.py $(TAG) $(ASSET)
+	./venv/bin/python3 ./scripts/sign_asset.py $(ASSET)
+	./venv/bin/python3 ./scripts/upload_asset.py $(TAG) $(ASSET).asc
 
 .SILENT:
