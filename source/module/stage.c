@@ -81,7 +81,11 @@ typedef enum
  * Use a constant request number for stage requests so that we can
  * query the stage request status between processes.
  */
+#if HPSS_MAJOR_VERSION >= 8
+static hpss_reqid_t REQUEST_ID = {0xdeadbeef, 0xdead, 0xbeef, 0xde, 0xad, {0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef}};
+#else
 static hpss_reqid_t REQUEST_ID = 0xDEADBEEF;
+#endif
 
 static globus_result_t
 check_request_status(bitfile_id_t *BitfileID, int *Status)
@@ -174,7 +178,7 @@ submit_stage_request(const char *Pathname)
         }
     }
 
-    callback_addr.id = 0xDEADBEEF;
+    callback_addr.id = REQUEST_ID;
 
     INFO(("Requesting stage for %s\n", Pathname));
 

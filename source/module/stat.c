@@ -51,6 +51,7 @@
 #include <hpss_errno.h>
 #include <hpss_stat.h>
 #include <u_signed64.h>
+#include <hpss_version.h>
 
 /*
  * Local includes
@@ -249,6 +250,9 @@ stat_directory(char      * Pathname,
 {
     globus_result_t result = GLOBUS_SUCCESS;
     int retval;
+#if HPSS_MAJOR_VERSION >= 8
+    int dir_fd = -1;
+#endif
 
 #define MAX_DIR_ENTRY 200
 
@@ -259,11 +263,23 @@ stat_directory(char      * Pathname,
         goto cleanup;
     }
 
+#if HPSS_MAJOR_VERSION >= 8
+    dir_fd = hpss_OpendirHandle(&dir_attrs.ObjectHandle, NULL);
+#endif
+
     uint64_t offset = 0;
     unsigned32 end = 0;
     do {
-
         ns_DirEntry_t dir_entries[MAX_DIR_ENTRY];
+#if HPSS_MAJOR_VERSION >= 8
+        int count = hpss_ReadAttrsPlus(dir_fd,
+                                       offset,
+                                       sizeof(dir_entries),
+                                       HPSS_READDIR_GETATTRS,
+                                       &end,
+                                       &offset,
+                                       dir_entries);
+#else
         int count = hpss_ReadAttrsHandle(&dir_attrs.ObjectHandle,
                                          offset,
                                          NULL,
@@ -272,6 +288,7 @@ stat_directory(char      * Pathname,
                                          &end,
                                          &offset,
                                          dir_entries);
+#endif
         if (count < 0)
         {
             result = GlobusGFSErrorSystemError("hpss_ReadAttrsHandle", -count);
@@ -299,6 +316,10 @@ stat_directory(char      * Pathname,
     } while (!end);
 
 cleanup:
+#if HPSS_MAJOR_VERSION >= 8
+    if (dir_fd >= 0)
+        hpss_Closedir(dir_fd);
+#endif
     return result;
 }
 
