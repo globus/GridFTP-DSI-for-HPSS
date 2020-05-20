@@ -264,6 +264,8 @@ stat_directory(char      * Pathname,
     }
 
 #if HPSS_MAJOR_VERSION >= 8
+    // mtrace puts off an error here, says free() called on unalloc'ed
+    // memory. Confirmed by IBM to be a false positive.
     dir_fd = hpss_OpendirHandle(&dir_attrs.ObjectHandle, NULL);
 #endif
 
@@ -308,7 +310,7 @@ stat_directory(char      * Pathname,
             }
         }
 
-        result = Callback(gfs_stat_array, count, CallbackArg);
+        result = Callback(gfs_stat_array, count, end, CallbackArg);
         stat_destroy_array(gfs_stat_array, count);
         if (result != GLOBUS_SUCCESS)
             goto cleanup;

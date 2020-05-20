@@ -1,3 +1,11 @@
+Version 2.12: Tue May 19 22:30:49 EDT 2020
+	- Fix for race condition in directory listings that caused listings to
+	  look like errors to Transfer. This was a very rare occurence and 
+	  Transfer would retry the transfer.
+
+Version 2.11: Thu Apr  9 16:41:08 EST 2020
+	- Added support for HPSS 8.x.
+
 Version 2.10: Thu Mar  5 14:46:03 EST 2020
 	- Fixes #72: WebApp should be able to follow symlinks to directories
 

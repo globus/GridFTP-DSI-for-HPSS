@@ -89,6 +89,7 @@ struct _stat_dir_cb_arg {
 static globus_result_t
 _stat_dir_cb_check_links(globus_gfs_stat_t * GFSStatArray,
                          uint32_t            ArrayLength,
+                         uint32_t            End,
                          void              * CallbackArg)
 {
     struct _stat_dir_cb_arg * cb_arg = CallbackArg;
@@ -128,6 +129,7 @@ _stat_dir_cb_check_links(globus_gfs_stat_t * GFSStatArray,
 static globus_result_t
 _stat_dir_cb_rm_links(globus_gfs_stat_t * GFSStatArray,
                       uint32_t            ArrayLength,
+                      uint32_t            End,
                       void              * CallbackArg)
 {
     struct _stat_dir_cb_arg * cb_arg = CallbackArg;

@@ -185,6 +185,7 @@ struct _stat_dir_cb_arg {
 static globus_result_t
 _stat_dir_callback(globus_gfs_stat_t * GFSStatArray,
                    uint32_t            ArrayLength,
+                   uint32_t            End,
                    void              * CallbackArg)
 {
     struct _stat_dir_cb_arg * cb_arg = CallbackArg;
@@ -197,11 +198,17 @@ _stat_dir_callback(globus_gfs_stat_t * GFSStatArray,
     if (result != GLOBUS_SUCCESS)
         return result;
 
-    if (ArrayLength > 0)
+    if (!End)
         globus_gridftp_server_finished_stat_partial(cb_arg->Operation,
                                                     GLOBUS_SUCCESS,
                                                     GFSStatArray,
                                                     ArrayLength);
+    else 
+        globus_gridftp_server_finished_stat(cb_arg->Operation,
+                                            result,
+                                            GFSStatArray,
+                                            ArrayLength);
+
     return GLOBUS_SUCCESS;
 }
 
@@ -242,7 +249,11 @@ dsi_stat(globus_gfs_operation_t   Operation,
 
     struct _stat_dir_cb_arg cb_arg = {Operation, StatInfo};
     result = stat_directory(StatInfo->pathname, _stat_dir_callback, &cb_arg);
-    globus_gridftp_server_finished_stat(Operation, result, NULL, 0);
+
+    // Error path. Success path is handled in the callback to avoid some
+    // timing issues.
+    if (result != GLOBUS_SUCCESS)
+        globus_gridftp_server_finished_stat(Operation, result, NULL, 0);
 }
 
 globus_gfs_storage_iface_t hpss_dsi_iface = {

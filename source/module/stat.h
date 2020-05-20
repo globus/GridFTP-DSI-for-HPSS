@@ -59,6 +59,7 @@ stat_link(char *Pathname, globus_gfs_stat_t *);
 
 typedef globus_result_t (*stat_dir_cb)(globus_gfs_stat_t * Array,
                                        uint32_t            ArrayLength,
+                                       uint32_t            End,
                                        void              * CallbackArg);
 
 globus_result_t

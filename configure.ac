@@ -1,4 +1,4 @@
-AC_INIT([globus-gridftp-server-hpss], [2.11], [Globus <support@globus.org>])
+AC_INIT([globus-gridftp-server-hpss], [2.12], [Globus <support@globus.org>])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 # automake 1.11.1 (RHEL 6.8) does not support AM_PROG_AR
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
