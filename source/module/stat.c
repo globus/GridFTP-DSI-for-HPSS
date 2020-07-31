@@ -298,6 +298,7 @@ stat_directory(char      * Pathname,
         }
 
         globus_gfs_stat_t gfs_stat_array[MAX_DIR_ENTRY];
+        memset(gfs_stat_array, 0, sizeof(gfs_stat_array));
         for (int i = 0; i < count; i++)
         {
             result = stat_translate_dir_entry(&dir_attrs.ObjectHandle,
