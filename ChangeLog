@@ -1,4 +1,4 @@
-Version 2.13: Fri Jul 31 15:52:12 EDT 2020
+Version 2.13.rc1: Fri Jul 31 15:52:12 EDT 2020
 	- Fixed an issue in directory listings that caused the GridFTP server
 	  to unexpectedly disconnect.
 
