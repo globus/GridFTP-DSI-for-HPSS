@@ -1,5 +1,5 @@
 #include <globus_gridftp_server.h>
-#include <hpss_api.h>
+#include "hpss.h"
 #include "test.h"
 
 int

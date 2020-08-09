@@ -5,17 +5,12 @@
 #include <stdlib.h>
 
 /*
- * HPSS includes.
- */
-#include <hpss_api.h>
-#include <hpss_errno.h>
-
-/*
  * Local includes.
  */
 #include "logging.h"
 #include "fixups.h"
 #include "stat.h"
+#include "hpss.h"
 
 globus_result_t
 fixup_stat_object(char              * Pathname,
@@ -138,7 +133,7 @@ _stat_dir_cb_rm_links(globus_gfs_stat_t * GFSStatArray,
     {
         if (! S_ISLNK(GFSStatArray[i].mode) )
             continue;
-        int retval = hpss_UnlinkHandle(&cb_arg->DirAttrs.ObjectHandle,
+        int retval = Hpss_UnlinkHandle(&cb_arg->DirAttrs.ObjectHandle,
                                        GFSStatArray[i].name,
                                        NULL);
         if (retval != 0)
@@ -157,7 +152,7 @@ fixup_rmd(char * Pathname, globus_result_t Result)
     struct _stat_dir_cb_arg cb_arg;
     cb_arg.Pathname = Pathname;
 
-    int retval = hpss_FileGetAttributes(Pathname, &cb_arg.DirAttrs);
+    int retval = Hpss_FileGetAttributes(Pathname, &cb_arg.DirAttrs);
     if (retval != HPSS_E_NOERROR)
         return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
 
@@ -177,7 +172,7 @@ fixup_rmd(char * Pathname, globus_result_t Result)
     if (result != GLOBUS_SUCCESS)
         return result;
 
-    retval = hpss_Rmdir(Pathname);
+    retval = Hpss_Rmdir(Pathname);
     if (retval != 0)
         return GlobusGFSErrorSystemError("hpss_Rmdir", -retval);
     return GLOBUS_SUCCESS;

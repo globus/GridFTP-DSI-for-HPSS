@@ -49,17 +49,11 @@
 #include <time.h>
 
 /*
- * HPSS includes
- */
-#include <hpss_api.h>
-#include <hpss_net.h>
-#include <hpss_version.h>
-
-/*
  * Local includes
  */
-#include "stage.h"
 #include "logging.h"
+#include "stage.h"
+#include "hpss.h"
 
 #if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) ||                     \
     HPSS_MAJOR_VERSION >= 8
@@ -92,9 +86,9 @@ check_request_status(bitfile_id_t *BitfileID, int *Status)
 {
 #if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) ||                     \
     HPSS_MAJOR_VERSION >= 8
-    int retval = hpss_GetAsyncStatus(REQUEST_ID, BitfileID, Status);
+    int retval = Hpss_GetAsyncStatus(REQUEST_ID, BitfileID, Status);
 #else
-    int retval = hpss_GetAsynchStatus(REQUEST_ID, BitfileID, Status);
+    int retval = Hpss_GetAsynchStatus(REQUEST_ID, BitfileID, Status);
 #endif
 
     if (retval)
@@ -128,7 +122,7 @@ static globus_result_t
 submit_stage_request(const char *Pathname)
 {
     hpss_fileattr_t fattrs;
-    int retval = hpss_FileGetAttributes((char *)Pathname, &fattrs);
+    int retval = Hpss_FileGetAttributes((char *)Pathname, &fattrs);
     if (retval)
         return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
 
@@ -157,7 +151,7 @@ submit_stage_request(const char *Pathname)
         }
 
         char errbuf[HPSS_NET_MAXBUF];
-        retval = hpss_net_getaddrinfo(node,
+        retval = Hpss_net_getaddrinfo(node,
                                       serv,
                                       0,
                                       HPSS_IPPROTO_TCP,
@@ -188,7 +182,7 @@ submit_stage_request(const char *Pathname)
      * hpss_Stage(BFS_ASYNCH_CALL) but then we block in hpss_Close().
      */
     bitfile_id_t bitfile_id;
-    retval = hpss_StageCallBack((char *)Pathname,
+    retval = Hpss_StageCallBack((char *)Pathname,
                                 cast64m(0),
                                 fattrs.Attrs.DataLength,
                                 0,
@@ -284,7 +278,7 @@ check_file_residency(const char *Pathname, residency_t *Residency)
      * Stat the object. Without API_GET_XATTRS_NO_BLOCK, this call would hang
      * on any file moving between levels in its hierarchy (ie staging).
      */
-    retval = hpss_FileGetXAttributes((char *)Pathname,
+    retval = Hpss_FileGetXAttributes((char *)Pathname,
                                      API_GET_STATS_FOR_ALL_LEVELS |
                                          API_GET_XATTRS_NO_BLOCK,
                                      0,
@@ -346,7 +340,7 @@ static globus_result_t
 get_bitfile_id(const char *Pathname, bitfile_id_t *bitfile_id)
 {
     hpss_fileattr_t attrs;
-    int retval = hpss_FileGetAttributes((char *)Pathname, &attrs);
+    int retval = Hpss_FileGetAttributes((char *)Pathname, &attrs);
     if (retval)
         return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
 

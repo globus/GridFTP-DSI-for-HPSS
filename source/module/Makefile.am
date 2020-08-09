@@ -12,6 +12,8 @@ SOURCES = authenticate.c \
           fixups.c       \
           fixups.h       \
           hooks.c        \
+          hpss.c         \
+          hpss.h         \
           logging.c      \
           logging.h      \
           pio.c          \

@@ -64,13 +64,13 @@ stor_can_change_cos(char *Pathname, int *can_change_cos)
     ns_FilesetAttrs_t    fileset_attr;
 
     memset(&fileattr, 0, sizeof(hpss_fileattr_t));
-    retval = hpss_FileGetAttributes(Pathname, &fileattr);
+    retval = Hpss_FileGetAttributes(Pathname, &fileattr);
     if (retval)
         return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
 
     fileset_attr_bits = orbit64m(0, NS_FS_ATTRINDEX_COS);
     memset(&fileset_attr, 0, sizeof(ns_FilesetAttrs_t));
-    retval = hpss_FilesetGetAttributes(NULL,
+    retval = Hpss_FilesetGetAttributes(NULL,
                                        &fileattr.Attrs.FilesetId,
                                        NULL,
                                        NULL,
@@ -143,7 +143,7 @@ stor_open_for_writing(char *        Pathname,
         oflags |= O_TRUNC;
 
     /* Open the HPSS file. */
-    *FileFD = hpss_Open(Pathname,
+    *FileFD = Hpss_Open(Pathname,
                         oflags,
                         S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH,
                         &hints_in,
@@ -165,7 +165,7 @@ stor_open_for_writing(char *        Pathname,
         hpss_cos_md_t cos_md;
 
         retval =
-            hpss_SetCOSByHints(*FileFD, 0, &hints_in, &priorities, &cos_md);
+            Hpss_SetCOSByHints(*FileFD, 0, &hints_in, &priorities, &cos_md);
 
         if (retval)
         {
@@ -181,7 +181,7 @@ cleanup:
     if (result)
     {
         if (*FileFD != -1)
-            hpss_Close(*FileFD);
+            Hpss_Close(*FileFD);
         *FileFD = -1;
     }
 
@@ -535,7 +535,7 @@ stor_transfer_complete_callback(globus_result_t Result, void *UserArg)
     if (!result)
         result = stor_info->Result;
 
-    rc = hpss_Close(stor_info->FileFD);
+    rc = Hpss_Close(stor_info->FileFD);
     if (rc && !result)
         result = GlobusGFSErrorSystemError("hpss_Close", -rc);
 
@@ -561,7 +561,7 @@ validate_restart(const char * Pathname,
                  globus_off_t Length)
 {
     hpss_stat_t hpss_stat_buf;
-    int retval = hpss_Lstat((char *)Pathname, &hpss_stat_buf);
+    int retval = Hpss_Lstat((char *)Pathname, &hpss_stat_buf);
     if (retval)
         return GlobusGFSErrorSystemError("hpss_Lstat", -retval);
 
@@ -659,7 +659,7 @@ cleanup:
         if (stor_info)
         {
             if (stor_info->FileFD != -1)
-                hpss_Close(stor_info->FileFD);
+                Hpss_Close(stor_info->FileFD);
             pthread_mutex_destroy(&stor_info->Mutex);
             pthread_cond_destroy(&stor_info->Cond);
             free(stor_info);

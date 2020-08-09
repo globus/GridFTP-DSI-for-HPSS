@@ -50,15 +50,10 @@
 #include <globus_gridftp_server.h>
 
 /*
- * HPSS includes
- */
-#include <hpss_Getenv.h>
-#include <hpss_api.h>
-
-/*
  * Local includes
  */
 #include "config.h"
+#include "hpss.h"
 
 /*
  * The config file search order is:
@@ -94,7 +89,7 @@ config_find_config_file(char **ConfigFilePath)
     }
 
     /* Check for HPSS_PATH_ETC in the environment. */
-    hpss_path_etc = hpss_Getenv("HPSS_PATH_ETC");
+    hpss_path_etc = Hpss_Getenv("HPSS_PATH_ETC");
 
     /* If it exists... */
     if (hpss_path_etc != NULL)
@@ -313,7 +308,7 @@ config_process_env()
     /*
      * Get the current HPSS client configuration.
      */
-    retval = hpss_GetConfiguration(&api_config);
+    retval = Hpss_GetConfiguration(&api_config);
     if (retval != 0)
         return GlobusGFSErrorSystemError("hpss_GetConfiguration", -retval);
 
@@ -325,7 +320,7 @@ config_process_env()
 
     /* Now set the current HPSS client configuration. */
     api_config.Flags = API_USE_CONFIG;
-    retval           = hpss_SetConfiguration(&api_config);
+    retval           = Hpss_SetConfiguration(&api_config);
     if (retval != 0)
         return GlobusGFSErrorSystemError("hpss_SetConfiguration", -retval);
 

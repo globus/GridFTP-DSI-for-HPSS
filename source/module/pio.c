@@ -45,15 +45,11 @@
 #include <pthread.h>
 
 /*
- * HPSS includes.
- */
-#include <hpss_errno.h>
-
-/*
  * Local includes
  */
-#include "pio.h"
 #include "logging.h"
+#include "hpss.h"
+#include "pio.h"
 
 globus_result_t
 pio_launch_detached(void *(*ThreadEntry)(void *Arg), void *Arg)
@@ -114,7 +110,7 @@ pio_coordinator_thread(void *Arg)
         bytes_moved = NoValue64;
 
         /* Call pio execute. */
-        rc = hpss_PIOExecute(pio->FD,
+        rc = Hpss_PIOExecute(pio->FD,
                              offset,
                              length,
                              pio->CoordinatorSG,
@@ -150,7 +146,7 @@ pio_coordinator_thread(void *Arg)
         } while (length == 0 && !eot && !rc);
     } while (!rc && !eot);
 
-    rc = hpss_PIOEnd(pio->CoordinatorSG);
+    rc = Hpss_PIOEnd(pio->CoordinatorSG);
     /*
      * The returned value from hpss_PIOEnd() is not very useful. It doesn't
      * have anything to do with the data we already transfered. If there is
@@ -209,7 +205,7 @@ pio_thread(void *Arg)
         goto cleanup;
     coord_launched = 1;
 
-    rc = hpss_PIORegister(0,
+    rc = Hpss_PIORegister(0,
                           NULL, /* DataNetSockAddr */
                           buffer,
                           pio->BlockSize,
@@ -223,7 +219,7 @@ pio_thread(void *Arg)
 cleanup:
     if (safe_to_end_pio)
     {
-        rc = hpss_PIOEnd(pio->ParticipantSG);
+        rc = Hpss_PIOEnd(pio->ParticipantSG);
         if (rc != 0 && rc != PIO_END_TRANSFER && !result)
             result = GlobusGFSErrorSystemError("hpss_PIOEnd", -rc);
     }
@@ -302,7 +298,7 @@ pio_start(hpss_pio_operation_t           PioOpType,
     pio_params.Transport       = HPSS_PIO_TCPIP;
     pio_params.Options         = 0;
 
-    int retval = hpss_PIOStart(&pio_params, &pio->CoordinatorSG);
+    int retval = Hpss_PIOStart(&pio_params, &pio->CoordinatorSG);
     if (retval != 0)
     {
         result = GlobusGFSErrorSystemError("hpss_PIOStart", -retval);
@@ -310,7 +306,7 @@ pio_start(hpss_pio_operation_t           PioOpType,
     }
 
     retval =
-        hpss_PIOExportGrp(pio->CoordinatorSG, &group_buffer, &buffer_length);
+        Hpss_PIOExportGrp(pio->CoordinatorSG, &group_buffer, &buffer_length);
     if (retval != 0)
     {
         result = GlobusGFSErrorSystemError("hpss_PIOExportGrp", -retval);
@@ -318,7 +314,7 @@ pio_start(hpss_pio_operation_t           PioOpType,
     }
 
     retval =
-        hpss_PIOImportGrp(group_buffer, buffer_length, &pio->ParticipantSG);
+        Hpss_PIOImportGrp(group_buffer, buffer_length, &pio->ParticipantSG);
     if (retval != 0)
     {
         result = GlobusGFSErrorSystemError("hpss_PIOImportGrp", -retval);

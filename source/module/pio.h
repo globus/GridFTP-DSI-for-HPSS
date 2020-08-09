@@ -52,9 +52,9 @@
 #include <globus_gridftp_server.h>
 
 /*
- * HPSS includes
+ * Local includes
  */
-#include <hpss_api.h>
+#include "hpss.h"
 
 #define PIO_END_TRANSFER 0xDEADBEEF
 

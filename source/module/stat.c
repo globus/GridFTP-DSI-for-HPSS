@@ -45,18 +45,10 @@
 #include <globus_gridftp_server.h>
 
 /*
- * HPSS includes
- */
-#include <hpss_api.h>
-#include <hpss_errno.h>
-#include <hpss_stat.h>
-#include <u_signed64.h>
-#include <hpss_version.h>
-
-/*
  * Local includes
  */
 #include "stat.h"
+#include "hpss.h"
 
 globus_result_t
 stat_translate_stat(char *             Pathname,
@@ -81,7 +73,7 @@ stat_translate_stat(char *             Pathname,
         char symlink_target[HPSS_MAX_PATH_NAME];
         /* Read the target. */
         int retval =
-            hpss_Readlink(Pathname, symlink_target, sizeof(symlink_target));
+            Hpss_Readlink(Pathname, symlink_target, sizeof(symlink_target));
 
         if (retval < 0)
         {
@@ -125,7 +117,7 @@ stat_object(char *Pathname, globus_gfs_stat_t *GFSStat)
     memset(GFSStat, 0, sizeof(globus_gfs_stat_t));
 
     hpss_stat_t hpss_stat_buf;
-    int retval = hpss_Stat(Pathname, &hpss_stat_buf);
+    int retval = Hpss_Stat(Pathname, &hpss_stat_buf);
     if (retval)
         return GlobusGFSErrorSystemError("hpss_Stat", -retval);
     return stat_translate_stat(Pathname, &hpss_stat_buf, GFSStat);
@@ -137,7 +129,7 @@ stat_link(char *Pathname, globus_gfs_stat_t *GFSStat)
     memset(GFSStat, 0, sizeof(globus_gfs_stat_t));
 
     hpss_stat_t hpss_stat_buf;
-    int         retval = hpss_Lstat(Pathname, &hpss_stat_buf);
+    int         retval = Hpss_Lstat(Pathname, &hpss_stat_buf);
     if (retval)
         return GlobusGFSErrorSystemError("hpss_Lstat", -retval);
     return stat_translate_stat(Pathname, &hpss_stat_buf, GFSStat);
@@ -201,7 +193,7 @@ stat_translate_dir_entry(ns_ObjHandle_t *   ParentObjHandle,
     timestamp_sec_t hpss_mtime;
     timestamp_sec_t hpss_ctime;
 
-    API_ConvertTimeToPosixTime(
+    HpssAPI_ConvertTimeToPosixTime(
         &DirEntry->Attrs, &hpss_atime, &hpss_mtime, &hpss_ctime);
 
     GFSStat->atime = hpss_atime;
@@ -220,7 +212,7 @@ stat_translate_dir_entry(ns_ObjHandle_t *   ParentObjHandle,
     {
         char symlink_target[HPSS_MAX_PATH_NAME];
         /* Read the target. */
-        int retval = hpss_ReadlinkHandle(ParentObjHandle,
+        int retval = Hpss_ReadlinkHandle(ParentObjHandle,
                                          DirEntry->Name,
                                          symlink_target,
                                          sizeof(symlink_target),
@@ -257,7 +249,7 @@ stat_directory(char      * Pathname,
 #define MAX_DIR_ENTRY 200
 
     hpss_fileattr_t dir_attrs;
-    if ((retval = hpss_FileGetAttributes(Pathname, &dir_attrs)) < 0)
+    if ((retval = Hpss_FileGetAttributes(Pathname, &dir_attrs)) < 0)
     {
         result = GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
         goto cleanup;
@@ -266,7 +258,7 @@ stat_directory(char      * Pathname,
 #if HPSS_MAJOR_VERSION >= 8
     // mtrace puts off an error here, says free() called on unalloc'ed
     // memory. Confirmed by IBM to be a false positive.
-    dir_fd = hpss_OpendirHandle(&dir_attrs.ObjectHandle, NULL);
+    dir_fd = Hpss_OpendirHandle(&dir_attrs.ObjectHandle, NULL);
 #endif
 
     uint64_t offset = 0;
@@ -274,7 +266,7 @@ stat_directory(char      * Pathname,
     do {
         ns_DirEntry_t dir_entries[MAX_DIR_ENTRY];
 #if HPSS_MAJOR_VERSION >= 8
-        int count = hpss_ReadAttrsPlus(dir_fd,
+        int count = Hpss_ReadAttrsPlus(dir_fd,
                                        offset,
                                        sizeof(dir_entries),
                                        HPSS_READDIR_GETATTRS,
@@ -282,7 +274,7 @@ stat_directory(char      * Pathname,
                                        &offset,
                                        dir_entries);
 #else
-        int count = hpss_ReadAttrsHandle(&dir_attrs.ObjectHandle,
+        int count = Hpss_ReadAttrsHandle(&dir_attrs.ObjectHandle,
                                          offset,
                                          NULL,
                                          sizeof(dir_entries),
@@ -321,7 +313,7 @@ stat_directory(char      * Pathname,
 cleanup:
 #if HPSS_MAJOR_VERSION >= 8
     if (dir_fd >= 0)
-        hpss_Closedir(dir_fd);
+        Hpss_Closedir(dir_fd);
 #endif
     return result;
 }
