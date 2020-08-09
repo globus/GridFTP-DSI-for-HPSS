@@ -46,11 +46,6 @@
  */
 #include <globus_gridftp_server.h>
 
-/*
- * HPSS includes
- */
-#include <ns_ObjHandle.h>
-
 globus_result_t
 stat_object(char *Pathname, globus_gfs_stat_t *);
 

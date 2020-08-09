@@ -45,14 +45,10 @@
 #include <assert.h>
 
 /*
- * HPSS includes.
- */
-#include <hpss_version.h>
-
-/*
  * Local includes
  */
 #include "cksm.h"
+#include "hpss.h"
 #include "pio.h"
 #include "stat.h"
 #include "logging.h"
@@ -165,7 +161,7 @@ cksm_open_for_reading(char *Pathname, int *FileFD, int *FileStripeWidth)
     memset(&priorities, 0, sizeof(hpss_cos_priorities_t));
 
     /* Open the HPSS file. */
-    *FileFD = hpss_Open(Pathname,
+    *FileFD = Hpss_Open(Pathname,
                         O_RDONLY,
                         S_IRUSR | S_IWUSR,
                         &hints_in,
@@ -233,7 +229,7 @@ cksm_transfer_complete_callback(globus_result_t Result, void *UserArg)
     if (cksm_info->Result)
         result = cksm_info->Result;
 
-    rc = hpss_Close(cksm_info->FileFD);
+    rc = Hpss_Close(cksm_info->FileFD);
     if (rc && !result)
         result = GlobusGFSErrorSystemError("hpss_Close", -rc);
 
@@ -293,7 +289,7 @@ cksm(globus_gfs_operation_t     Operation,
         }
     }
 
-    rc = hpss_Stat(CommandInfo->pathname, &hpss_stat_buf);
+    rc = Hpss_Stat(CommandInfo->pathname, &hpss_stat_buf);
     if (rc)
     {
         result = GlobusGFSErrorSystemError("hpss_Stat", -rc);
@@ -360,7 +356,7 @@ cleanup:
         if (cksm_info)
         {
             if (cksm_info->FileFD != -1)
-                hpss_Close(cksm_info->FileFD);
+                Hpss_Close(cksm_info->FileFD);
             if (cksm_info->Pathname)
                 free(cksm_info->Pathname);
             free(cksm_info);
@@ -417,7 +413,7 @@ cksm_set_checksum(char *Pathname, config_t *Config, char *Checksum)
         attr_list.Pair[6].Key   = "/hpss/user/cksum/filesize";
         attr_list.Pair[6].Value = filesize_buf;
 
-        retval = hpss_UserAttrSetAttrs(Pathname, &attr_list, NULL);
+        retval = Hpss_UserAttrSetAttrs(Pathname, &attr_list, NULL);
         if (retval)
             return GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
     }
@@ -453,10 +449,10 @@ checksum_get_file_sum(char *Pathname, config_t *Config, char **ChecksumString)
 
 #if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) ||                     \
     HPSS_MAJOR_VERSION >= 8
-        retval = hpss_UserAttrGetAttrs(
+        retval = Hpss_UserAttrGetAttrs(
             Pathname, &attr_list, UDA_API_VALUE, HPSS_XML_SIZE - 1);
 #else
-        retval = hpss_UserAttrGetAttrs(Pathname, &attr_list, UDA_API_VALUE);
+        retval = Hpss_UserAttrGetAttrs(Pathname, &attr_list, UDA_API_VALUE);
 #endif
 
         switch (retval)
@@ -469,7 +465,7 @@ checksum_get_file_sum(char *Pathname, config_t *Config, char **ChecksumString)
             return GlobusGFSErrorSystemError("hpss_UserAttrGetAttrs", -retval);
         }
 
-        tmp = hpss_ChompXMLHeader(algorithm, NULL);
+        tmp = Hpss_ChompXMLHeader(algorithm, NULL);
         if (!tmp)
             return GLOBUS_SUCCESS;
 
@@ -479,7 +475,7 @@ checksum_get_file_sum(char *Pathname, config_t *Config, char **ChecksumString)
         if (strcmp(value, "md5") != 0)
             return GLOBUS_SUCCESS;
 
-        tmp = hpss_ChompXMLHeader(state, NULL);
+        tmp = Hpss_ChompXMLHeader(state, NULL);
         if (!tmp)
             return GLOBUS_SUCCESS;
 
@@ -489,7 +485,7 @@ checksum_get_file_sum(char *Pathname, config_t *Config, char **ChecksumString)
         if (strcmp(value, "Valid") != 0)
             return GLOBUS_SUCCESS;
 
-        *ChecksumString = hpss_ChompXMLHeader(checksum, NULL);
+        *ChecksumString = Hpss_ChompXMLHeader(checksum, NULL);
     }
     return GLOBUS_SUCCESS;
 }
@@ -509,7 +505,7 @@ cksm_clear_checksum(char *Pathname, config_t *Config)
         attr_list.Pair[0].Key   = "/hpss/user/cksum/state";
         attr_list.Pair[0].Value = "Invalid";
 
-        retval = hpss_UserAttrSetAttrs(Pathname, &attr_list, NULL);
+        retval = Hpss_UserAttrSetAttrs(Pathname, &attr_list, NULL);
         if (retval && retval != -ENOENT)
             return GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
     }

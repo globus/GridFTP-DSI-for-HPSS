@@ -50,11 +50,6 @@
 #include <globus_gridftp_server.h>
 
 /*
- * HPSS includes
- */
-#include <hpss_api.h>
-
-/*
  * Local includes
  */
 #include "authenticate.h"
@@ -65,6 +60,7 @@
 #include "retr.h"
 #include "stat.h"
 #include "stor.h"
+#include "hpss.h"
 
 void
 dsi_init(globus_gfs_operation_t     Operation,
@@ -96,7 +92,7 @@ dsi_init(globus_gfs_operation_t     Operation,
      * Pulling the HPSS directory from the user's credential will support
      * sites that use HPSS LDAP.
      */
-    result = hpss_GetThreadUcred(&user_cred);
+    result = Hpss_GetThreadUcred(&user_cred);
     if (result)
         goto cleanup;
 

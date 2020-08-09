@@ -51,17 +51,10 @@
 #include <globus_gridftp_server.h>
 
 /*
- * HPSS includes
- */
-#include <hpss_String.h>
-#include <hpss_api.h>
-#include <hpss_errno.h>
-#include <hpss_mech.h>
-
-/*
  * Local includes
  */
 #include "authenticate.h"
+#include "hpss.h"
 
 globus_result_t
 authenticate_get_uid(char *UserName, int *Uid)
@@ -95,22 +88,22 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
 
     char * authn_mech_string = AuthenticationMech;
     if (!authn_mech_string)
-        authn_mech_string = hpss_Getenv("HPSS_API_AUTHN_MECH");
+        authn_mech_string = Hpss_Getenv("HPSS_API_AUTHN_MECH");
     if (!authn_mech_string)
-        authn_mech_string = hpss_Getenv("HPSS_PRIMARY_AUTHN_MECH");
+        authn_mech_string = Hpss_Getenv("HPSS_PRIMARY_AUTHN_MECH");
 
-    int retval = hpss_AuthnMechTypeFromString(authn_mech_string, &authn_mech);
+    int retval = Hpss_AuthnMechTypeFromString(authn_mech_string, &authn_mech);
     if (retval != HPSS_E_NOERROR)
         return GlobusGFSErrorSystemError("hpss_AuthnMechTypeFromString()",
                                          -retval);
 
     char * authenticator_string = Authenticator;
     if (!authenticator_string)
-        authenticator_string = hpss_Getenv("HPSS_PRIMARY_AUTHENTICATOR");
+        authenticator_string = Hpss_Getenv("HPSS_PRIMARY_AUTHENTICATOR");
 
     hpss_rpc_auth_type_t auth_type; // enum {invalid, krb5, unix, gsi, spkm}
     char * authenticator;
-    retval = hpss_ParseAuthString(authenticator_string,
+    retval = Hpss_ParseAuthString(authenticator_string,
                                   &authn_mech,
                                   &auth_type,
                                   (void **)&authenticator);
@@ -119,7 +112,7 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
         LoginName = "hpssftp";
 
     /* Now log into HPSS using our configured 'super user' */
-    retval = hpss_SetLoginCred(LoginName,
+    retval = Hpss_SetLoginCred(LoginName,
                                authn_mech,
                                hpss_rpc_cred_client,
                                auth_type,
@@ -139,7 +132,7 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
          * set our credential to that user. The lookup is determined by the
          * /var/hpss/etc/auth.conf, authz.conf files.
          */
-        retval = hpss_LoadDefaultThreadState(uid, hpss_Umask(0), NULL);
+        retval = Hpss_LoadDefaultThreadState(uid, Hpss_Umask(0), NULL);
         if (retval != HPSS_E_NOERROR)
             return GlobusGFSErrorSystemError("hpss_LoadDefaultThreadState()",
                                              -retval);

@@ -52,14 +52,10 @@
 #include <globus_gridftp_server.h>
 
 /*
- * HPSS includes
- */
-#include <hpss_api.h>
-
-/*
  * Local includes
  */
 #include "cksm.h"
+#include "hpss.h"
 #include "commands.h"
 #include "logging.h"
 #include "config.h"
@@ -94,7 +90,7 @@ commands_mkdir(globus_gfs_operation_t     Operation,
 
     INFO(("mdkir %s\n", CommandInfo->pathname));
 
-    int retval = hpss_Mkdir(CommandInfo->pathname,
+    int retval = Hpss_Mkdir(CommandInfo->pathname,
                             S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Mkdir", -retval);
@@ -109,7 +105,7 @@ commands_rmdir(char * Pathname)
 
     INFO(("rmdir %s\n", Pathname));
 
-    int retval = hpss_Rmdir(Pathname);
+    int retval = Hpss_Rmdir(Pathname);
     if (retval != HPSS_E_NOERROR)
         result = GlobusGFSErrorSystemError("hpss_Rmdir", -retval);
     return result;
@@ -124,7 +120,7 @@ commands_unlink(globus_gfs_operation_t     Operation,
 
     INFO(("ulink %s\n", CommandInfo->pathname));
 
-    int retval = hpss_Unlink(CommandInfo->pathname);
+    int retval = Hpss_Unlink(CommandInfo->pathname);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Unlink", -retval);
 
@@ -159,7 +155,7 @@ commands_chmod(globus_gfs_operation_t     Operation,
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
-    int retval = hpss_Chmod(CommandInfo->pathname, CommandInfo->chmod_mode);
+    int retval = Hpss_Chmod(CommandInfo->pathname, CommandInfo->chmod_mode);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Chmod", -retval);
 
@@ -197,7 +193,7 @@ commands_chgrp(globus_gfs_operation_t     Operation,
     int             gid;
 
     hpss_stat_t hpss_stat_buf;
-    int         retval = hpss_Stat(CommandInfo->pathname, &hpss_stat_buf);
+    int         retval = Hpss_Stat(CommandInfo->pathname, &hpss_stat_buf);
     if (retval)
     {
         result = GlobusGFSErrorSystemError("hpss_Stat", -retval);
@@ -218,7 +214,7 @@ commands_chgrp(globus_gfs_operation_t     Operation,
         gid = atoi(CommandInfo->chgrp_group);
     }
 
-    retval = hpss_Chown(CommandInfo->pathname, hpss_stat_buf.st_uid, gid);
+    retval = Hpss_Chown(CommandInfo->pathname, hpss_stat_buf.st_uid, gid);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Chgrp", -retval);
 
@@ -236,7 +232,7 @@ commands_utime(globus_gfs_operation_t     Operation,
     times.actime  = CommandInfo->utime_time;
     times.modtime = CommandInfo->utime_time;
 
-    int retval = hpss_Utime(CommandInfo->pathname, &times);
+    int retval = Hpss_Utime(CommandInfo->pathname, &times);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Utime", -retval);
 
@@ -251,7 +247,7 @@ commands_symlink(globus_gfs_operation_t     Operation,
     globus_result_t result = GLOBUS_SUCCESS;
 
     int retval =
-        hpss_Symlink(CommandInfo->from_pathname, CommandInfo->pathname);
+        Hpss_Symlink(CommandInfo->from_pathname, CommandInfo->pathname);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Symlink", -retval);
 
@@ -268,7 +264,7 @@ commands_truncate(globus_gfs_operation_t     Operation,
     INFO(("truncate %s\n", CommandInfo->pathname));
 
     int retval =
-        hpss_Truncate(CommandInfo->from_pathname, CommandInfo->cksm_offset);
+        Hpss_Truncate(CommandInfo->from_pathname, CommandInfo->cksm_offset);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Truncate", -retval);
 
