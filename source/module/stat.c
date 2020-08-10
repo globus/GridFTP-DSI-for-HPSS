@@ -259,6 +259,11 @@ stat_directory(char      * Pathname,
     // mtrace puts off an error here, says free() called on unalloc'ed
     // memory. Confirmed by IBM to be a false positive.
     dir_fd = Hpss_OpendirHandle(&dir_attrs.ObjectHandle, NULL);
+    if (dir_fd < 0)
+    {
+        result = GlobusGFSErrorSystemError("Hpss_OpendirHandle", -dir_fd);
+        goto cleanup;
+    }
 #endif
 
     uint64_t offset = 0;
