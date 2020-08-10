@@ -2,6 +2,7 @@
  * System includes.
  */
 #include <stdbool.h>
+#include <string.h>
 
 /*
  * Local includes.
@@ -129,6 +130,8 @@ Hpss_FileGetAttributes(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+
+    memset(AttrOut, 0, sizeof(*AttrOut));
     return_value = hpss_FileGetAttributes(Path, AttrOut);
     return _FindBestErrno(return_value);
 }
@@ -143,7 +146,12 @@ Hpss_FileGetXAttributes(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_FileGetXAttributes(Path, Flags, StorageLevel, AttrOut);
+
+    memset(AttrOut, 0, sizeof(*AttrOut));
+    return_value = hpss_FileGetXAttributes(Path,
+                                           Flags,
+                                           StorageLevel,
+                                           AttrOut);
     return _FindBestErrno(return_value);
 }
 
@@ -159,6 +167,8 @@ Hpss_FilesetGetAttributes(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+
+    memset(FilesetAttrs, 0, sizeof(*FilesetAttrs));
     return_value = hpss_FilesetGetAttributes(Name,
                                              FilesetId,
                                              FilesetHandle,
@@ -212,6 +222,7 @@ Hpss_GetConfiguration(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(ConfigOut, 0, sizeof(*ConfigOut));
     return_value = hpss_GetConfiguration(ConfigOut);
     return _FindBestErrno(return_value);
 }
@@ -223,6 +234,7 @@ Hpss_GetThreadUcred(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(RetUcred, 0, sizeof(*RetUcred));
     return_value = hpss_GetThreadUcred(RetUcred);
     return _FindBestErrno(return_value);
 }
@@ -248,6 +260,7 @@ Hpss_Lstat(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(Buf, 0, sizeof(*Buf));
     return_value = hpss_Lstat(Path, Buf);
     return _FindBestErrno(return_value);
 }
@@ -277,6 +290,9 @@ Hpss_net_getaddrinfo(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+
+    memset(addr, 0, sizeof(*addr));
+    memset(errbuf, 0, errbuflen);
     return_value = hpss_net_getaddrinfo(hostname,
                                         service,
                                         flags,
@@ -299,6 +315,7 @@ Hpss_Open(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(HintsOut, 0, sizeof(*HintsOut));
     return_value = hpss_Open(Path,
                              Oflag,
                              Mode,
@@ -362,12 +379,17 @@ Hpss_PIOExecute(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+
+    memset(GapInfo, 0, sizeof(*GapInfo));
+    // Don't clear BytesMoved, it is used as a regression test in pio.c
+
     return_value = hpss_PIOExecute(Fd,
                                    FileOffset,
                                    Size,
                                    StripeGroup,
                                    GapInfo,
                                    BytesMoved);
+
     return _FindBestErrno(return_value);
 }
 
@@ -380,6 +402,7 @@ Hpss_PIOExportGrp(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(Buffer, 0, *BufLength);
     return_value = hpss_PIOExportGrp(StripeGroup, Buffer, BufLength);
     return _FindBestErrno(return_value);
 }
@@ -393,6 +416,7 @@ Hpss_PIOImportGrp(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    // hpss_pio_grp_t is opaque, no way to zero it
     return_value = hpss_PIOImportGrp(Buffer, BufLength, StripeGroup);
     return _FindBestErrno(return_value);
 }
@@ -428,6 +452,7 @@ Hpss_PIOStart(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    // hpss_pio_grp_t is opaque, no way to zero it
     return_value = hpss_PIOStart(InputParams, StripeGroup);
     return _FindBestErrno(return_value);
 }
@@ -446,6 +471,7 @@ Hpss_ReadAttrsPlus(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(DirentPtr, 0, BufferSize);
     return_value = hpss_ReadAttrsPlus(Dirdes,
                                       OffsetIn,
                                       BufferSize,
@@ -470,6 +496,7 @@ Hpss_ReadAttrsHandle(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(DirentPtr, 0, BufferSize);
     return_value = hpss_ReadAttrsHandle(ObjHandle,
                                         OffsetIn,
                                         Ucred,
@@ -491,6 +518,7 @@ Hpss_Readlink(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(Contents, 0, BufferSize);
     return_value = hpss_Readlink(Path, Contents, BufferSize);
     return _FindBestErrno(return_value);
 }
@@ -506,6 +534,7 @@ Hpss_ReadlinkHandle(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(Contents, 0, BufferSize);
     return_value = hpss_ReadlinkHandle(ObjHandle,
                                        Path,
                                        Contents,
@@ -559,6 +588,7 @@ Hpss_SetCOSByHints(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(COSPtr, 0, sizeof(*COSPtr));
     return_value = hpss_SetCOSByHints(Fildes, Flags, HintsPtr, PrioPtr, COSPtr);
     return _FindBestErrno(return_value);
 }
@@ -600,6 +630,7 @@ Hpss_StageCallBack(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(BitfileObj, 0, sizeof(*BitfileObj));
     return_value = hpss_StageCallBack(Path,
                                       Offset,
                                       Length,
@@ -619,6 +650,7 @@ Hpss_Stat(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(Buf, 0, sizeof(*Buf));
     return_value = hpss_Stat(Path, Buf);
     return _FindBestErrno(return_value);
 }
@@ -691,6 +723,7 @@ Hpss_UserAttrGetAttrs(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(Attr, 0, sizeof(*Attr));
     return_value = hpss_UserAttrGetAttrs(Path, Attr, XMLFlag);
     return _FindBestErrno(return_value);
 }
@@ -705,6 +738,7 @@ Hpss_UserAttrGetAttrs(
     int return_value;
 
     Hpss_ClearLastHPSSErrno();
+    memset(Attr, 0, sizeof(*Attr));
     return_value = hpss_UserAttrGetAttrs(Path, Attr, XMLFlag, XMLSize);
     return _FindBestErrno(return_value);
 }
