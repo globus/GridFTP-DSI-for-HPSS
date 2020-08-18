@@ -430,8 +430,6 @@ stage(globus_gfs_operation_t     Operation,
     residency_t     residency      = ARCHIVED;
     globus_result_t result;
 
-    INFO("Stage request for %s\n", CommandInfo->pathname);
-
     result = stage_get_timeout(Operation, CommandInfo, &timeout);
     if (result)
         goto cleanup;

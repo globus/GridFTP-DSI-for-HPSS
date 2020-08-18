@@ -81,21 +81,16 @@ commands_init(globus_gfs_operation_t Operation)
     return GLOBUS_SUCCESS;
 }
 
-void
-commands_mkdir(globus_gfs_operation_t     Operation,
-               globus_gfs_command_info_t *CommandInfo,
-               commands_callback          Callback)
+globus_result_t
+commands_mkdir(globus_gfs_command_info_t *CommandInfo)
 {
     globus_result_t result = GLOBUS_SUCCESS;
-
-    INFO("mdkir %s\n", CommandInfo->pathname);
 
     int retval = Hpss_Mkdir(CommandInfo->pathname,
                             S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Mkdir", -retval);
-
-    Callback(Operation, result, NULL);
+    return result;
 }
 
 globus_result_t
@@ -103,35 +98,26 @@ commands_rmdir(char * Pathname)
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
-    INFO("rmdir %s\n", Pathname);
-
     int retval = Hpss_Rmdir(Pathname);
     if (retval != HPSS_E_NOERROR)
         result = GlobusGFSErrorSystemError("hpss_Rmdir", -retval);
     return result;
 }
 
-void
-commands_unlink(globus_gfs_operation_t     Operation,
-                globus_gfs_command_info_t *CommandInfo,
-                commands_callback          Callback)
+globus_result_t
+commands_unlink(globus_gfs_command_info_t *CommandInfo)
 {
     globus_result_t result = GLOBUS_SUCCESS;
-
-    INFO("ulink %s\n", CommandInfo->pathname);
 
     int retval = Hpss_Unlink(CommandInfo->pathname);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Unlink", -retval);
-
-    Callback(Operation, result, NULL);
+    return result;
 }
 
-void
-commands_rename(globus_gfs_operation_t     Operation,
-                globus_gfs_command_info_t *CommandInfo,
-                config_t *                 Config,
-                commands_callback          Callback)
+globus_result_t
+commands_rename(globus_gfs_command_info_t *CommandInfo,
+                config_t *                 Config)
 {
     int             retval = 0;
     globus_result_t result = GLOBUS_SUCCESS;
@@ -145,21 +131,18 @@ commands_rename(globus_gfs_operation_t     Operation,
         result = GlobusGFSErrorSystemError("hpss_Rename", -retval);
 
 cleanup:
-    Callback(Operation, result, NULL);
+    return result;
 }
 
-void
-commands_chmod(globus_gfs_operation_t     Operation,
-               globus_gfs_command_info_t *CommandInfo,
-               commands_callback          Callback)
+globus_result_t
+commands_chmod(globus_gfs_command_info_t *CommandInfo)
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
     int retval = Hpss_Chmod(CommandInfo->pathname, CommandInfo->chmod_mode);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Chmod", -retval);
-
-    Callback(Operation, result, NULL);
+    return result;
 }
 
 globus_result_t
@@ -184,10 +167,8 @@ session_get_gid(char *GroupName, int *Gid)
     return GLOBUS_SUCCESS;
 }
 
-void
-commands_chgrp(globus_gfs_operation_t     Operation,
-               globus_gfs_command_info_t *CommandInfo,
-               commands_callback          Callback)
+globus_result_t
+commands_chgrp(globus_gfs_command_info_t *CommandInfo)
 {
     globus_result_t result = GLOBUS_SUCCESS;
     int             gid;
@@ -195,20 +176,13 @@ commands_chgrp(globus_gfs_operation_t     Operation,
     hpss_stat_t hpss_stat_buf;
     int         retval = Hpss_Stat(CommandInfo->pathname, &hpss_stat_buf);
     if (retval)
-    {
-        result = GlobusGFSErrorSystemError("hpss_Stat", -retval);
-        Callback(Operation, result, NULL);
-        return;
-    }
+        return GlobusGFSErrorSystemError("hpss_Stat", -retval);
 
     if (!isdigit(*CommandInfo->chgrp_group))
     {
         result = session_get_gid(CommandInfo->chgrp_group, &gid);
         if (result != GLOBUS_SUCCESS)
-        {
-            Callback(Operation, result, NULL);
-            return;
-        }
+            return result;
     } else
     {
         gid = atoi(CommandInfo->chgrp_group);
@@ -217,14 +191,11 @@ commands_chgrp(globus_gfs_operation_t     Operation,
     retval = Hpss_Chown(CommandInfo->pathname, hpss_stat_buf.st_uid, gid);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Chgrp", -retval);
-
-    Callback(Operation, result, NULL);
+    return result;
 }
 
-void
-commands_utime(globus_gfs_operation_t     Operation,
-               globus_gfs_command_info_t *CommandInfo,
-               commands_callback          Callback)
+globus_result_t
+commands_utime(globus_gfs_command_info_t *CommandInfo)
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
@@ -235,14 +206,11 @@ commands_utime(globus_gfs_operation_t     Operation,
     int retval = Hpss_Utime(CommandInfo->pathname, &times);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Utime", -retval);
-
-    Callback(Operation, result, NULL);
+    return result;
 }
 
-void
-commands_symlink(globus_gfs_operation_t     Operation,
-                 globus_gfs_command_info_t *CommandInfo,
-                 commands_callback          Callback)
+globus_result_t
+commands_symlink(globus_gfs_command_info_t *CommandInfo)
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
@@ -250,83 +218,17 @@ commands_symlink(globus_gfs_operation_t     Operation,
         Hpss_Symlink(CommandInfo->from_pathname, CommandInfo->pathname);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Symlink", -retval);
-
-    Callback(Operation, result, NULL);
+    return result;
 }
 
-void
-commands_truncate(globus_gfs_operation_t     Operation,
-                  globus_gfs_command_info_t *CommandInfo,
-                  commands_callback          Callback)
+globus_result_t
+commands_truncate(globus_gfs_command_info_t *CommandInfo)
 {
     globus_result_t result = GLOBUS_SUCCESS;
-
-    INFO("truncate %s\n", CommandInfo->pathname);
 
     int retval =
         Hpss_Truncate(CommandInfo->from_pathname, CommandInfo->cksm_offset);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Truncate", -retval);
-
-    Callback(Operation, result, NULL);
-}
-
-void
-commands_run(globus_gfs_operation_t     Operation,
-             globus_gfs_command_info_t *CommandInfo,
-             config_t *                 Config,
-             commands_callback          Callback)
-{
-    switch (CommandInfo->command)
-    {
-    case GLOBUS_GFS_CMD_MKD:
-        commands_mkdir(Operation, CommandInfo, Callback);
-        break;
-    case GLOBUS_GFS_CMD_DELE:
-        commands_unlink(Operation, CommandInfo, Callback);
-        break;
-    case GLOBUS_GFS_CMD_RNTO:
-        commands_rename(Operation, CommandInfo, Config, Callback);
-        break;
-    case GLOBUS_GFS_CMD_RNFR:
-        break;
-    case GLOBUS_GFS_CMD_SITE_CHMOD:
-        commands_chmod(Operation, CommandInfo, Callback);
-        break;
-    case GLOBUS_GFS_CMD_SITE_CHGRP:
-        commands_chgrp(Operation, CommandInfo, Callback);
-        break;
-    case GLOBUS_GFS_CMD_SITE_UTIME:
-        commands_utime(Operation, CommandInfo, Callback);
-        break;
-    case GLOBUS_GFS_CMD_SITE_SYMLINKFROM:
-        break;
-    case GLOBUS_GFS_CMD_SITE_SYMLINK:
-        commands_symlink(Operation, CommandInfo, Callback);
-        break;
-    case GLOBUS_GFS_CMD_CKSM:
-        cksm(Operation, CommandInfo, Config, Callback);
-        break;
-    case GLOBUS_GFS_HPSS_CMD_SITE_STAGE:
-        stage(Operation, CommandInfo, Callback);
-        break;
-    case GLOBUS_GFS_CMD_TRNC:
-        commands_truncate(Operation, CommandInfo, Callback);
-        break;
-
-    case GLOBUS_GFS_CMD_SITE_AUTHZ_ASSERT:
-    case GLOBUS_GFS_CMD_SITE_RDEL:
-    case GLOBUS_GFS_CMD_SITE_DSI:
-    case GLOBUS_GFS_CMD_SITE_SETNETSTACK:
-    case GLOBUS_GFS_CMD_SITE_SETDISKSTACK:
-    case GLOBUS_GFS_CMD_SITE_CLIENTINFO:
-    case GLOBUS_GFS_CMD_DCSC:
-    case GLOBUS_GFS_CMD_HTTP_PUT:
-    case GLOBUS_GFS_CMD_HTTP_GET:
-    case GLOBUS_GFS_CMD_HTTP_CONFIG:
-    case GLOBUS_GFS_CMD_SITE_TASKID:
-    default:
-        return Callback(
-            Operation, GlobusGFSErrorGeneric("Not Supported"), NULL);
-    }
+    return result;
 }

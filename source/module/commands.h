@@ -63,18 +63,32 @@ typedef void (*commands_callback)(globus_gfs_operation_t Operation,
                                   globus_result_t        Result,
                                   char *                 CommandResponse);
 
-void
-commands_run(globus_gfs_operation_t     Operation,
-             globus_gfs_command_info_t *CommandInfo,
-             config_t *                 Config,
-             commands_callback          Callback);
+globus_result_t
+commands_mkdir(globus_gfs_command_info_t *CommandInfo);
 
-
-/*
- * This command is the first of many to be broken out of the group so that
- * they can be easily tested and have fixups applied.
- */
 globus_result_t
 commands_rmdir(char * Pathname);
+
+globus_result_t
+commands_unlink(globus_gfs_command_info_t *CommandInfo);
+
+globus_result_t
+commands_rename(globus_gfs_command_info_t *CommandInfo,
+                config_t *                 Config);
+
+globus_result_t
+commands_chmod(globus_gfs_command_info_t *CommandInfo);
+
+globus_result_t
+commands_chgrp(globus_gfs_command_info_t *CommandInfo);
+
+globus_result_t
+commands_utime(globus_gfs_command_info_t *CommandInfo);
+
+globus_result_t
+commands_symlink(globus_gfs_command_info_t *CommandInfo);
+
+globus_result_t
+commands_truncate(globus_gfs_command_info_t *CommandInfo);
 
 #endif /* HPSS_DSI_COMMANDS_H */
