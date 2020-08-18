@@ -374,11 +374,11 @@ retr(globus_gfs_operation_t Operation, globus_gfs_transfer_info_t *TransferInfo)
 
     globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
-    INFO(("RETR of %s:  Offset: %lld  Length: %lld Filesize: %lld\n",
+    INFO("RETR of %s:  Offset: %lld  Length: %lld Filesize: %lld\n",
            TransferInfo->pathname,
            retr_info->CurrentOffset,
            retr_info->RangeLength,
-           retr_info->FileSize));
+           retr_info->FileSize);
 
     if (retr_info->RangeLength == -1)
         retr_info->RangeLength = retr_info->FileSize - retr_info->CurrentOffset;

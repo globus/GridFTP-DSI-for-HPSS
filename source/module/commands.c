@@ -88,7 +88,7 @@ commands_mkdir(globus_gfs_operation_t     Operation,
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
-    INFO(("mdkir %s\n", CommandInfo->pathname));
+    INFO("mdkir %s\n", CommandInfo->pathname);
 
     int retval = Hpss_Mkdir(CommandInfo->pathname,
                             S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
@@ -103,7 +103,7 @@ commands_rmdir(char * Pathname)
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
-    INFO(("rmdir %s\n", Pathname));
+    INFO("rmdir %s\n", Pathname);
 
     int retval = Hpss_Rmdir(Pathname);
     if (retval != HPSS_E_NOERROR)
@@ -118,7 +118,7 @@ commands_unlink(globus_gfs_operation_t     Operation,
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
-    INFO(("ulink %s\n", CommandInfo->pathname));
+    INFO("ulink %s\n", CommandInfo->pathname);
 
     int retval = Hpss_Unlink(CommandInfo->pathname);
     if (retval)
@@ -136,9 +136,9 @@ commands_rename(globus_gfs_operation_t     Operation,
     int             retval = 0;
     globus_result_t result = GLOBUS_SUCCESS;
 
-    INFO(("rename %s to %s\n",
+    INFO("rename %s to %s\n",
            CommandInfo->from_pathname,
-           CommandInfo->pathname));
+           CommandInfo->pathname);
 
     retval = hpss_Rename(CommandInfo->from_pathname, CommandInfo->pathname);
     if (retval)
@@ -261,7 +261,7 @@ commands_truncate(globus_gfs_operation_t     Operation,
 {
     globus_result_t result = GLOBUS_SUCCESS;
 
-    INFO(("truncate %s\n", CommandInfo->pathname));
+    INFO("truncate %s\n", CommandInfo->pathname);
 
     int retval =
         Hpss_Truncate(CommandInfo->from_pathname, CommandInfo->cksm_offset);

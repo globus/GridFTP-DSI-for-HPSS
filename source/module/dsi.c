@@ -222,12 +222,12 @@ dsi_stat(globus_gfs_operation_t   Operation,
         switch (StatInfo->use_symlink_info)
         {
         case 0:
-            INFO(("stat() of %s\n", StatInfo->pathname));
+            INFO("stat() of %s\n", StatInfo->pathname);
             result = stat_object(StatInfo->pathname, &gfs_stat);
             result = fixup_stat_object(StatInfo->pathname, result, &gfs_stat);
             break;
         default:
-            INFO(("lstat() of %s\n", StatInfo->pathname));
+            INFO("lstat() of %s\n", StatInfo->pathname);
             result = stat_link(StatInfo->pathname, &gfs_stat);
             break;
         }
@@ -241,7 +241,7 @@ dsi_stat(globus_gfs_operation_t   Operation,
     /*
      * Directory listing.
      */
-    INFO(("List stat of %s\n", StatInfo->pathname));
+    INFO("List stat of %s\n", StatInfo->pathname);
 
     struct _stat_dir_cb_arg cb_arg = {Operation, StatInfo};
     result = stat_directory(StatInfo->pathname, _stat_dir_callback, &cb_arg);
