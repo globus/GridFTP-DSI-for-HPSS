@@ -200,11 +200,11 @@ stor_gridftp_callback(globus_gfs_operation_t Operation,
     stor_buffer_t *stor_buffer = UserArg;
     stor_info_t *  stor_info   = stor_buffer->StorInfo;
 
-    TRACE(("%s: "
-           "Length: %zu "
-           "Offset: %"GLOBUS_OFF_T_FORMAT" "
-           "Eof: %d Error: %d\n", 
-           __func__, Length, Offset, Eof, Result != GLOBUS_SUCCESS));
+    TRACE("%s: "
+          "Length: %zu "
+          "Offset: %"GLOBUS_OFF_T_FORMAT" "
+          "Eof: %d Error: %d\n", 
+          __func__, Length, Offset, Eof, Result != GLOBUS_SUCCESS);
 
     if (stor_buffer->Valid != VALID_TAG)
         return;
@@ -266,9 +266,9 @@ stor_copy_out_buffers(stor_info_t *StorInfo,
     uint64_t       copied_length  = 0;
     uint64_t       length_to_copy = 0;
 
-    TRACE(("%s (enter): "
-           "Offset: %"PRIu64" "
-           "Length: %"PRIu64"\n", __func__, Offset, Length));
+    TRACE("%s (enter): "
+          "Offset: %"PRIu64" "
+          "Length: %"PRIu64"\n", __func__, Offset, Length);
 
     do
     {
@@ -308,7 +308,7 @@ stor_copy_out_buffers(stor_info_t *StorInfo,
         }
     } while (copied_length != Length && buf_entry);
 
-    TRACE(("%s (exit): Copied Length: %"PRIu64"\n", __func__, copied_length));
+    TRACE("%s (exit): Copied Length: %"PRIu64"\n", __func__, copied_length);
     return copied_length;
 }
 
@@ -389,10 +389,10 @@ stor_pio_callout(char     * Buffer,
     stor_info_t *   stor_info     = CallbackArg;
     globus_result_t result        = GLOBUS_SUCCESS;
 
-    TRACE(("%s (enter): "
-           "Length: %"PRIu32" "
-           "Offset: %"PRIu64"\n",
-           __func__, *Length, Offset));
+    TRACE("%s (enter): "
+          "Length: %"PRIu32" "
+          "Offset: %"PRIu64"\n",
+          __func__, *Length, Offset);
 
     pthread_mutex_lock(&stor_info->Mutex);
     {
@@ -437,10 +437,10 @@ stor_pio_callout(char     * Buffer,
 
     int exit_code = !(result == GLOBUS_SUCCESS);
 // XXX copied_length == *Length if exit_code == 0 (ALWAYS)
-    TRACE(("%s (exit): "
-           "Copied Length: %"PRIu64" "
-           "Exit Code: 0x%X\n", 
-           __func__, copied_length, exit_code));
+    TRACE("%s (exit): "
+          "Copied Length: %"PRIu64" "
+          "Exit Code: 0x%X\n", 
+          __func__, copied_length, exit_code);
     return exit_code;
 }
 
@@ -472,7 +472,7 @@ stor_range_complete_callback(globus_off_t *Offset,
 {
     stor_info_t *stor_info = UserArg;
 
-    INFO(("Restart marker sent: %lld, %lld\n", *Offset, *Length));
+    INFO("Restart marker sent: %lld, %lld\n", *Offset, *Length);
     globus_gridftp_server_update_range_recvd(stor_info->Operation,
                                              *Offset, 
                                              *Length);
@@ -621,11 +621,11 @@ stor(globus_gfs_operation_t      Operation,
 
     globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
-    INFO(("STOR of %s:  Offset: %lld  Length: %lld Allo: %lld\n",
+    INFO("STOR of %s:  Offset: %lld  Length: %lld Allo: %lld\n",
            TransferInfo->pathname,
            offset, 
            stor_info->RangeLength,
-           TransferInfo->alloc_size));
+           TransferInfo->alloc_size);
 
     if (stor_info->RangeLength == -1)
         stor_info->RangeLength = TransferInfo->alloc_size;

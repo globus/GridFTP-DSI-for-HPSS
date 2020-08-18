@@ -121,9 +121,9 @@ pio_coordinator_thread(void *Arg)
         {
         case NoValue64:
             length = 0;
-            WARN(("Your HPSS installation does not support BZ4719 "
+            WARN("Your HPSS installation does not support BZ4719 "
                   "and so restart markers are not supported on error "
-                  "conditions.\n"));
+                  "conditions.\n");
             break;
 
         default:
@@ -132,9 +132,9 @@ pio_coordinator_thread(void *Arg)
         }
 
         if (gap_info.Length > 0)
-            INFO(("Gap in file. Offset:%llu Length:%llu\n",
-                   gap_info.Offset, 
-                   gap_info.Length));
+            WARN("Gap in file. Offset:%llu Length:%llu\n",
+                 gap_info.Offset, 
+                 gap_info.Length);
 
         if (rc != 0)
             pio->CoordinatorResult =
@@ -155,7 +155,7 @@ pio_coordinator_thread(void *Arg)
      * can really do is log a warning and hope the admin sees it.
      */
     if (rc != HPSS_E_NOERROR)
-        WARN(("hpss_PIOEnd() returned %d\n", rc));
+        WARN("hpss_PIOEnd() returned %d\n", rc);
 
     return NULL;
 }
