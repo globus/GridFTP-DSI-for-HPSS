@@ -116,8 +116,7 @@ commands_unlink(globus_gfs_command_info_t *CommandInfo)
 }
 
 globus_result_t
-commands_rename(globus_gfs_command_info_t *CommandInfo,
-                config_t *                 Config)
+commands_rename(globus_gfs_command_info_t *CommandInfo)
 {
     int             retval = 0;
     globus_result_t result = GLOBUS_SUCCESS;
@@ -129,8 +128,6 @@ commands_rename(globus_gfs_command_info_t *CommandInfo,
     retval = hpss_Rename(CommandInfo->from_pathname, CommandInfo->pathname);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Rename", -retval);
-
-cleanup:
     return result;
 }
 

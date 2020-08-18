@@ -184,7 +184,7 @@ dsi_command(globus_gfs_operation_t     Operation,
         INFO("rename %s to %s",
              CommandInfo->from_pathname,
              CommandInfo->pathname);
-        result = commands_rename(CommandInfo, UserArg);
+        result = commands_rename(CommandInfo);
         globus_gridftp_server_finished_command(Operation, result, NULL);
         break;
     case GLOBUS_GFS_CMD_RNFR:

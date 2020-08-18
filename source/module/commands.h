@@ -46,11 +46,6 @@
  */
 #include <globus_gridftp_server.h>
 
-/*
- * Local includes
- */
-#include "config.h"
-
 enum
 {
     GLOBUS_GFS_HPSS_CMD_SITE_STAGE = GLOBUS_GFS_MIN_CUSTOM_CMD,
@@ -73,8 +68,7 @@ globus_result_t
 commands_unlink(globus_gfs_command_info_t *CommandInfo);
 
 globus_result_t
-commands_rename(globus_gfs_command_info_t *CommandInfo,
-                config_t *                 Config);
+commands_rename(globus_gfs_command_info_t *CommandInfo);
 
 globus_result_t
 commands_chmod(globus_gfs_command_info_t *CommandInfo);
