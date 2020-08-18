@@ -35,12 +35,6 @@ Hpss_ChompXMLHeader(
     char                        *  Header);
 
 int
-Hpss_Chown(
-    const char                  *  Path,
-    uid_t                          Owner,
-    gid_t                          Group);
-
-int
 Hpss_Close(int Fildes);
 
 int

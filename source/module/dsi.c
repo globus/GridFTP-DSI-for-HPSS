@@ -154,11 +154,6 @@ dsi_command(globus_gfs_operation_t     Operation,
         result = commands_chmod(CommandInfo);
         globus_gridftp_server_finished_command(Operation, result, NULL);
         break;
-    case GLOBUS_GFS_CMD_SITE_CHGRP:
-        INFO("chgrp %s %s", CommandInfo->chgrp_group, CommandInfo->pathname);
-        result = commands_chgrp(CommandInfo);
-        globus_gridftp_server_finished_command(Operation, result, NULL);
-        break;
     case GLOBUS_GFS_CMD_SITE_UTIME:
         INFO("utime access_time=%ld modification_time=%ld %s",
              CommandInfo->chgrp_group,
@@ -176,11 +171,11 @@ dsi_command(globus_gfs_operation_t     Operation,
         globus_gridftp_server_finished_command(Operation, result, NULL);
         break;
     case GLOBUS_GFS_CMD_CKSM:
-        INFO("CKSM of %s\n", CommandInfo->pathname);
+        INFO("checksum %s\n", CommandInfo->pathname);
         cksm(Operation, CommandInfo, config->UDAChecksumSupport, Callback);
         break;
     case GLOBUS_GFS_HPSS_CMD_SITE_STAGE:
-        INFO("Stage request for %s\n", CommandInfo->pathname);
+        INFO("stage %s\n", CommandInfo->pathname);
         stage(Operation, CommandInfo, Callback);
         break;
     case GLOBUS_GFS_CMD_TRNC:
