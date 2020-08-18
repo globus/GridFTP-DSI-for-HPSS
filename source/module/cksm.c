@@ -274,8 +274,6 @@ cksm(globus_gfs_operation_t     Operation,
     char *          checksum_string   = NULL;
     hpss_stat_t     hpss_stat_buf;
 
-    INFO("CKSM of %s\n", CommandInfo->pathname);
-
     if (CommandInfo->cksm_offset == 0 && CommandInfo->cksm_length == -1)
     {
         result = checksum_get_file_sum(

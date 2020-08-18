@@ -32,16 +32,18 @@ log_message(log_type_t type, const char * format, ...)
         message = static_errmsg;
     }
 
+    const char * prefix = "[HPSS Connector]";
+
     switch(type)
     {
     case LOG_TYPE_ERROR:
-        globus_gfs_log_message(GLOBUS_GFS_LOG_ERR, "%s\n", message);
+        globus_gfs_log_message(GLOBUS_GFS_LOG_ERR, "%s[ERROR] %s\n", prefix, message);
         break;
     case LOG_TYPE_WARN:
-        globus_gfs_log_message(GLOBUS_GFS_LOG_WARN, "%s\n", message);
+        globus_gfs_log_message(GLOBUS_GFS_LOG_WARN, "%s[WARN] %s\n", prefix, message);
         break;
     case LOG_TYPE_INFO:
-        globus_gfs_log_message(GLOBUS_GFS_LOG_INFO, "%s\n", message);
+        globus_gfs_log_message(GLOBUS_GFS_LOG_INFO, "%s[INFO] %s\n", prefix, message);
         break;
     case LOG_TYPE_DEBUG:
     case LOG_TYPE_TRACE:
