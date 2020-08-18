@@ -5,6 +5,7 @@
  * System includes
  */
 #include <openssl/md5.h>
+#include <stdbool.h>
 
 /*
  * Globus includes
@@ -20,7 +21,6 @@
  * Local includes
  */
 #include "commands.h"
-#include "config.h"
 
 typedef struct
 {
@@ -34,7 +34,7 @@ typedef struct
 {
     globus_gfs_operation_t     Operation;
     globus_gfs_command_info_t *CommandInfo;
-    config_t *                 Config;
+    bool                       UseUDAChecksums;
     char *                     Pathname;
     commands_callback          Callback;
     MD5_CTX                    MD5Context;
@@ -48,16 +48,16 @@ typedef struct
 void
 cksm(globus_gfs_operation_t     Operation,
      globus_gfs_command_info_t *CommandInfo,
-     config_t *                 Config,
+     bool                       UseUDAChecksums,
      commands_callback          Callback);
 
 globus_result_t
-cksm_set_checksum(char *Pathname, config_t *Config, char *Checksum);
+cksm_set_uda_checksum(char *Pathname, char *Checksum);
 
 globus_result_t
-checksum_get_file_sum(char *Pathname, config_t *Config, char **ChecksumString);
+cksm_get_uda_checksum(char *  Pathname, char ** ChecksumString);
 
 globus_result_t
-cksm_clear_checksum(char *Pathname, config_t *Config);
+cksm_clear_uda_checksum(char *Pathname);
 
 #endif /* HPSS_DSI_CKSM_H */

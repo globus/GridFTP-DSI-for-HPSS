@@ -214,7 +214,10 @@ cksm_transfer_complete_callback(globus_result_t Result, void *UserArg)
 
     if (!result && cksm_info->CommandInfo->cksm_offset == 0 &&
         cksm_info->CommandInfo->cksm_length == -1)
-        cksm_set_checksum(cksm_info->Pathname, cksm_info->Config, cksm_string);
+    {
+        if (cksm_info->UseUDAChecksums)
+            cksm_set_uda_checksum(cksm_info->Pathname, cksm_string);
+    }
 
     free(cksm_info->Pathname);
     free(cksm_info);
@@ -223,7 +226,7 @@ cksm_transfer_complete_callback(globus_result_t Result, void *UserArg)
 void
 cksm(globus_gfs_operation_t     Operation,
      globus_gfs_command_info_t *CommandInfo,
-     config_t *                 Config,
+     bool                       UseUDAChecksums,
      commands_callback          Callback)
 {
     globus_result_t result            = GLOBUS_SUCCESS;
@@ -235,14 +238,17 @@ cksm(globus_gfs_operation_t     Operation,
 
     if (CommandInfo->cksm_offset == 0 && CommandInfo->cksm_length == -1)
     {
-        result = checksum_get_file_sum(
-            CommandInfo->pathname, Config, &checksum_string);
-        if (result || checksum_string)
+        if (UseUDAChecksums)
         {
-            Callback(Operation, result, result ? NULL : checksum_string);
-            if (checksum_string)
-                free(checksum_string);
-            return;
+            result = cksm_get_uda_checksum(CommandInfo->pathname,
+                                           &checksum_string);
+            if (result || checksum_string)
+            {
+                Callback(Operation, result, result ? NULL : checksum_string);
+                if (checksum_string)
+                    free(checksum_string);
+                return;
+            }
         }
     }
 
@@ -261,13 +267,13 @@ cksm(globus_gfs_operation_t     Operation,
         goto cleanup;
     }
     memset(cksm_info, 0, sizeof(cksm_info_t));
-    cksm_info->Operation   = Operation;
-    cksm_info->CommandInfo = CommandInfo;
-    cksm_info->Callback    = Callback;
-    cksm_info->Config      = Config;
-    cksm_info->FileFD      = -1;
-    cksm_info->Pathname    = strdup(CommandInfo->pathname);
-    cksm_info->RangeLength = CommandInfo->cksm_length;
+    cksm_info->Operation       = Operation;
+    cksm_info->CommandInfo     = CommandInfo;
+    cksm_info->Callback        = Callback;
+    cksm_info->UseUDAChecksums = UseUDAChecksums;
+    cksm_info->FileFD          = -1;
+    cksm_info->Pathname        = strdup(CommandInfo->pathname);
+    cksm_info->RangeLength     = CommandInfo->cksm_length;
     if (cksm_info->RangeLength == -1)
         cksm_info->RangeLength =
             hpss_stat_buf.st_size - CommandInfo->cksm_offset;
@@ -332,7 +338,7 @@ cleanup:
  * /hpss/user/cksum/filesize                                     1
  */
 globus_result_t
-cksm_set_checksum(char *Pathname, config_t *Config, char *Checksum)
+cksm_set_uda_checksum(char *Pathname, char *Checksum)
 {
     int                  retval = 0;
     char                 filesize_buf[32];
@@ -342,44 +348,41 @@ cksm_set_checksum(char *Pathname, config_t *Config, char *Checksum)
     hpss_userattr_list_t attr_list;
     globus_gfs_stat_t    gfs_stat;
 
-    if (Config->UDAChecksumSupport)
-    {
-        result = stat_object(Pathname, &gfs_stat);
-        if (result != GLOBUS_SUCCESS)
-            return result;
+    result = stat_object(Pathname, &gfs_stat);
+    if (result != GLOBUS_SUCCESS)
+        return result;
 
-        snprintf(filesize_buf, sizeof(filesize_buf), "%lu", gfs_stat.size);
-        snprintf(lastupdate_buf, sizeof(lastupdate_buf), "%lu", time(NULL));
-        stat_destroy(&gfs_stat);
+    snprintf(filesize_buf, sizeof(filesize_buf), "%lu", gfs_stat.size);
+    snprintf(lastupdate_buf, sizeof(lastupdate_buf), "%lu", time(NULL));
+    stat_destroy(&gfs_stat);
 
-        attr_list.len  = sizeof(user_attrs) / sizeof(*user_attrs);
-        attr_list.Pair = user_attrs;
+    attr_list.len  = sizeof(user_attrs) / sizeof(*user_attrs);
+    attr_list.Pair = user_attrs;
 
-        attr_list.Pair[0].Key   = "/hpss/user/cksum/algorithm";
-        attr_list.Pair[0].Value = "md5";
-        attr_list.Pair[1].Key   = "/hpss/user/cksum/checksum";
-        attr_list.Pair[1].Value = Checksum;
-        attr_list.Pair[2].Key   = "/hpss/user/cksum/lastupdate";
-        attr_list.Pair[2].Value = lastupdate_buf;
-        attr_list.Pair[3].Key   = "/hpss/user/cksum/errors";
-        attr_list.Pair[3].Value = "0";
-        attr_list.Pair[4].Key   = "/hpss/user/cksum/state";
-        attr_list.Pair[4].Value = "Valid";
-        attr_list.Pair[5].Key   = "/hpss/user/cksum/app";
-        attr_list.Pair[5].Value = "GridFTP";
-        attr_list.Pair[6].Key   = "/hpss/user/cksum/filesize";
-        attr_list.Pair[6].Value = filesize_buf;
+    attr_list.Pair[0].Key   = "/hpss/user/cksum/algorithm";
+    attr_list.Pair[0].Value = "md5";
+    attr_list.Pair[1].Key   = "/hpss/user/cksum/checksum";
+    attr_list.Pair[1].Value = Checksum;
+    attr_list.Pair[2].Key   = "/hpss/user/cksum/lastupdate";
+    attr_list.Pair[2].Value = lastupdate_buf;
+    attr_list.Pair[3].Key   = "/hpss/user/cksum/errors";
+    attr_list.Pair[3].Value = "0";
+    attr_list.Pair[4].Key   = "/hpss/user/cksum/state";
+    attr_list.Pair[4].Value = "Valid";
+    attr_list.Pair[5].Key   = "/hpss/user/cksum/app";
+    attr_list.Pair[5].Value = "GridFTP";
+    attr_list.Pair[6].Key   = "/hpss/user/cksum/filesize";
+    attr_list.Pair[6].Value = filesize_buf;
 
-        retval = Hpss_UserAttrSetAttrs(Pathname, &attr_list, NULL);
-        if (retval)
-            return GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
-    }
+    retval = Hpss_UserAttrSetAttrs(Pathname, &attr_list, NULL);
+    if (retval)
+        return GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
 
     return GLOBUS_SUCCESS;
 }
 
 globus_result_t
-checksum_get_file_sum(char *Pathname, config_t *Config, char **ChecksumString)
+cksm_get_uda_checksum(char *  Pathname, char ** ChecksumString)
 {
     int                  retval = 0;
     char *               tmp    = NULL;
@@ -392,80 +395,74 @@ checksum_get_file_sum(char *Pathname, config_t *Config, char **ChecksumString)
 
     *ChecksumString = NULL;
 
-    if (Config->UDAChecksumSupport)
-    {
-        attr_list.len  = sizeof(user_attrs) / sizeof(*user_attrs);
-        attr_list.Pair = user_attrs;
+    attr_list.len  = sizeof(user_attrs) / sizeof(*user_attrs);
+    attr_list.Pair = user_attrs;
 
-        attr_list.Pair[0].Key   = "/hpss/user/cksum/algorithm";
-        attr_list.Pair[0].Value = algorithm;
-        attr_list.Pair[1].Key   = "/hpss/user/cksum/checksum";
-        attr_list.Pair[1].Value = checksum;
-        attr_list.Pair[2].Key   = "/hpss/user/cksum/state";
-        attr_list.Pair[2].Value = state;
+    attr_list.Pair[0].Key   = "/hpss/user/cksum/algorithm";
+    attr_list.Pair[0].Value = algorithm;
+    attr_list.Pair[1].Key   = "/hpss/user/cksum/checksum";
+    attr_list.Pair[1].Value = checksum;
+    attr_list.Pair[2].Key   = "/hpss/user/cksum/state";
+    attr_list.Pair[2].Value = state;
 
 #if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) ||                     \
     HPSS_MAJOR_VERSION >= 8
-        retval = Hpss_UserAttrGetAttrs(
-            Pathname, &attr_list, UDA_API_VALUE, HPSS_XML_SIZE - 1);
+    retval = Hpss_UserAttrGetAttrs(
+        Pathname, &attr_list, UDA_API_VALUE, HPSS_XML_SIZE - 1);
 #else
-        retval = Hpss_UserAttrGetAttrs(Pathname, &attr_list, UDA_API_VALUE);
+    retval = Hpss_UserAttrGetAttrs(Pathname, &attr_list, UDA_API_VALUE);
 #endif
 
-        switch (retval)
-        {
-        case 0:
-            break;
-        case -ENOENT:
-            return GLOBUS_SUCCESS;
-        default:
-            return GlobusGFSErrorSystemError("hpss_UserAttrGetAttrs", -retval);
-        }
-
-        tmp = Hpss_ChompXMLHeader(algorithm, NULL);
-        if (!tmp)
-            return GLOBUS_SUCCESS;
-
-        strcpy(value, tmp);
-        free(tmp);
-
-        if (strcmp(value, "md5") != 0)
-            return GLOBUS_SUCCESS;
-
-        tmp = Hpss_ChompXMLHeader(state, NULL);
-        if (!tmp)
-            return GLOBUS_SUCCESS;
-
-        strcpy(value, tmp);
-        free(tmp);
-
-        if (strcmp(value, "Valid") != 0)
-            return GLOBUS_SUCCESS;
-
-        *ChecksumString = Hpss_ChompXMLHeader(checksum, NULL);
+    switch (retval)
+    {
+    case 0:
+        break;
+    case -ENOENT:
+        return GLOBUS_SUCCESS;
+    default:
+        return GlobusGFSErrorSystemError("hpss_UserAttrGetAttrs", -retval);
     }
+
+    tmp = Hpss_ChompXMLHeader(algorithm, NULL);
+    if (!tmp)
+        return GLOBUS_SUCCESS;
+
+    strcpy(value, tmp);
+    free(tmp);
+
+    if (strcmp(value, "md5") != 0)
+        return GLOBUS_SUCCESS;
+
+    tmp = Hpss_ChompXMLHeader(state, NULL);
+    if (!tmp)
+        return GLOBUS_SUCCESS;
+
+    strcpy(value, tmp);
+    free(tmp);
+
+    if (strcmp(value, "Valid") != 0)
+        return GLOBUS_SUCCESS;
+
+    *ChecksumString = Hpss_ChompXMLHeader(checksum, NULL);
     return GLOBUS_SUCCESS;
 }
 
 globus_result_t
-cksm_clear_checksum(char *Pathname, config_t *Config)
+cksm_clear_uda_checksum(char *Pathname)
 {
     int                  retval = 0;
     hpss_userattr_t      user_attrs[1];
     hpss_userattr_list_t attr_list;
 
-    if (Config->UDAChecksumSupport)
-    {
-        attr_list.len  = sizeof(user_attrs) / sizeof(*user_attrs);
-        attr_list.Pair = user_attrs;
+    attr_list.len  = sizeof(user_attrs) / sizeof(*user_attrs);
+    attr_list.Pair = user_attrs;
 
-        attr_list.Pair[0].Key   = "/hpss/user/cksum/state";
-        attr_list.Pair[0].Value = "Invalid";
+    attr_list.Pair[0].Key   = "/hpss/user/cksum/state";
+    attr_list.Pair[0].Value = "Invalid";
 
-        retval = Hpss_UserAttrSetAttrs(Pathname, &attr_list, NULL);
-        if (retval && retval != -ENOENT)
-            return GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
-    }
+    retval = Hpss_UserAttrSetAttrs(Pathname, &attr_list, NULL);
+    if (retval && retval != -ENOENT)
+        return GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
 
     return GLOBUS_SUCCESS;
 }

@@ -109,7 +109,7 @@ dsi_recv(globus_gfs_operation_t      Operation,
          globus_gfs_transfer_info_t *TransferInfo,
          void *                      UserArg)
 {
-    stor(Operation, TransferInfo, UserArg);
+    stor(Operation, TransferInfo);
 }
 
 void
@@ -118,6 +118,7 @@ dsi_command(globus_gfs_operation_t     Operation,
             void *                     UserArg)
 {
     globus_result_t result;
+    config_t * config = UserArg;
 
     commands_callback Callback = globus_gridftp_server_finished_command;
 
@@ -176,7 +177,7 @@ dsi_command(globus_gfs_operation_t     Operation,
         break;
     case GLOBUS_GFS_CMD_CKSM:
         INFO("CKSM of %s\n", CommandInfo->pathname);
-        cksm(Operation, CommandInfo, UserArg, Callback);
+        cksm(Operation, CommandInfo, config->UDAChecksumSupport, Callback);
         break;
     case GLOBUS_GFS_HPSS_CMD_SITE_STAGE:
         INFO("Stage request for %s\n", CommandInfo->pathname);

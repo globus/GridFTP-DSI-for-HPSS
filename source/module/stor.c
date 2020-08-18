@@ -9,7 +9,6 @@
  * Local includes
  */
 #include "logging.h"
-#include "config.h"
 #include "stor.h"
 #include "cksm.h"
 #include "pio.h"
@@ -532,8 +531,7 @@ validate_restart(const char * Pathname,
 
 void
 stor(globus_gfs_operation_t      Operation,
-     globus_gfs_transfer_info_t *TransferInfo,
-     config_t *                  Config)
+     globus_gfs_transfer_info_t *TransferInfo)
 {
     stor_info_t *   stor_info         = NULL;
     globus_result_t result            = GLOBUS_SUCCESS;
@@ -558,7 +556,7 @@ stor(globus_gfs_operation_t      Operation,
 
     globus_gridftp_server_get_block_size(Operation, &stor_info->BlockSize);
 
-    result = cksm_clear_checksum(TransferInfo->pathname, Config);
+    result = cksm_clear_uda_checksum(TransferInfo->pathname);
     if (result)
         goto cleanup;
 
