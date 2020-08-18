@@ -7,6 +7,7 @@
 /*
  * Local includes.
  */
+#include "logging.h"
 #include "hpss.h"
 
 /*******************************************************************************
@@ -33,7 +34,6 @@ _FindBestErrno(int Errno)
     hpss_errno_state_t last_errno_state = hpss_GetLastHPSSErrno();
     if (last_errno_state.hpss_errno != 0)
         return last_errno_state.hpss_errno;
-
     return Errno;
 }
 
@@ -52,10 +52,9 @@ Hpss_AuthnMechTypeFromString(
    const char              *  AuthnMechString,
    hpss_authn_mech_t       *  AuthnMech)
 {
-    signed32 return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_AuthnMechTypeFromString(AuthnMechString, AuthnMech);
+    signed32 return_value = hpss_AuthnMechTypeFromString(AuthnMechString,
+                                                         AuthnMech);
     return _FindBestErrno(return_value);
 }
 
@@ -64,10 +63,8 @@ Hpss_Chmod(
     const char                  *  Path,
     mode_t                         Mode)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_Chmod(Path, Mode);
+    int return_value = hpss_Chmod(Path, Mode);
     return _FindBestErrno(return_value);
 }
 
@@ -76,23 +73,8 @@ Hpss_ChompXMLHeader(
     char                        * XML,
     char                        * Header)
 {
-    char * return_value;
-
-    return_value = hpss_ChompXMLHeader(XML, Header);
+    char * return_value = hpss_ChompXMLHeader(XML, Header);
     return return_value;
-}
-
-int
-Hpss_Chown(
-    const char                  *  Path,
-    uid_t                          Owner,
-    gid_t                          Group)
-{
-    int return_value;
-
-    Hpss_ClearLastHPSSErrno();
-    return_value = hpss_Chown(Path, Owner, Group);
-    return _FindBestErrno(return_value);
 }
 
 void
@@ -105,20 +87,16 @@ Hpss_ClearLastHPSSErrno(void)
 int
 Hpss_Close(int Fildes)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_Close(Fildes);
+    int return_value = hpss_Close(Fildes);
     return _FindBestErrno(return_value);
 }
 
 int
 Hpss_Closedir(int Dirdes)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_Closedir(Dirdes);
+    int return_value = hpss_Closedir(Dirdes);
     return _FindBestErrno(return_value);
 }
 
@@ -127,12 +105,10 @@ Hpss_FileGetAttributes(
     const char                  *  Path,
     hpss_fileattr_t             *  AttrOut)
 {
-    int return_value;
+    memset(AttrOut, 0, sizeof(*AttrOut));
 
     Hpss_ClearLastHPSSErrno();
-
-    memset(AttrOut, 0, sizeof(*AttrOut));
-    return_value = hpss_FileGetAttributes(Path, AttrOut);
+    int return_value = hpss_FileGetAttributes(Path, AttrOut);
     return _FindBestErrno(return_value);
 }
 
@@ -143,15 +119,13 @@ Hpss_FileGetXAttributes(
     uint32_t                       StorageLevel,
     hpss_xfileattr_t            *  AttrOut)
 {
-    int return_value;
+    memset(AttrOut, 0, sizeof(*AttrOut));
 
     Hpss_ClearLastHPSSErrno();
-
-    memset(AttrOut, 0, sizeof(*AttrOut));
-    return_value = hpss_FileGetXAttributes(Path,
-                                           Flags,
-                                           StorageLevel,
-                                           AttrOut);
+    int return_value = hpss_FileGetXAttributes(Path,
+                                               Flags,
+                                               StorageLevel,
+                                               AttrOut);
     return _FindBestErrno(return_value);
 }
 
@@ -164,17 +138,15 @@ Hpss_FilesetGetAttributes(
     ns_FilesetAttrBits_t           FilesetAttrBits,
     ns_FilesetAttrs_t           *  FilesetAttrs)
 {
-    int return_value;
+    memset(FilesetAttrs, 0, sizeof(*FilesetAttrs));
 
     Hpss_ClearLastHPSSErrno();
-
-    memset(FilesetAttrs, 0, sizeof(*FilesetAttrs));
-    return_value = hpss_FilesetGetAttributes(Name,
-                                             FilesetId,
-                                             FilesetHandle,
-                                             CoreServerID,
-                                             FilesetAttrBits,
-                                             FilesetAttrs);
+    int return_value = hpss_FilesetGetAttributes(Name,
+                                                 FilesetId,
+                                                 FilesetHandle,
+                                                 CoreServerID,
+                                                 FilesetAttrBits,
+                                                 FilesetAttrs);
     return _FindBestErrno(return_value);
 }
 
@@ -185,10 +157,8 @@ Hpss_GetAsynchStatus(
     hpssoid_t                   *  BitfileID,
     signed32                    *  Status)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_GetAsynchStatus(CallBackId, BitfileID, Status);
+    int return_value = hpss_GetAsynchStatus(CallBackId, BitfileID, Status);
     return _FindBestErrno(return_value);
 }
 #else
@@ -198,10 +168,8 @@ Hpss_GetAsyncStatus(
     bfs_bitfile_obj_handle_t    *  BitfileObj,
     int32_t                     *  Status)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_GetAsyncStatus(CallBackId, BitfileObj, Status);
+    int return_value = hpss_GetAsyncStatus(CallBackId, BitfileObj, Status);
     return _FindBestErrno(return_value);
 }
 #endif
@@ -209,9 +177,7 @@ Hpss_GetAsyncStatus(
 char *
 Hpss_Getenv(const char *Env)
 {
-    char * return_value;
-
-    return_value = hpss_Getenv(Env);
+    char * return_value = hpss_Getenv(Env);
     return return_value;
 }
 
@@ -219,11 +185,10 @@ int
 Hpss_GetConfiguration(
     api_config_t                *  ConfigOut)
 {
-    int return_value;
+    memset(ConfigOut, 0, sizeof(*ConfigOut));
 
     Hpss_ClearLastHPSSErrno();
-    memset(ConfigOut, 0, sizeof(*ConfigOut));
-    return_value = hpss_GetConfiguration(ConfigOut);
+    int return_value = hpss_GetConfiguration(ConfigOut);
     return _FindBestErrno(return_value);
 }
 
@@ -231,11 +196,10 @@ int
 Hpss_GetThreadUcred(
     sec_cred_t                  *  RetUcred)
 {
-    int return_value;
+    memset(RetUcred, 0, sizeof(*RetUcred));
 
     Hpss_ClearLastHPSSErrno();
-    memset(RetUcred, 0, sizeof(*RetUcred));
-    return_value = hpss_GetThreadUcred(RetUcred);
+    int return_value = hpss_GetThreadUcred(RetUcred);
     return _FindBestErrno(return_value);
 }
 
@@ -245,10 +209,10 @@ Hpss_LoadDefaultThreadState(
     mode_t                    Umask,
     char                   *  ClientFullName)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_LoadDefaultThreadState(UserID, Umask, ClientFullName);
+    int return_value = hpss_LoadDefaultThreadState(UserID,
+                                                   Umask,
+                                                   ClientFullName);
     return _FindBestErrno(return_value);
 }
 
@@ -257,11 +221,10 @@ Hpss_Lstat(
     const char                  *  Path,
     hpss_stat_t                 *  Buf)
 {
-    int return_value;
+    memset(Buf, 0, sizeof(*Buf));
 
     Hpss_ClearLastHPSSErrno();
-    memset(Buf, 0, sizeof(*Buf));
-    return_value = hpss_Lstat(Path, Buf);
+    int return_value = hpss_Lstat(Path, Buf);
     return _FindBestErrno(return_value);
 }
 
@@ -270,10 +233,8 @@ Hpss_Mkdir(
     const char                  *  Path,
     mode_t                         Mode)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_Mkdir(Path, Mode);
+    int return_value = hpss_Mkdir(Path, Mode);
     return _FindBestErrno(return_value);
 }
 
@@ -287,19 +248,17 @@ Hpss_net_getaddrinfo(
     char                        *  errbuf,
     size_t                         errbuflen)
 {
-    int return_value;
-
-    Hpss_ClearLastHPSSErrno();
-
     memset(addr, 0, sizeof(*addr));
     memset(errbuf, 0, errbuflen);
-    return_value = hpss_net_getaddrinfo(hostname,
-                                        service,
-                                        flags,
-                                        protocol,
-                                        addr,
-                                        errbuf,
-                                        errbuflen);
+
+    Hpss_ClearLastHPSSErrno();
+    int return_value = hpss_net_getaddrinfo(hostname,
+                                            service,
+                                            flags,
+                                            protocol,
+                                            addr,
+                                            errbuf,
+                                            errbuflen);
     return _FindBestErrno(return_value);
 }
 
@@ -312,16 +271,15 @@ Hpss_Open(
     const hpss_cos_priorities_t * HintsPri,
     hpss_cos_hints_t            * HintsOut)
 {
-    int return_value;
+    memset(HintsOut, 0, sizeof(*HintsOut));
 
     Hpss_ClearLastHPSSErrno();
-    memset(HintsOut, 0, sizeof(*HintsOut));
-    return_value = hpss_Open(Path,
-                             Oflag,
-                             Mode,
-                             HintsIn,
-                             HintsPri,
-                             HintsOut);
+    int return_value = hpss_Open(Path,
+                                 Oflag,
+                                 Mode,
+                                 HintsIn,
+                                 HintsPri,
+                                 HintsOut);
     return _FindBestErrno(return_value);
 }
 
@@ -331,10 +289,8 @@ Hpss_OpendirHandle(
     const ns_ObjHandle_t        *  DirHandle,
     const sec_cred_t            *  Ucred)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_OpendirHandle(DirHandle, Ucred);
+    int return_value = hpss_OpendirHandle(DirHandle, Ucred);
     return _FindBestErrno(return_value);
 }
 #endif
@@ -346,13 +302,11 @@ Hpss_ParseAuthString(
     hpss_rpc_auth_type_t   *  AuthenticatorType,
     void                   ** Authenticator)
 {
-    signed32 return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_ParseAuthString(AuthenticatorString,
-                                        AuthnMechanism,
-                                        AuthenticatorType,
-                                        Authenticator);
+    signed32 return_value = hpss_ParseAuthString(AuthenticatorString,
+                                                 AuthnMechanism,
+                                                 AuthenticatorType,
+                                                 Authenticator);
     return _FindBestErrno(return_value);
 }
 
@@ -360,10 +314,8 @@ int
 Hpss_PIOEnd(
     hpss_pio_grp_t                 StripeGroup)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_PIOEnd(StripeGroup);
+    int return_value = hpss_PIOEnd(StripeGroup);
     return _FindBestErrno(return_value);
 }
 
@@ -376,20 +328,16 @@ Hpss_PIOExecute(
     hpss_pio_gapinfo_t          *  GapInfo,
     uint64_t                    *  BytesMoved)
 {
-    int return_value;
-
-    Hpss_ClearLastHPSSErrno();
-
     memset(GapInfo, 0, sizeof(*GapInfo));
     // Don't clear BytesMoved, it is used as a regression test in pio.c
 
-    return_value = hpss_PIOExecute(Fd,
-                                   FileOffset,
-                                   Size,
-                                   StripeGroup,
-                                   GapInfo,
-                                   BytesMoved);
-
+    Hpss_ClearLastHPSSErrno();
+    int return_value = hpss_PIOExecute(Fd,
+                                       FileOffset,
+                                       Size,
+                                       StripeGroup,
+                                       GapInfo,
+                                       BytesMoved);
     return _FindBestErrno(return_value);
 }
 
@@ -399,11 +347,10 @@ Hpss_PIOExportGrp(
     void                        ** Buffer,
     unsigned int                *  BufLength)
 {
-    int return_value;
+    memset(Buffer, 0, *BufLength);
 
     Hpss_ClearLastHPSSErrno();
-    memset(Buffer, 0, *BufLength);
-    return_value = hpss_PIOExportGrp(StripeGroup, Buffer, BufLength);
+    int return_value = hpss_PIOExportGrp(StripeGroup, Buffer, BufLength);
     return _FindBestErrno(return_value);
 }
 
@@ -413,11 +360,9 @@ Hpss_PIOImportGrp(
     unsigned int                   BufLength,
     hpss_pio_grp_t              *  StripeGroup)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
     // hpss_pio_grp_t is opaque, no way to zero it
-    return_value = hpss_PIOImportGrp(Buffer, BufLength, StripeGroup);
+    int return_value = hpss_PIOImportGrp(Buffer, BufLength, StripeGroup);
     return _FindBestErrno(return_value);
 }
 
@@ -431,16 +376,14 @@ Hpss_PIORegister(
     const hpss_pio_cb_t            IOCallback,
     const void                  *  IOCallbackArg)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_PIORegister(StripeElement,
-                                    DataNetSockAddr,
-                                    DataBuffer,
-                                    DataBufLen,
-                                    StripeGroup,
-                                    IOCallback,
-                                    IOCallbackArg);
+    int return_value = hpss_PIORegister(StripeElement,
+                                        DataNetSockAddr,
+                                        DataBuffer,
+                                        DataBufLen,
+                                        StripeGroup,
+                                        IOCallback,
+                                        IOCallbackArg);
     return _FindBestErrno(return_value);
 }
 
@@ -449,11 +392,9 @@ Hpss_PIOStart(
     hpss_pio_params_t           *  InputParams,
     hpss_pio_grp_t              *  StripeGroup)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
     // hpss_pio_grp_t is opaque, no way to zero it
-    return_value = hpss_PIOStart(InputParams, StripeGroup);
+    int return_value = hpss_PIOStart(InputParams, StripeGroup);
     return _FindBestErrno(return_value);
 }
 
@@ -468,17 +409,16 @@ Hpss_ReadAttrsPlus(
     uint64_t                    *  OffsetOut,
     ns_DirEntry_t               *  DirentPtr)
 {
-    int return_value;
+    memset(DirentPtr, 0, BufferSize);
 
     Hpss_ClearLastHPSSErrno();
-    memset(DirentPtr, 0, BufferSize);
-    return_value = hpss_ReadAttrsPlus(Dirdes,
-                                      OffsetIn,
-                                      BufferSize,
-                                      Flags,
-                                      End,
-                                      OffsetOut,
-                                      DirentPtr);
+    int return_value = hpss_ReadAttrsPlus(Dirdes,
+                                          OffsetIn,
+                                          BufferSize,
+                                          Flags,
+                                          End,
+                                          OffsetOut,
+                                          DirentPtr);
     return _FindBestErrno(return_value);
 }
 #else
@@ -493,18 +433,17 @@ Hpss_ReadAttrsHandle(
     uint64_t                    *  OffsetOut,
     ns_DirEntry_t               *  DirentPtr)
 {
-    int return_value;
+    memset(DirentPtr, 0, BufferSize);
 
     Hpss_ClearLastHPSSErrno();
-    memset(DirentPtr, 0, BufferSize);
-    return_value = hpss_ReadAttrsHandle(ObjHandle,
-                                        OffsetIn,
-                                        Ucred,
-                                        BufferSize,
-                                        GetAttributes,
-                                        End,
-                                        OffsetOut,
-                                        DirentPtr);
+    int return_value = hpss_ReadAttrsHandle(ObjHandle,
+                                            OffsetIn,
+                                            Ucred,
+                                            BufferSize,
+                                            GetAttributes,
+                                            End,
+                                            OffsetOut,
+                                            DirentPtr);
     return _FindBestErrno(return_value);
 }
 #endif
@@ -515,11 +454,10 @@ Hpss_Readlink(
     char                        *  Contents,
     size_t                         BufferSize)
 {
-    int return_value;
+    memset(Contents, 0, BufferSize);
 
     Hpss_ClearLastHPSSErrno();
-    memset(Contents, 0, BufferSize);
-    return_value = hpss_Readlink(Path, Contents, BufferSize);
+    int return_value = hpss_Readlink(Path, Contents, BufferSize);
     return _FindBestErrno(return_value);
 }
 
@@ -531,15 +469,14 @@ Hpss_ReadlinkHandle(
     size_t                         BufferSize,
     const sec_cred_t            *  Ucred)
 {
-    int return_value;
+    memset(Contents, 0, BufferSize);
 
     Hpss_ClearLastHPSSErrno();
-    memset(Contents, 0, BufferSize);
-    return_value = hpss_ReadlinkHandle(ObjHandle,
-                                       Path,
-                                       Contents,
-                                       BufferSize,
-                                       Ucred);
+    int return_value = hpss_ReadlinkHandle(ObjHandle,
+                                           Path,
+                                           Contents,
+                                           BufferSize,
+                                           Ucred);
     return _FindBestErrno(return_value);
 }
 
@@ -548,10 +485,8 @@ Hpss_Rename(
     const char                  *  Old,
     const char                  *  New)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_Rename(Old, New);
+    int return_value = hpss_Rename(Old, New);
     return _FindBestErrno(return_value);
 }
 
@@ -559,10 +494,8 @@ int
 Hpss_Rmdir(
     const char                  *  Path)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_Rmdir(Path);
+    int return_value = hpss_Rmdir(Path);
     return _FindBestErrno(return_value);
 }
 
@@ -570,10 +503,8 @@ int
 Hpss_SetConfiguration(
     const api_config_t          * ConfigIn)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_SetConfiguration(ConfigIn);
+    int return_value = hpss_SetConfiguration(ConfigIn);
     return _FindBestErrno(return_value);
 }
 
@@ -585,11 +516,14 @@ Hpss_SetCOSByHints(
     const hpss_cos_priorities_t *  PrioPtr,
     hpss_cos_md_t               *  COSPtr)
 {
-    int return_value;
+    memset(COSPtr, 0, sizeof(*COSPtr));
 
     Hpss_ClearLastHPSSErrno();
-    memset(COSPtr, 0, sizeof(*COSPtr));
-    return_value = hpss_SetCOSByHints(Fildes, Flags, HintsPtr, PrioPtr, COSPtr);
+    int return_value = hpss_SetCOSByHints(Fildes,
+                                          Flags,
+                                          HintsPtr,
+                                          PrioPtr,
+                                          COSPtr);
     return _FindBestErrno(return_value);
 }
 
@@ -601,14 +535,12 @@ Hpss_SetLoginCred(
     hpss_rpc_auth_type_t      AuthType,
     void                   *  Authenticator)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_SetLoginCred(PrincipalName,
-                                     Mechanism,
-                                     CredType,
-                                     AuthType,
-                                     Authenticator);
+    int return_value = hpss_SetLoginCred(PrincipalName,
+                                         Mechanism,
+                                         CredType,
+                                         AuthType,
+                                         Authenticator);
 
     /* Enable post-login functionality. */
     if (return_value == HPSS_E_NOERROR)
@@ -627,18 +559,17 @@ Hpss_StageCallBack(
     hpss_reqid_t                *  ReqID,
     bfs_bitfile_obj_handle_t    *  BitfileObj)
 {
-    int return_value;
+    memset(BitfileObj, 0, sizeof(*BitfileObj));
 
     Hpss_ClearLastHPSSErrno();
-    memset(BitfileObj, 0, sizeof(*BitfileObj));
-    return_value = hpss_StageCallBack(Path,
-                                      Offset,
-                                      Length,
-                                      StorageLevel,
-                                      CallBackPtr,
-                                      Flags,
-                                      ReqID,
-                                      BitfileObj);
+    int return_value = hpss_StageCallBack(Path,
+                                          Offset,
+                                          Length,
+                                          StorageLevel,
+                                          CallBackPtr,
+                                          Flags,
+                                          ReqID,
+                                          BitfileObj);
     return _FindBestErrno(return_value);
 }
 
@@ -647,11 +578,10 @@ Hpss_Stat(
     const char                  * Path,
     hpss_stat_t                 * Buf)
 {
-    int return_value;
+    memset(Buf, 0, sizeof(*Buf));
 
     Hpss_ClearLastHPSSErrno();
-    memset(Buf, 0, sizeof(*Buf));
-    return_value = hpss_Stat(Path, Buf);
+    int return_value = hpss_Stat(Path, Buf);
     return _FindBestErrno(return_value);
 }
 
@@ -660,10 +590,8 @@ Hpss_Symlink(
     const char                  *  Contents,
     const char                  *  Path)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_Symlink(Contents, Path);
+    int return_value = hpss_Symlink(Contents, Path);
     return _FindBestErrno(return_value);
 }
 
@@ -672,20 +600,16 @@ Hpss_Truncate(
     const char                  *  Path,
     uint64_t                       Length)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_Truncate(Path, Length);
+    int return_value = hpss_Truncate(Path, Length);
     return _FindBestErrno(return_value);
 }
 
 mode_t
 Hpss_Umask(mode_t CMask)
 {
-    mode_t return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_Umask(CMask);
+    mode_t return_value = hpss_Umask(CMask);
     return _FindBestErrno(return_value);
 }
 
@@ -693,10 +617,8 @@ int
 Hpss_Unlink(
     const char                  *  Path)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_Unlink(Path);
+    int return_value = hpss_Unlink(Path);
     return _FindBestErrno(return_value);
 }
 
@@ -706,10 +628,8 @@ Hpss_UnlinkHandle(
     const char                  *  Path,
     const sec_cred_t            *  Ucred)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_UnlinkHandle(ObjHandle, Path, Ucred);
+    int return_value = hpss_UnlinkHandle(ObjHandle, Path, Ucred);
     return _FindBestErrno(return_value);
 }
 
@@ -720,11 +640,8 @@ Hpss_UserAttrGetAttrs(
     hpss_userattr_list_t        * Attr,
     int                           XMLFlag)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    memset(Attr, 0, sizeof(*Attr));
-    return_value = hpss_UserAttrGetAttrs(Path, Attr, XMLFlag);
+    int return_value = hpss_UserAttrGetAttrs(Path, Attr, XMLFlag);
     return _FindBestErrno(return_value);
 }
 #else
@@ -735,11 +652,8 @@ Hpss_UserAttrGetAttrs(
     int                           XMLFlag,
     int                           XMLSize)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    memset(Attr, 0, sizeof(*Attr));
-    return_value = hpss_UserAttrGetAttrs(Path, Attr, XMLFlag, XMLSize);
+    int return_value = hpss_UserAttrGetAttrs(Path, Attr, XMLFlag, XMLSize);
     return _FindBestErrno(return_value);
 }
 #endif
@@ -750,10 +664,8 @@ Hpss_UserAttrSetAttrs(
     const hpss_userattr_list_t  * Attr,
     const char                  * Schema)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_UserAttrSetAttrs(Path, Attr, Schema);
+    int return_value = hpss_UserAttrSetAttrs(Path, Attr, Schema);
     return _FindBestErrno(return_value);
 }
 
@@ -763,9 +675,7 @@ Hpss_Utime(
     const char                  *  Path,
     const struct utimbuf        *  Times)
 {
-    int return_value;
-
     Hpss_ClearLastHPSSErrno();
-    return_value = hpss_Utime(Path, Times);
+    int return_value = hpss_Utime(Path, Times);
     return _FindBestErrno(return_value);
 }

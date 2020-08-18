@@ -405,12 +405,14 @@ cksm_get_uda_checksum(char *  Pathname, char ** ChecksumString)
     attr_list.Pair[2].Key   = "/hpss/user/cksum/state";
     attr_list.Pair[2].Value = state;
 
-#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) ||                     \
-    HPSS_MAJOR_VERSION >= 8
-    retval = Hpss_UserAttrGetAttrs(
-        Pathname, &attr_list, UDA_API_VALUE, HPSS_XML_SIZE - 1);
-#else
+
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION < 4)
     retval = Hpss_UserAttrGetAttrs(Pathname, &attr_list, UDA_API_VALUE);
+#else
+    retval = Hpss_UserAttrGetAttrs(Pathname,
+                                   &attr_list,
+                                   UDA_API_VALUE,
+                                   HPSS_XML_SIZE - 1);
 #endif
 
     switch (retval)
