@@ -333,7 +333,7 @@ retr(globus_gfs_operation_t Operation, globus_gfs_transfer_info_t *TransferInfo)
 
     globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
-    INFO("Sending %s: Offset:%lld Filesize:%lld\n",
+    INFO("Sending %s: Offset:%lld Filesize:%lld",
            TransferInfo->pathname,
            retr_info->CurrentOffset,
            retr_info->FileSize);
