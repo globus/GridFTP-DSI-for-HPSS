@@ -133,7 +133,7 @@ submit_stage_request(const char *Pathname)
 
     callback_addr.id = REQUEST_ID;
 
-    INFO("Requesting stage for %s\n", Pathname);
+    DEBUG("Requesting stage for %s\n", Pathname);
 
     /*
      * We use hpss_StageCallBack() so that we do not block while the
@@ -254,13 +254,13 @@ check_file_residency(const char *Pathname, residency_t *Residency)
     switch (*Residency)
     {
     case ARCHIVED:
-        INFO("File is ARCHIVED: %s\n", Pathname);
+        DEBUG("File is ARCHIVED: %s\n", Pathname);
         break;
     case RESIDENT:
-        INFO("File is RESIDENT: %s\n", Pathname);
+        DEBUG("File is RESIDENT: %s\n", Pathname);
         break;
     case TAPE_ONLY:
-        INFO("File is TAPE_ONLY: %s\n", Pathname);
+        DEBUG("File is TAPE_ONLY: %s\n", Pathname);
         break;
     }
 

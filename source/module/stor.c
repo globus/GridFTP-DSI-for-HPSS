@@ -430,7 +430,7 @@ stor_range_complete_callback(globus_off_t *Offset,
 {
     stor_info_t *stor_info = UserArg;
 
-    INFO("Restart marker sent: %lld, %lld\n", *Offset, *Length);
+    TRACE("Restart marker sent: %lld, %lld\n", *Offset, *Length);
     globus_gridftp_server_update_range_recvd(stor_info->Operation,
                                              *Offset, 
                                              *Length);
@@ -578,10 +578,9 @@ stor(globus_gfs_operation_t      Operation,
 
     globus_gridftp_server_begin_transfer(Operation, 0, NULL);
 
-    INFO("STOR of %s:  Offset: %lld  Length: %lld Allo: %lld\n",
+    INFO("Receiving %s: Offset:%lld  Length:%lld\n",
            TransferInfo->pathname,
            offset, 
-           stor_info->RangeLength,
            TransferInfo->alloc_size);
 
     if (stor_info->RangeLength == -1)

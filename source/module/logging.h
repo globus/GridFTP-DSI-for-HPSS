@@ -17,6 +17,14 @@
 void
 logging_init();
 
+// Include 'user' as the authenticated user in all log messages.
+void
+logging_set_user(const char * user);
+
+// Include 'taskid' in all log messages.
+void
+logging_set_taskid(const char * taskid);
+
 typedef enum {
     LOG_TYPE_ERROR = 1<<0,
     LOG_TYPE_WARN  = 1<<1,

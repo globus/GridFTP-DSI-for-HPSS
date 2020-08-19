@@ -52,7 +52,7 @@ TestInit()
 
     TestPlan.TestsEnabled = true;
 
-    INFO("!!!DSI testing is enabled!!!\n");
+    WARN("!!!DSI testing is enabled!!!\n");
 
     if (strcmp(plan, "INJECT_TRANSFER_FAILURE") == 0)
         TestPlan.Flags = INJECT_TRANSFER_FAILURE;
@@ -103,7 +103,7 @@ TestEventRangeBegin(struct pio_range_begin * PioRangeBegin)
         // the transfer completes.
         *PioRangeBegin->Length = Random64InRange(offset, length);
 
-        INFO("Current transfer will be truncated to %lu bytes for "
+        WARN("Current transfer will be truncated to %lu bytes for "
              "testing purposes.\n", *PioRangeBegin->Length);
     }
 }
@@ -127,7 +127,7 @@ TestEventRangeComplete(struct pio_range_complete * PioRangeComplete)
 
     if (TestPlan.Flags == INJECT_TRANSFER_FAILURE)
     {
-        INFO("Injecting failure into current transfer\n");
+        WARN("Injecting failure into current transfer\n");
         *PioRangeComplete->ReturnValue = INJECTED_ERROR_VALUE;
     } else if (TestPlan.Flags == INJECT_BAD_RESTART_MARKER)
     {
@@ -141,14 +141,14 @@ TestEventRangeComplete(struct pio_range_complete * PioRangeComplete)
         *PioRangeComplete->BytesMovedOut = Random64InRange(offset, length);
         *PioRangeComplete->ReturnValue = INJECTED_ERROR_VALUE;
 
-        INFO("Injecting bad restart marker at offset %lu\n",
+        WARN("Injecting bad restart marker at offset %lu\n",
               *PioRangeComplete->BytesMovedOut);
     } else if (TestPlan.Flags == INJECT_BZ4719)
     {
         // Leave BytesMoved unchanged.
         *PioRangeComplete->BytesMovedOut = PioRangeComplete->BytesMovedIn;
         *PioRangeComplete->ReturnValue = INJECTED_ERROR_VALUE;
-        INFO("Injecting BZ4719\n");
+        WARN("Injecting BZ4719\n");
     }
 }
 

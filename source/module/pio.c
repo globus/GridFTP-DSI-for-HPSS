@@ -91,9 +91,9 @@ pio_coordinator_thread(void *Arg)
         }
 
         if (gap_info.Length > 0)
-            WARN("Gap in file. Offset:%llu Length:%llu\n",
-                 gap_info.Offset, 
-                 gap_info.Length);
+            DEBUG("Gap in file. Offset:%llu Length:%llu\n",
+                  gap_info.Offset, 
+                  gap_info.Length);
 
         if (rc != 0)
             pio->CoordinatorResult =
@@ -114,7 +114,7 @@ pio_coordinator_thread(void *Arg)
      * can really do is log a warning and hope the admin sees it.
      */
     if (rc != HPSS_E_NOERROR)
-        WARN("hpss_PIOEnd() returned %d\n", rc);
+        DEBUG("hpss_PIOEnd() returned %d\n", rc);
 
     return NULL;
 }
