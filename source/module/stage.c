@@ -56,13 +56,13 @@ check_request_status(bitfile_id_t *BitfileID, int *Status)
     switch (*Status)
     {
     case HPSS_STAGE_STATUS_UNKNOWN:
-        WARN("Stage request status UNKNOWN\n");
+        WARN("Stage request status UNKNOWN");
         break;
     case HPSS_STAGE_STATUS_ACTIVE:
-        DEBUG("Stage request status ACTIVE\n");
+        DEBUG("Stage request status ACTIVE");
         break;
     case HPSS_STAGE_STATUS_QUEUED:
-        DEBUG("Stage request status QUEUED\n");
+        DEBUG("Stage request status QUEUED");
         break;
     }
 
@@ -120,7 +120,7 @@ submit_stage_request(const char *Pathname)
 
         if (retval)
         {
-            ERROR("Failed to set stage callback address %s: %d (%s) - %s\n",
+            ERROR("Failed to set stage callback address %s: %d (%s) - %s",
                    callback_addr_str,
                    retval,
                    gai_strerror(retval),
@@ -133,7 +133,7 @@ submit_stage_request(const char *Pathname)
 
     callback_addr.id = REQUEST_ID;
 
-    DEBUG("Requesting stage for %s\n", Pathname);
+    DEBUG("Requesting stage for %s", Pathname);
 
     /*
      * We use hpss_StageCallBack() so that we do not block while the
@@ -254,13 +254,13 @@ check_file_residency(const char *Pathname, residency_t *Residency)
     switch (*Residency)
     {
     case ARCHIVED:
-        DEBUG("File is ARCHIVED: %s\n", Pathname);
+        DEBUG("File is ARCHIVED: %s", Pathname);
         break;
     case RESIDENT:
-        DEBUG("File is RESIDENT: %s\n", Pathname);
+        DEBUG("File is RESIDENT: %s", Pathname);
         break;
     case TAPE_ONLY:
-        DEBUG("File is TAPE_ONLY: %s\n", Pathname);
+        DEBUG("File is TAPE_ONLY: %s", Pathname);
         break;
     }
 
