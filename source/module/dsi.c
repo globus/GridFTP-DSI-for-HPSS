@@ -33,6 +33,7 @@ dsi_init(globus_gfs_operation_t     Operation,
     sec_cred_t      user_cred;
 
     logging_init();
+    logging_set_user(SessionInfo->username);
 
     /*
      * Read in the config.
@@ -67,7 +68,7 @@ dsi_init(globus_gfs_operation_t     Operation,
     result = commands_init(Operation);
 
 cleanup:
-
+// XXX log in successful / denied?
     /*
      * Inform the server that we are done. If we do not pass in a username, the
      * server will use the name we mapped to with GSI. If we do not pass in a
@@ -101,6 +102,8 @@ dsi_send(globus_gfs_operation_t      Operation,
          globus_gfs_transfer_info_t *TransferInfo,
          void *                      UserArg)
 {
+    // Defering the INFO() call until inside of retr() since it has the
+    // critical information.
     retr(Operation, TransferInfo);
 }
 
@@ -109,6 +112,8 @@ dsi_recv(globus_gfs_operation_t      Operation,
          globus_gfs_transfer_info_t *TransferInfo,
          void *                      UserArg)
 {
+    // Defering the INFO() call until inside of stor() since it has the
+    // critical information.
     stor(Operation, TransferInfo);
 }
 
@@ -125,23 +130,23 @@ dsi_command(globus_gfs_operation_t     Operation,
     switch (CommandInfo->command)
     {
     case GLOBUS_GFS_CMD_RMD:
-        INFO("rmdir %s", CommandInfo->pathname);
+        INFO("Removing directory %s", CommandInfo->pathname);
         result = commands_rmdir(CommandInfo->pathname);
         result = fixup_rmd(CommandInfo->pathname, result);
         globus_gridftp_server_finished_command(Operation, result, NULL);
         break;
     case GLOBUS_GFS_CMD_MKD:
-        INFO("mdkir %s", CommandInfo->pathname);
+        INFO("Creating directory %s", CommandInfo->pathname);
         result = commands_mkdir(CommandInfo);
         globus_gridftp_server_finished_command(Operation, result, NULL);
         break;
     case GLOBUS_GFS_CMD_DELE:
-        INFO("unlink %s", CommandInfo->pathname);
+        INFO("Deleting %s", CommandInfo->pathname);
         result = commands_unlink(CommandInfo);
         globus_gridftp_server_finished_command(Operation, result, NULL);
         break;
     case GLOBUS_GFS_CMD_RNTO:
-        INFO("rename %s to %s",
+        INFO("Renaming %s to %s",
              CommandInfo->from_pathname,
              CommandInfo->pathname);
         result = commands_rename(CommandInfo);
@@ -150,40 +155,46 @@ dsi_command(globus_gfs_operation_t     Operation,
     case GLOBUS_GFS_CMD_RNFR:
         break;
     case GLOBUS_GFS_CMD_SITE_CHMOD:
-        INFO("chmod %.3o %s", CommandInfo->chmod_mode, CommandInfo->pathname);
+        // TODO: CHMOD is not used by Transfer.
+        INFO("Changing permissions on %s to %.3o",
+             CommandInfo->pathname,
+             CommandInfo->chmod_mode);
         result = commands_chmod(CommandInfo);
         globus_gridftp_server_finished_command(Operation, result, NULL);
         break;
     case GLOBUS_GFS_CMD_SITE_UTIME:
-        INFO("utime access_time=%ld modification_time=%ld %s",
-             CommandInfo->chgrp_group,
-             CommandInfo->pathname);
+        INFO("Setting access and modification times on %s to %ld",
+             CommandInfo->pathname,
+             CommandInfo->utime_time);
         result = commands_utime(CommandInfo);
         globus_gridftp_server_finished_command(Operation, result, NULL);
         break;
     case GLOBUS_GFS_CMD_SITE_SYMLINKFROM:
         break;
     case GLOBUS_GFS_CMD_SITE_SYMLINK:
-        INFO("symlink %s to %s",
+        INFO("Creating symlink %s to %s",
              CommandInfo->from_pathname,
              CommandInfo->pathname);
         result = commands_symlink(CommandInfo);
         globus_gridftp_server_finished_command(Operation, result, NULL);
         break;
     case GLOBUS_GFS_CMD_CKSM:
-        INFO("checksum %s\n", CommandInfo->pathname);
+        INFO("Get checksum of %s", CommandInfo->pathname);
         cksm(Operation, CommandInfo, config->UDAChecksumSupport, Callback);
         break;
     case GLOBUS_GFS_HPSS_CMD_SITE_STAGE:
-        INFO("stage %s\n", CommandInfo->pathname);
+        INFO("Staging %s", CommandInfo->pathname);
         stage(Operation, CommandInfo, Callback);
         break;
     case GLOBUS_GFS_CMD_TRNC:
-        INFO("truncate %s\n", CommandInfo->pathname);
+        // TODO: I don't think Transfer uses this command
+        INFO("Truncating %s", CommandInfo->pathname);
         result = commands_truncate(CommandInfo);
         globus_gridftp_server_finished_command(Operation, result, NULL);
         break;
     case GLOBUS_GFS_CMD_SITE_TASKID:
+        INFO("Task ID %s", CommandInfo->pathname);
+        logging_set_taskid(CommandInfo->pathname);
         break;
     default:
         globus_gridftp_server_finished_command(
@@ -237,17 +248,17 @@ dsi_stat(globus_gfs_operation_t   Operation,
 
     if (StatInfo->file_only)
     {
+        INFO("Getting attributes of %s", StatInfo->pathname);
+
         globus_gfs_stat_t gfs_stat;
 
         switch (StatInfo->use_symlink_info)
         {
         case 0:
-            INFO("stat() of %s\n", StatInfo->pathname);
             result = stat_object(StatInfo->pathname, &gfs_stat);
             result = fixup_stat_object(StatInfo->pathname, result, &gfs_stat);
             break;
         default:
-            INFO("lstat() of %s\n", StatInfo->pathname);
             result = stat_link(StatInfo->pathname, &gfs_stat);
             break;
         }
@@ -261,7 +272,7 @@ dsi_stat(globus_gfs_operation_t   Operation,
     /*
      * Directory listing.
      */
-    INFO("Listing %s\n", StatInfo->pathname);
+    INFO("Listing directory %s", StatInfo->pathname);
 
     struct _stat_dir_cb_arg cb_arg = {Operation, StatInfo};
     result = stat_directory(StatInfo->pathname, _stat_dir_callback, &cb_arg);

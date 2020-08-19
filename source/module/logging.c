@@ -6,6 +6,9 @@
 GlobusDebugDeclare(GLOBUS_GRIDFTP_SERVER_HPSS);
 GlobusDebugDefine(GLOBUS_GRIDFTP_SERVER_HPSS);
 
+static const char * TaskIDToLog = NULL;
+static const char * UserToLog = NULL;
+
 void
 logging_init()
 {
@@ -17,41 +20,97 @@ logging_init()
     GlobusDebugInit(GLOBUS_GRIDFTP_SERVER_HPSS, ERROR WARN INFO DEBUG TRACE);
 }
 
+// Include 'user' as the authenticated user in all log messages.
 void
-log_message(log_type_t type, const char * format, ...)
+logging_set_user(const char * user)
 {
-    va_list ap;
-    va_start (ap, format);
+    UserToLog = strdup(user);
+}
 
-    char * message = NULL;
-    const char * static_errmsg = "COULD NOT ALLOCATE MEMORY FOR LOG MESSAGE";
-    int rc = vasprintf(&message, format, ap);
-    if (rc == -1)
-    {
-        type = LOG_TYPE_ERROR;
-        message = static_errmsg;
-    }
+// Include 'taskid' in all log messages.
+void
+logging_set_taskid(const char * taskid)
+{
+    TaskIDToLog = strdup(taskid);
+}
 
-    const char * prefix = "[HPSS Connector]";
-
+static const char *
+log_type_to_string(log_type_t type)
+{
     switch(type)
     {
     case LOG_TYPE_ERROR:
-        globus_gfs_log_message(GLOBUS_GFS_LOG_ERR, "%s[ERROR] %s\n", prefix, message);
+        return "ERROR";
+    case LOG_TYPE_WARN:
+        return "WARN";
+    case LOG_TYPE_INFO:
+        return "INFO";
+    case LOG_TYPE_DEBUG:
+        return "DEBUG";
+    case LOG_TYPE_TRACE:
+        return "TRACE";
+    }
+    return NULL;
+}
+
+static const char *
+build_log_entry(log_type_t type, const char * message_format, va_list ap)
+{
+    char * message = NULL;
+    int rc = vasprintf(&message, message_format, ap);
+    if (rc == -1)
+        return NULL;
+
+    char * entry = NULL;
+    rc = asprintf(&entry,
+                  "[HPSS Connector][%s] %s%s%s%s%s%s%s\n",
+                  log_type_to_string(type),
+                  UserToLog   ? "User="     : "",
+                  UserToLog   ? UserToLog   : "",
+                  UserToLog   ? " "         : "",
+                  TaskIDToLog ? "TaskID="   : "",
+                  TaskIDToLog ? TaskIDToLog : "",
+                  TaskIDToLog ? " "         : "",
+                  message);
+    free(message);
+    if (rc == -1)
+        return NULL;
+    return entry;
+}
+
+void
+log_message(log_type_t type, const char * format, ...)
+{
+    const char * static_errmsg = "COULD NOT ALLOCATE MEMORY FOR LOG MESSAGE";
+
+    va_list ap;
+    va_start (ap, format);
+
+    const char * entry = build_log_entry(type, format, ap);
+    if (entry == NULL)
+    {
+        type = LOG_TYPE_ERROR;
+        entry = static_errmsg;
+    }
+    
+    switch(type)
+    {
+    case LOG_TYPE_ERROR:
+        globus_gfs_log_message(GLOBUS_GFS_LOG_ERR, entry);
         break;
     case LOG_TYPE_WARN:
-        globus_gfs_log_message(GLOBUS_GFS_LOG_WARN, "%s[WARN] %s\n", prefix, message);
+        globus_gfs_log_message(GLOBUS_GFS_LOG_WARN, entry);
         break;
     case LOG_TYPE_INFO:
-        globus_gfs_log_message(GLOBUS_GFS_LOG_INFO, "%s[INFO] %s\n", prefix, message);
+        globus_gfs_log_message(GLOBUS_GFS_LOG_INFO, entry);
         break;
     case LOG_TYPE_DEBUG:
     case LOG_TYPE_TRACE:
-        GlobusDebugPrintf(GLOBUS_GRIDFTP_SERVER_HPSS, type, (message));
+        GlobusDebugPrintf(GLOBUS_GRIDFTP_SERVER_HPSS, type, (entry));
         break;
     }
 
-    if (message != static_errmsg)
-        free(message);
+    if (entry != static_errmsg)
+        free((char *)entry);
     va_end(ap);
 }
