@@ -14,10 +14,14 @@ SOURCES = authenticate.c \
           hooks.c        \
           hpss.c         \
           hpss.h         \
+          hpss_log.c     \
+          hpss_log.h     \
           logging.c      \
           logging.h      \
           pio.c          \
           pio.h          \
+          pool.c         \
+          pool.h         \
           retr.c         \
           retr.h         \
           stage.c        \
@@ -26,6 +30,8 @@ SOURCES = authenticate.c \
           stat.h         \
           stor.c         \
           stor.h         \
+          strings.c      \
+          strings.h      \
           test.c         \
           test.h
 
