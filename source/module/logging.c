@@ -7,7 +7,6 @@
 #include "logging.h"
 #include "strings.h"
 
-GlobusDebugDeclare(GLOBUS_GRIDFTP_SERVER_HPSS);
 GlobusDebugDefine(GLOBUS_GRIDFTP_SERVER_HPSS);
 
 static const char * TaskIDToLog = NULL;
