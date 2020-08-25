@@ -17,23 +17,31 @@
 
 #define TRACE(...) log_message(LOG_TYPE_TRACE, __VA_ARGS__)
 
-#define API_ENTER(func, format, ... /* format, args */) \
-{                                                       \
-    struct pool * pool = &(struct pool){NULL, 0, 0};    \
-    pool_create(pool);                                  \
-    log_api_enter(func, format, ##__VA_ARGS__);         \
-    pool_destroy(pool);                                 \
-}
+// Explicitly checking if TRACE is enabled allows us to skip
+// expansion of the arguments in production environments.
+#define API_ENTER(func, format, ... /* format, args */)     \
+    if (GlobusDebugTrue(GLOBUS_GRIDFTP_SERVER_HPSS, LOG_TYPE_TRACE)) \
+    {                                                                \
+        struct pool * pool = &(struct pool){NULL, 0, 0};             \
+        pool_create(pool);                                           \
+        log_api_enter(func, format, ##__VA_ARGS__);                  \
+        pool_destroy(pool);                                          \
+    }
+
+#define API_EXIT(func, format, ... /* format, args */) \
+    if (GlobusDebugTrue(GLOBUS_GRIDFTP_SERVER_HPSS, LOG_TYPE_TRACE)) \
+    {                                                                \
+        struct pool * pool = &(struct pool){NULL, 0, 0};             \
+        pool_create(pool);                                           \
+        log_api_exit(func, format, ##__VA_ARGS__);                   \
+        pool_destroy(pool);                                          \
+    }
+
+GlobusDebugDeclare(GLOBUS_GRIDFTP_SERVER_HPSS);
+
 void
 log_api_enter(const char * func, const char * format, ...);
 
-#define API_EXIT(func, format, ... /* format, args */) \
-{                                                      \
-    struct pool * pool = &(struct pool){NULL, 0, 0};   \
-    pool_create(pool);                                 \
-    log_api_exit(func, format, ##__VA_ARGS__);         \
-    pool_destroy(pool);                                \
-}
 void
 log_api_exit(const char * func, const char * format, ...);
 
@@ -118,6 +126,7 @@ logging_set_user(const char * user);
 void
 logging_set_taskid(const char * taskid);
 
+// These need to be kept in sync with the levels passed to GlobusDebugInit()
 typedef enum {
     LOG_TYPE_ERROR = 1<<0,
     LOG_TYPE_WARN  = 1<<1,
