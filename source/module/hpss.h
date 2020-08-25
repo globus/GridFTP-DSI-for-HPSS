@@ -57,7 +57,11 @@ Hpss_FilesetGetAttributes(
     const char                  *  Name,
     const uint64_t              *  FilesetId,
     const ns_ObjHandle_t        *  FilesetHandle,
+#if (HPSS_MAJOR_VERSION == 7)
+    const hpss_uuid_t           *  CoreServerUUID
+#else
     const hpss_srvr_id_t        *  CoreServerID,
+#endif
     ns_FilesetAttrBits_t           FilesetAttrBits,
     ns_FilesetAttrs_t           *  FilesetAttrs);
 
