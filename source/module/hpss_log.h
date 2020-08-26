@@ -93,9 +93,7 @@ _hpss_pio_prarams_t_ptr(struct pool * pool, const hpss_pio_params_t * p);
 #if HPSS_MAJOR_VERSION < 8
  #define HPSS_REQID_T(r) UNSIGNED32(r)
 #else
- #define HPSS_REQID_T(r) _hpss_reqid_t(pool, r)
- char *
- _hpss_reqid_t(struct pool * pool, hpss_reqid_t r);
+ #define HPSS_REQID_T(r) HPSS_UUID_T(r)
 #endif
 
 #define HPSS_REQID_T_PTR(p) _hpss_reqid_t_ptr(pool, p)
