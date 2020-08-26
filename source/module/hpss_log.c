@@ -612,7 +612,6 @@ _hpss_stat_t_ptr(struct pool * pool, const hpss_stat_t * p)
             HEX(p->st_mode));
 }
 
-// XXX which these always have valid inputs?
 char *
 _hpss_userattr_t(struct pool * pool, hpss_userattr_t a)
 {
@@ -801,7 +800,7 @@ _ns_filesetattrs_t_ptr(struct pool * pool, const ns_FilesetAttrs_t * p)
 #endif
             "StateFlags=%s, "            // unsigned32
             "SubSystemId=%s, "           // unsigned32
-// XXX            "UserData=%s, "              // byte[NS_FS_MAX_USER_DATA]
+            "UserData=%s, "              // byte[NS_FS_MAX_USER_DATA]
             "DirectoryCount=%s, "        // u_signed64
             "FileCount=%s, "             // u_signed64
             "HardLinkCount=%s, "         // u_signed64
@@ -821,7 +820,7 @@ _ns_filesetattrs_t_ptr(struct pool * pool, const ns_FilesetAttrs_t * p)
 #endif
             UNSIGNED(p->StateFlags),
             UNSIGNED(p->SubSystemId),
-// XXX            CHAR_PTR(p->UserData),
+            CHAR_PTR(p->UserData),
             UNSIGNED64(p->DirectoryCount),
             UNSIGNED64(p->FileCount),
             UNSIGNED64(p->HardLinkCount),
