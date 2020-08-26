@@ -5,6 +5,7 @@
  * System includes
  */
 #include <pthread.h>
+#include <stdbool.h>
 
 /*
  * Globus includes
@@ -63,6 +64,7 @@ typedef struct stor_info
 
 void
 stor(globus_gfs_operation_t       Operation,
-     globus_gfs_transfer_info_t * TransferInfo);
+     globus_gfs_transfer_info_t * TransferInfo,
+     bool                         UseUDAChecksums);
 
 #endif /* HPSS_DSI_STOR_H */

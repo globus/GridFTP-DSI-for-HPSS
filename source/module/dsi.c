@@ -112,9 +112,11 @@ dsi_recv(globus_gfs_operation_t      Operation,
          globus_gfs_transfer_info_t *TransferInfo,
          void *                      UserArg)
 {
+    config_t * config = UserArg;
+
     // Defering the INFO() call until inside of stor() since it has the
     // critical information.
-    stor(Operation, TransferInfo);
+    stor(Operation, TransferInfo, config->UDAChecksumSupport);
 }
 
 void
