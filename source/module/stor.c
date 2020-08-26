@@ -510,7 +510,8 @@ validate_restart(const char * Pathname,
 
 void
 stor(globus_gfs_operation_t      Operation,
-     globus_gfs_transfer_info_t *TransferInfo)
+     globus_gfs_transfer_info_t *TransferInfo,
+     bool                        UseUDAChecksums)
 {
     stor_info_t *   stor_info         = NULL;
     globus_result_t result            = GLOBUS_SUCCESS;
@@ -535,9 +536,19 @@ stor(globus_gfs_operation_t      Operation,
 
     globus_gridftp_server_get_block_size(Operation, &stor_info->BlockSize);
 
-    result = cksm_clear_uda_checksum(TransferInfo->pathname);
-    if (result)
-        goto cleanup;
+    /*
+     * Clearing a UDA checksum is not as innocuous as it sounds. It actually
+     * sets UDA values that indicate that the checksum is invalid. Setting
+     * _any_ value in UDA when the endpoint admin has disabled UDA would
+     * seem to violate that configuration option. So we check if we should
+     * be using UDA at all before clearing the stored value.
+     */
+    if (UseUDAChecksums)
+    {
+        result = cksm_clear_uda_checksum(TransferInfo->pathname);
+        if (result)
+            goto cleanup;
+    }
 
     /*
      * Open the file.
