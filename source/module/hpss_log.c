@@ -361,7 +361,7 @@ _hpss_cos_priorities_t_ptr(struct pool * pool, const hpss_cos_priorities_t * p)
 }
 
 char *
-_hpss_error_state_t(struct pool * pool, hpss_errno_state_t errno_state)
+_hpss_errno_state_t(struct pool * pool, hpss_errno_state_t errno_state)
 {
     return _sprintf(pool,
                     "{hpss_errno=%s, func=%s, requestId=%s}", 

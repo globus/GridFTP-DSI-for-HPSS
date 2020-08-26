@@ -61,9 +61,9 @@ _hpss_cos_priorities_t_ptr(struct pool * pool, const hpss_cos_priorities_t * p);
 
 #define HPSS_DISTRIBUTIONKEY_T(k) UNSIGNED16(k)
 
-#define HPSS_ERROR_STATE_T(e) _hpss_error_state_t(pool, e)
+#define HPSS_ERRNO_STATE_T(e) _hpss_errno_state_t(pool, e)
 char *
-_hpss_error_state_t(struct pool * pool, hpss_errno_state_t errno_state);
+_hpss_errno_state_t(struct pool * pool, hpss_errno_state_t errno_state);
 
 #define HPSS_FILEATTR_T(a) _hpss_fileattr_t(pool, a)
 char *
