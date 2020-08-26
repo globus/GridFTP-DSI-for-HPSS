@@ -210,16 +210,16 @@ Hpss_FileGetXAttributes(
 
 int
 Hpss_FilesetGetAttributes(
-    const char                  *  Name,
-    const uint64_t              *  FilesetId,
-    const ns_ObjHandle_t        *  FilesetHandle,
+    const char                  *  Name,            // IN
+    const uint64_t              *  FilesetId,       // IN
+    const ns_ObjHandle_t        *  FilesetHandle,   // IN
 #if (HPSS_MAJOR_VERSION == 7)
-    const hpss_uuid_t           *  CoreServerUUID
+    const hpss_uuid_t           *  CoreServerUUID   // IN
 #else
-    const hpss_srvr_id_t        *  CoreServerID,
+    const hpss_srvr_id_t        *  CoreServerID,    // IN
 #endif
-    ns_FilesetAttrBits_t           FilesetAttrBits,
-    ns_FilesetAttrs_t           *  FilesetAttrs)
+    ns_FilesetAttrBits_t           FilesetAttrBits, // IN
+    ns_FilesetAttrs_t           *  FilesetAttrs)    // OUT
 {
     API_ENTER("hpss_FilesetGetAttributes",
               "Name=%s "            // const char *
