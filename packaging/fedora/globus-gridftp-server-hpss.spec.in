@@ -21,7 +21,7 @@ Packager: Jason Alt <jasonalt@globus.org>
 #  For more details: http://ftp.rpm.org/max-rpm/s1-rpm-depend-auto-depend.html
 AutoReq: no
 
-Requires: globus-gridftp-server >= 12.23
+Requires: globus-gridftp-server >= 12.24
 Requires: openssl
 Requires: hpss-lib
 Requires: libtirpc
