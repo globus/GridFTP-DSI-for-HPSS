@@ -18,6 +18,9 @@
 # verbose output to the log file. The format used in these log messages is
 # targetted at HPSS connector developers and may change between versions.
 #
+# The file must exist and be writable by any or all users that you want
+# to be able to log information from their GridFTP sessions.
+#
 
 #$GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG "ALL,/var/log/hpss_connector_debug.log,1,2"
 
