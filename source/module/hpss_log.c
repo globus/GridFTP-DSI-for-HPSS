@@ -259,7 +259,7 @@ _hpss_cos_hints_t_ptr(struct pool * pool, const hpss_cos_hints_t * p)
             "StageCode=%s, "         // unsigned32
             "StripeWidth=%s, "       // unsigned32
             "StripeLength=%s, "      // u_signed64
-            "FamilyId=%s",           // unsigned32
+            "FamilyId=%s"            // unsigned32
         "}",
             UNSIGNED(p->COSId),
             CHAR_PTR(p->COSName),
