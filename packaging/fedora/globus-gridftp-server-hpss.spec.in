@@ -46,6 +46,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT/etc/gridftp.d/
 mkdir -p $RPM_BUILD_ROOT/var/hpss/etc
 install -m 644 data/hpss $RPM_BUILD_ROOT/etc/gridftp.d/
+install -m 644 data/hpss_debug $RPM_BUILD_ROOT/etc/gridftp.d/
 install -m 644 data/gridftp_hpss_dsi.conf $RPM_BUILD_ROOT/var/hpss/etc/
 
 # Remove libtool archives (.la files)
@@ -56,6 +57,7 @@ find $RPM_BUILD_ROOT%{_libdir} -name 'lib*.la' -exec rm -v '{}' \;
 /usr/lib64/*
 
 %attr(644, -, -) /etc/gridftp.d/hpss
+%attr(644, -, -) /etc/gridftp.d/hpss_debug
 %attr(644, -, -) /var/hpss/etc/gridftp_hpss_dsi.conf
 
 %config /etc/gridftp.d/hpss

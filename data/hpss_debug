@@ -1,0 +1,34 @@
+#
+# This file is used to configure the HPSS connector to perform additional
+# logging and testing which is generally only useful for debugging by 
+# developers or release testing by endpoint administrators. 
+#
+# If you are looking for general production logging, see the 'log_level'
+# setting, set in /etc/gridftp.d/globus-connect-server-gridftp-logging by
+# default. As of version 2.15, the HPSS connector sends it standard logging
+# to the GridFTP server's default log file.
+#
+# See the HPSS connector documentation at docs.globus.org for more information.
+#
+
+#
+# $GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG
+#
+# Uncommenting this option will configure the HPSS connector to log extremely
+# verbose output to the log file. The format used in these log messages is
+# targetted at HPSS connector developers and may change between versions.
+#
+
+#$GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG "ALL,/var/log/hpss_connector_debug.log,1,2"
+
+# 
+# $HPSS_API_DEBUG - configures the level of debug information
+# $HPSS_API_DEBUG_PATH - configures the file used to store logging
+#
+# The following two options are used to enable HPSS API debugging in the HPSS
+# client libraries. This is a feature of HPSS not the HPSS connector. These are
+# provided as a convenience.
+#
+
+#$HPSS_API_DEBUG 7
+#$HPSS_API_DEBUG_PATH "/var/log/hpss_api.debug"
