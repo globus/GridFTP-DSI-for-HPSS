@@ -71,7 +71,7 @@ Hpss_AuthnMechTypeFromString(
     API_EXIT("hpss_AuthnMechTypeFromString",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              HPSS_AUTHN_MECH_T_PTR(AuthnMech));
     return rv;
 }
@@ -88,7 +88,7 @@ Hpss_Chmod(
     API_EXIT("hpss_Chmod",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -136,7 +136,7 @@ Hpss_Close(int Fildes)
     API_EXIT("hpss_Close",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -152,7 +152,7 @@ Hpss_Closedir(int Dirdes)
     API_EXIT("hpss_Closedir",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -175,7 +175,7 @@ Hpss_FileGetAttributes(
     API_EXIT("hpss_FileGetAttributes",
              "return_value=%s last_hpss_errno=%s AttrOut=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              HPSS_FILEATTR_T(AttrOut));
     return rv;
 }
@@ -203,7 +203,7 @@ Hpss_FileGetXAttributes(
     API_EXIT("hpss_FileGetXAttributes",
              "return_value=%s last_hpss_errno=%s AttrOut=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              HPSS_XFILEATTR_T_PTR(AttrOut));
     return rv;
 }
@@ -253,7 +253,7 @@ Hpss_FilesetGetAttributes(
     API_EXIT("hpss_FilesetGetAttributes",
              "return_value=%s last_hpss_errno=%s FilesetAttrs=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              NS_FILESETATTRS_T(FilesetAttrs));
     return rv;
 }
@@ -280,7 +280,7 @@ Hpss_GetAsynchStatus(
     API_EXIT("hpss_GetAsynchStatus",
              "return_value=%s last_hpss_errno=%s Status=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              UNSIGNED_PTR(FilesetAttrs));
     return rv;
 }
@@ -304,7 +304,7 @@ Hpss_GetAsyncStatus(
     API_EXIT("hpss_GetAsynchStatus",
              "return_value=%s last_hpss_errno=%s Status=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              SIGNED_PTR(Status));
     return rv;
 }
@@ -321,7 +321,7 @@ Hpss_Getenv(const char *Env)
     API_EXIT("hpss_Getenv",
              "return_value=%s last_hpss_errno=%s",
              CHAR_PTR(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -340,7 +340,7 @@ Hpss_GetConfiguration(
     API_EXIT("hpss_GetConfiguration",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              API_CONFIG_T_PTR(ConfigOut));
     return rv;
 }
@@ -360,7 +360,7 @@ Hpss_GetThreadUcred(
     API_EXIT("hpss_GetThreadUcred",
              "return_value=%s last_hpss_errno=%s RetUcred=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              SEC_CRED_T_PTR(RetUcred));
     return rv;
 }
@@ -384,7 +384,7 @@ Hpss_LoadDefaultThreadState(
     API_EXIT("Hpss_LoadDefaultThreadState",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -404,7 +404,7 @@ Hpss_Lstat(
     API_EXIT("hpss_Lstat",
              "return_value=%s last_hpss_errno=%s Buf=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              HPSS_STAT_T_PTR(Buf));
     return rv;
 }
@@ -423,7 +423,7 @@ Hpss_Mkdir(
     API_EXIT("hpss_Mkdir",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -469,7 +469,7 @@ Hpss_net_getaddrinfo(
     API_EXIT("hpss_net_getaddrinfo",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -505,7 +505,7 @@ Hpss_Open(
     API_EXIT("hpss_Open",
              "return_value=%s last_hpss_errno=%s HintsOut=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              HPSS_COS_HINTS_T_PTR(HintsOut));
     return rv;
 }
@@ -528,7 +528,7 @@ Hpss_OpendirHandle(
     API_EXIT("hpss_OpendirHandle",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 #endif
@@ -563,7 +563,7 @@ Hpss_ParseAuthString(
              "AuthnMechanism=%s "
              "AuthenticatorType=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              HPSS_AUTHN_MECH_T_PTR(AuthnMechanism),
              HPSS_RPC_AUTH_TYPE_T_PTR(AuthenticatorType));
     return rv;
@@ -582,7 +582,7 @@ Hpss_PIOEnd(
     API_EXIT("hpss_PIOEnd",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -623,7 +623,7 @@ Hpss_PIOExecute(
     API_EXIT("hpss_PIOExecute",
              "return_value=%s last_hpss_errno=%s GapInfo=%s BytesMoved=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              HPSS_PIO_GAPINFO_T_PTR(GapInfo),
              UNSIGNED64_PTR(BytesMoved));
     return rv;
@@ -650,7 +650,7 @@ Hpss_PIOExportGrp(
     API_EXIT("hpss_PIOExportGrp",
              "return_value=%s last_hpss_errno=%s BufLength=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              UNSIGNED_PTR(BufLength));
     return rv;
 }
@@ -676,7 +676,7 @@ Hpss_PIOImportGrp(
     API_EXIT("hpss_PIOImportGrp",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -719,7 +719,7 @@ Hpss_PIORegister(
     API_EXIT("hpss_PIORegister",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -742,7 +742,7 @@ Hpss_PIOStart(
     API_EXIT("hpss_PIOStart",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -792,7 +792,7 @@ Hpss_ReadAttrsPlus(
              "OffsetOut=%s "
              "DirentPtr=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              UNSIGNED_PTR(End),
              UNSIGNED64_PTR(OffsetOut),
              rv > 0 ? NS_DIRENTRY_T_ARRAY(DirentPtr, rv) : "{}");
@@ -848,7 +848,7 @@ Hpss_ReadAttrsHandle(
              "OffsetOut=%s "
              "DirentPtr=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              UNSIGNED_PTR(End),
              UNSIGNED64_PTR(OffsetOut),
              rv > 0 ? NS_DIRENTRY_T_ARRAY(DirentPtr, rv) : "[]");
@@ -878,7 +878,7 @@ Hpss_Readlink(
              "last_hpss_errno=%s "
              "Contents=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              CHAR_PTR(Contents));
     return rv;
 }
@@ -909,7 +909,7 @@ Hpss_ReadlinkHandle(
              "last_hpss_errno=%s "
              "Contents=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              CHAR_PTR(Contents));
     return rv;
 }
@@ -929,7 +929,7 @@ Hpss_Rename(
              "return_value=%s "
              "last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -947,7 +947,7 @@ Hpss_Rmdir(
              "return_value=%s "
              "last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -967,7 +967,7 @@ Hpss_SetConfiguration(
              "return_value=%s "
              "last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -998,7 +998,7 @@ Hpss_SetCOSByHints(
              "last_hpss_errno=%s "
              "COSPtr=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              HPSS_COS_MD_T_PTR(COSPtr));
     return rv;
 }
@@ -1040,7 +1040,7 @@ Hpss_SetLoginCred(
              "return_value=%s "
              "last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -1092,7 +1092,7 @@ Hpss_StageCallBack(
              "ReqID=%s "
              "BitfileObj=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              HPSS_REQID_T_PTR(ReqID),
              BFS_BITFILE_OBJ_HANDLE_T_PTR(BitfileObj));
     return rv;
@@ -1114,7 +1114,7 @@ Hpss_Stat(
     API_EXIT("hpss_Stat",
              "return_value=%s last_hpss_errno=%s Buf=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              HPSS_STAT_T_PTR(Buf));
     return rv;
 }
@@ -1136,7 +1136,7 @@ Hpss_Symlink(
     API_EXIT("hpss_Symlink",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -1157,7 +1157,7 @@ Hpss_Truncate(
     API_EXIT("hpss_Truncate",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -1173,7 +1173,7 @@ Hpss_Umask(mode_t CMask)
     API_EXIT("hpss_Umask",
              "return_value=%s last_hpss_errno=%s",
              MODE_T(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -1190,7 +1190,7 @@ Hpss_Unlink(
     API_EXIT("hpss_Unlink",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -1213,7 +1213,7 @@ Hpss_UnlinkHandle(
     API_EXIT("hpss_UnlinkHandle",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -1237,7 +1237,7 @@ Hpss_UserAttrGetAttrs(
     API_EXIT("hpss_UserAttrGetAttrs",
              "return_value=%s last_hpss_errno=%s Attr=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              HPSS_USERATTR_LIST_T_PTR(Attr));
     return rv;
 }
@@ -1263,7 +1263,7 @@ Hpss_UserAttrGetAttrs(
     API_EXIT("hpss_UserAttrGetAttrs",
              "return_value=%s last_hpss_errno=%s Attr=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state),
+             HPSS_ERRNO_STATE_T(errno_state),
              HPSS_USERATTR_LIST_T_PTR(Attr));
     return rv;
 }
@@ -1288,7 +1288,7 @@ Hpss_UserAttrSetAttrs(
     API_EXIT("hpss_UserAttrSetAttrs",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
 
@@ -1310,6 +1310,6 @@ Hpss_Utime(
     API_EXIT("hpss_Utime",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
-             HPSS_ERROR_STATE_T(errno_state));
+             HPSS_ERRNO_STATE_T(errno_state));
     return rv;
 }
