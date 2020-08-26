@@ -2,6 +2,7 @@
 #include <hpss_RequestID.h>
 #endif
 #include <hpss_types.h>
+#include <hpss_uuid.h>
 
 #include "hpss_log.h"
 #include "strings.h"
@@ -423,17 +424,6 @@ _hpss_pio_prarams_t_ptr(struct pool * pool, const hpss_pio_params_t * p)
            HPSS_PIO_OPTIONS_T(p->Options));
 }
 
-#if HPSS_MAJOR_VERSION >= 8
-char *
-_hpss_reqid_t(struct pool * pool, hpss_reqid_t r)
-{
-    char * s1 = hpss_RequestIDtoString(&r);
-    char * s2 = _sprintf(pool, "[%s] %s", s1, HPSS_UUID_T(r));
-    free(s1);
-    return s2;
-}
-#endif
-
 char *
 _hpss_reqid_t_ptr(struct pool * pool, const hpss_reqid_t * p)
 {
@@ -502,6 +492,22 @@ _hpss_uuid_t_ptr(struct pool * pool, const hpss_uuid_t * p)
 {
     if (p== NULL)
         return PTR(p);
+
+    unsigned32 status;
+    char * uuid_str = NULL;
+
+#if HPSS_MAJOR_VERSION >= 8
+    status = hpss_uuid_to_string(p, &uuid_str);
+#else
+    uuid_to_string(p, &uuid_str, &status);
+#endif
+
+    if (status == 0)
+    {
+        char * u = _strdup(pool, uuid_str);
+        free(uuid_str);
+        return u;
+    }
 
     return _sprintf(
         pool,
