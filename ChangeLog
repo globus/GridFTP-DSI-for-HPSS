@@ -5,6 +5,7 @@ Version 2.13.rc1: Fri Jul 31 15:52:12 EDT 2020
 	  does not have a value.
 	- Removed support for the Globus quota system. The 'QuotaSupport
 	  config option is no longer supported.
+	- Do not overwrite config files on package update.
 
 Version 2.12: Tue May 19 22:30:49 EDT 2020
 	- Fix for race condition in directory listings that caused listings to

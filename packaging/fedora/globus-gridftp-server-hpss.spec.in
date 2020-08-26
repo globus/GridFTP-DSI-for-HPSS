@@ -58,6 +58,9 @@ find $RPM_BUILD_ROOT%{_libdir} -name 'lib*.la' -exec rm -v '{}' \;
 %attr(644, -, -) /etc/gridftp.d/hpss
 %attr(644, -, -) /var/hpss/etc/gridftp_hpss_dsi.conf
 
+%config /etc/gridftp.d/hpss
+%config /var/hpss/etc/gridftp_hpss_dsi.conf
+
 %pre
 %post
 %preun
