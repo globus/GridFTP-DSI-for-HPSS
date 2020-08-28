@@ -27,7 +27,8 @@ static pthread_once_t ErrorTableInitialized = PTHREAD_ONCE_INIT;
 static void
 error_table_init()
 {
-    ErrorTableIndex = 0;
+    // Can't use index 0
+    ErrorTableIndex = 1;
     memset(ErrorTable, 0, sizeof(ErrorTable));
 }
 
@@ -41,10 +42,17 @@ hpss_error_put(hpss_error_t he)
     {
         index = ErrorTableIndex;
         ErrorTable[index] = he;
-        ErrorTableIndex = (ErrorTableIndex + 1) % MAX_HPSS_ERRORS;
+        // Can't use index 0
+        ErrorTableIndex = ((ErrorTableIndex + 1) % (MAX_HPSS_ERRORS-1)) + 1;
     }
     pthread_mutex_unlock(&ErrorTableMutex);
     return -index;
+}
+
+hpss_error_t
+hpss_error_get(int index)
+{
+    return ErrorTable[-index];
 }
 
 int

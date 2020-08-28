@@ -27,6 +27,9 @@ typedef struct {
 int
 hpss_error_put(hpss_error_t he);
 
+hpss_error_t
+hpss_error_get(int);
+
 /*
  * Takes the (int) returned from hpss_error_put() and returns the actual
  * return value of the HPSS function.
