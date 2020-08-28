@@ -14,8 +14,9 @@
 /*
  * HPSS includes.
  */
-#include "hpss_error.h"
-#include "hpss_String.h"
+#include <hpss_String.h>
+#include <hpss_errno.h>
+#include <hpss_error.h>
 
 #define MAX_HPSS_ERRORS 64
 static hpss_error_t ErrorTable[64];

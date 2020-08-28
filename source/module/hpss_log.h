@@ -91,7 +91,7 @@ _hpss_pio_prarams_t_ptr(struct pool * pool, const hpss_pio_params_t * p);
 #define HPSS_READDIR_FLAGS_T(f) HEX(f)
 
 #if HPSS_MAJOR_VERSION < 8
- #define HPSS_REQID_T(r) UNSIGNED32(r)
+ #define HPSS_REQID_T(r) UNSIGNED(r)
 #else
  #define HPSS_REQID_T(r) HPSS_UUID_T(r)
 #endif

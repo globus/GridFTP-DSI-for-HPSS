@@ -496,10 +496,10 @@ _hpss_uuid_t_ptr(struct pool * pool, const hpss_uuid_t * p)
     unsigned32 status;
     char * uuid_str = NULL;
 
-#if HPSS_MAJOR_VERSION >= 8
-    status = hpss_uuid_to_string(p, &uuid_str);
-#else
+#if HPSS_MAJOR_VERSION ==  7 && HPSS_MINOR_VERSION == 4
     uuid_to_string(p, &uuid_str, &status);
+#else
+    status = hpss_uuid_to_string(p, &uuid_str);
 #endif
 
     if (status == 0)
@@ -677,7 +677,32 @@ _hpss_userattr_list_t_ptr(struct pool * pool, const hpss_userattr_list_t * p)
 char *
 _hpssoid_t(struct pool * pool, hpssoid_t o)
 {
-#if HPSS_MAJOR_VERSION >= 8
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    return _sprintf(
+        pool,
+        "{"
+            "ObjectID=%s, "            // hpss_uuid_t
+            "ServerDep1=%s, "          // unsigned32
+            "ServerDep2=%s, "          // unsigned16
+            "ServerDep3=%s, "          // unsigned16
+            "ServerDep4=%s, "          // byte
+            "ServerDep5=%s, "          // byte
+            "SecurityLevel={%s, %s}, " // byte[2]
+            "Reserved={%s, %s}, "      // byte[2]
+            "SubType=%s, "             // byte
+            "Type=%s"                  // byte
+        "}",
+            HPSS_UUID_T(o.ObjectID),
+            UNSIGNED(o.ServerDep1),
+            UNSIGNED16(o.ServerDep2),
+            UNSIGNED16(o.ServerDep3),
+            HEX8(o.ServerDep4),
+            HEX8(o.ServerDep5),
+            HEX8(o.SecurityLevel[0]), HEX8(o.SecurityLevel[1]),
+            HEX8(o.Reserved[0]), HEX8(o.Reserved[1]),
+            HEX8(o.SubType),
+            HEX8(o.Type));
+#else
     return _sprintf(
         pool,
         "{"
@@ -722,31 +747,6 @@ _hpssoid_t(struct pool * pool, hpssoid_t o)
             HEX8(o.Bytes[16]),
             HEX8(o.Bytes[17]),
             HEX8(o.Bytes[18]));
-#else
-    return _sprintf(
-        pool,
-        "{"
-            "ObjectID=%s, "            // hpss_uuid_t
-            "ServerDep1=%s, "          // unsigned32
-            "ServerDep2=%s, "          // unsigned16
-            "ServerDep3=%s, "          // unsigned16
-            "ServerDep4=%s, "          // byte
-            "ServerDep5=%s, "          // byte
-            "SecurityLevel={%s, %s}, " // byte[2]
-            "Reserved={%s, %s}, "      // byte[2]
-            "SubType=%s, "             // byte
-            "Type=%s"                  // byte
-        "}",
-            HPSS_UUID_T(o.ObjectID),
-            UNSIGNED(o.ServerDep1),
-            UNSIGNED16(o.ServerDep2),
-            UNSIGNED16(o.ServerDep3),
-            HEX8(o.ServerDep4),
-            HEX8(o.ServerDep5),
-            HEX8(o.SecurityLevel[0]), HEX8(o.SecurityLevel[1]),
-            HEX8(o.Reserved[0]), HEX8(o.Reserved[1]),
-            HEX8(o.SubType),
-            HEX8(o.Type));
 #endif
 }
 
@@ -821,7 +821,7 @@ _ns_filesetattrs_t_ptr(struct pool * pool, const ns_FilesetAttrs_t * p)
             UNSIGNED64(p->FilesetId),
             CHAR_PTR(p->FilesetName),
             UNSIGNED(p->FilesetType),
-#if HPSS_MAJOR_VERSION == 7
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
             HPSS_UUID_T(p->GatewayUUID),
 #endif
             UNSIGNED(p->StateFlags),
@@ -846,7 +846,24 @@ _ns_objhandle_t_ptr(struct pool * pool, const ns_ObjHandle_t * p)
     if (p == NULL)
         return PTR(p);
 
-#if HPSS_MAJOR_VERSION >= 8
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    return _sprintf(
+        pool,
+        "{"
+            "ObjId=%s, "        // u_signed64
+            "FileId=%s, "       // u_signed64
+            "Type=%s, "         // byte
+            "Flags=%s, "        // byte
+            "Generation=%s, "   // unsigned16
+            "CoreServerUUID=%s" // hpss_uuid_t
+        "}",
+            UNSIGNED64(p->ObjId),
+            UNSIGNED64(p->FileId),
+            HEX8(p->Type),
+            HEX8(p->Flags),
+            UNSIGNED16(p->Generation),
+            HPSS_UUID_T(p->CoreServerUUID));
+#else
     return _sprintf(
         pool,
         "{"
@@ -867,23 +884,6 @@ _ns_objhandle_t_ptr(struct pool * pool, const ns_ObjHandle_t * p)
             HEX8(p->Flags),
             UNSIGNED64(p->Generation),
             HPSS_SRVR_ID_T(p->CoreServerId));
-#else
-    return _sprintf(
-        pool,
-        "{"
-            "ObjId=%s, "        // u_signed64
-            "FileId=%s, "       // u_signed64
-            "Type=%s, "         // byte
-            "Flags=%s, "        // byte
-            "Generation=%s, "   // unsigned16
-            "CoreServerUUID=%s" // hpss_uuid_t
-        "}",
-            UNSIGNED64(p->ObjId),
-            UNSIGNED64(p->FileId),
-            HEX8(p->Type),
-            HEX8(p->Flags),
-            UNSIGNED16(p->Generation),
-            HPSS_UUID_T(p->CoreServerUUID));
 #endif
 }
 
