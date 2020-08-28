@@ -66,7 +66,7 @@ build_log_entry(log_type_t type, const char * message_format, va_list ap)
 
     char * entry = NULL;
     rc = asprintf(&entry,
-                  "[HPSS Connector][%s] %s%s%s%s%s%s%s\n",
+                  "[HPSS Connector][%s] %s%s%s%s%s%s:: %s\n",
                   log_type_to_string(type),
                   UserToLog   ? "User="     : "",
                   UserToLog   ? UserToLog   : "",
