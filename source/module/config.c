@@ -11,6 +11,7 @@
 /*
  * Local includes
  */
+#include "logging.h"
 #include "config.h"
 #include "hpss.h"
 
@@ -42,8 +43,10 @@ config_find_config_file(char **ConfigFilePath)
         /* Check if it exists and if we have access. */
         retval = access(*ConfigFilePath, R_OK);
         if (retval)
-            result = GlobusGFSErrorGeneric(
-                "Could not open config file defined in environment");
+        {
+            ERROR("Could not open config file %s", *ConfigFilePath);
+            result = GlobusGFSErrorConfigurationError();
+        }
         goto cleanup;
     }
 
@@ -87,8 +90,8 @@ config_find_config_file(char **ConfigFilePath)
          * All other cases indicate failure at some level.
          */
         default:
-            result =
-                GlobusGFSErrorSystemError("Can not access config file", errno);
+            ERROR("Can not access config file: %s", strerror(errno));
+            result = GlobusGFSErrorConfigurationError();
             goto cleanup;
         }
     }
@@ -103,7 +106,8 @@ config_find_config_file(char **ConfigFilePath)
     /* All failures are error conditions at this stage. */
     if (retval != 0)
     {
-        result = GlobusGFSErrorSystemError("Can not access config file", errno);
+        ERROR("Can not access config file: %s", strerror(errno));
+        result = GlobusGFSErrorConfigurationError();
         goto cleanup;
     }
 
@@ -189,14 +193,16 @@ config_parse_file(char *ConfigFilePath, config_t *Config)
     config_f = fopen(ConfigFilePath, "r");
     if (!config_f)
     {
-        result = GlobusGFSErrorWrapFailed(
-            "Attempting to open config file",
-            GlobusGFSErrorSystemError("fopen()", errno));
+        ERROR("Can not open config file: %s", strerror(errno));
+        result = GlobusGFSErrorConfigurationError();
         goto cleanup;
     }
 
+    int l_no = 0;
     while (fgets(buffer, sizeof(buffer), config_f) != NULL)
     {
+        l_no++;
+
         /* Locate the keyword */
         config_find_next_word(buffer, &key, &key_length);
         if (key == NULL)
@@ -206,8 +212,8 @@ config_parse_file(char *ConfigFilePath, config_t *Config)
         config_find_next_word(key + key_length, &value, &value_length);
         if (value == NULL)
         {
-            result = GlobusGFSErrorWrapFailed("Parsing config options",
-                                              GlobusGFSErrorGeneric(buffer));
+            ERROR("Configuration error, could not find key on line %d", l_no);
+            result = GlobusGFSErrorConfigurationError();
             goto cleanup;
         }
 
@@ -215,8 +221,8 @@ config_parse_file(char *ConfigFilePath, config_t *Config)
         config_find_next_word(value + value_length, &tmp, &tmp_length);
         if (tmp != NULL)
         {
-            result = GlobusGFSErrorWrapFailed("Parsing config options",
-                                              GlobusGFSErrorGeneric(buffer));
+            ERROR("Configuration error, found extra value on line %d", l_no);
+            result = GlobusGFSErrorConfigurationError();
             goto cleanup;
         }
 
@@ -240,8 +246,8 @@ config_parse_file(char *ConfigFilePath, config_t *Config)
                 config_get_bool_value(value, value_length);
         } else
         {
-            result = GlobusGFSErrorWrapFailed("Parsing config options",
-                                              GlobusGFSErrorGeneric(buffer));
+            ERROR("Configuration error, unsupported option \"%s\"", key);
+            result = GlobusGFSErrorConfigurationError();
             goto cleanup;
         }
     }
