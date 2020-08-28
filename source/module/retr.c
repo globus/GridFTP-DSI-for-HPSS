@@ -29,14 +29,14 @@ retr_open_for_reading(char *Pathname, int *FileFD, int *FileStripeWidth)
     memset(&priorities, 0, sizeof(hpss_cos_priorities_t));
 
     /* Open the HPSS file. */
-    *FileFD = hpss_Open(Pathname,
+    *FileFD = Hpss_Open(Pathname,
                         O_RDONLY,
                         S_IRUSR | S_IWUSR,
                         &hints_in,
                         &priorities,
                         &hints_out);
     if (*FileFD < 0)
-        return GlobusGFSErrorSystemError("hpss_Open", -(*FileFD));
+        return hpss_error_to_globus_result(*FileFD);
 
     /* Copy out the file stripe width. */
     *FileStripeWidth = hints_out.StripeWidth;
@@ -273,9 +273,9 @@ retr_transfer_complete_callback(globus_result_t Result, void *UserArg)
     if (result)
         result = retr_info->Result;
 
-    rc = hpss_Close(retr_info->FileFD);
+    rc = Hpss_Close(retr_info->FileFD);
     if (rc && !result)
-        result = GlobusGFSErrorSystemError("hpss_Close", -rc);
+        result = hpss_error_to_globus_result(rc);
 
     pthread_mutex_destroy(&retr_info->Mutex);
     pthread_cond_destroy(&retr_info->Cond);
@@ -294,10 +294,10 @@ retr(globus_gfs_operation_t Operation, globus_gfs_transfer_info_t *TransferInfo)
     globus_result_t result            = GLOBUS_SUCCESS;
     hpss_stat_t     hpss_stat_buf;
 
-    rc = hpss_Stat(TransferInfo->pathname, &hpss_stat_buf);
+    rc = Hpss_Stat(TransferInfo->pathname, &hpss_stat_buf);
     if (rc)
     {
-        result = GlobusGFSErrorSystemError("hpss_Stat", -rc);
+        result = hpss_error_to_globus_result(rc);
         goto cleanup;
     }
 
@@ -362,7 +362,7 @@ cleanup:
         if (retr_info)
         {
             if (retr_info->FileFD != -1)
-                hpss_Close(retr_info->FileFD);
+                Hpss_Close(retr_info->FileFD);
             pthread_mutex_destroy(&retr_info->Mutex);
             pthread_cond_destroy(&retr_info->Cond);
             free(retr_info);

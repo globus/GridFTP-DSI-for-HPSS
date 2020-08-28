@@ -14,6 +14,8 @@ SOURCES = authenticate.c \
           hooks.c        \
           hpss.c         \
           hpss.h         \
+          hpss_error.c   \
+          hpss_error.h   \
           hpss_log.c     \
           hpss_log.h     \
           logging.c      \

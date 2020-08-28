@@ -54,9 +54,12 @@ dsi_init(globus_gfs_operation_t     Operation,
      * Pulling the HPSS directory from the user's credential will support
      * sites that use HPSS LDAP.
      */
-    result = Hpss_GetThreadUcred(&user_cred);
-    if (result)
+    int retval = Hpss_GetThreadUcred(&user_cred);
+    if (retval)
+    {
+        result = hpss_error_to_globus_result(retval);
         goto cleanup;
+    }
 
     home = strdup(user_cred.Directory);
     if (!home)

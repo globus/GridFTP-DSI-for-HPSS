@@ -53,8 +53,7 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
 
     int retval = Hpss_AuthnMechTypeFromString(authn_mech_string, &authn_mech);
     if (retval != HPSS_E_NOERROR)
-        return GlobusGFSErrorSystemError("hpss_AuthnMechTypeFromString()",
-                                         -retval);
+        return hpss_error_to_globus_result(retval);
 
     char * authenticator_string = Authenticator;
     if (!authenticator_string)
@@ -77,7 +76,7 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
                                auth_type,
                                authenticator);
     if (retval != HPSS_E_NOERROR)
-        return GlobusGFSErrorSystemError("hpss_SetLoginCred()", -retval);
+        return hpss_error_to_globus_result(retval);
 
     if (UserName)
     {
@@ -93,9 +92,7 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
          */
         retval = Hpss_LoadDefaultThreadState(uid, Hpss_Umask(0), NULL);
         if (retval != HPSS_E_NOERROR)
-            return GlobusGFSErrorSystemError("hpss_LoadDefaultThreadState()",
-                                             -retval);
+            return hpss_error_to_globus_result(retval);
     }
-
     return GLOBUS_SUCCESS;
 }
