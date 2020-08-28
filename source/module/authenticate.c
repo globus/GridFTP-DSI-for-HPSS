@@ -13,6 +13,7 @@
  * Local includes
  */
 #include "authenticate.h"
+#include "logging.h"
 #include "hpss.h"
 
 globus_result_t
@@ -53,7 +54,12 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
 
     int retval = Hpss_AuthnMechTypeFromString(authn_mech_string, &authn_mech);
     if (retval != HPSS_E_NOERROR)
-        return hpss_error_to_globus_result(retval);
+    {
+        ERROR("User could not log into because the configured authentication "
+              "mechanism \"%s\" is not known to HPSS.",
+             authn_mech_string);
+        return GlobusGFSErrorLoginDenied();
+    }
 
     char * authenticator_string = Authenticator;
     if (!authenticator_string)
@@ -76,7 +82,12 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
                                auth_type,
                                authenticator);
     if (retval != HPSS_E_NOERROR)
-        return hpss_error_to_globus_result(retval);
+    {
+        ERROR("Could not log into HPSS as \"%s\". %s",
+              LoginName,
+              hpss_ErrnoString(hpss_error_get(retval).returned_value));
+        return GlobusGFSErrorLoginDenied();
+    }
 
     if (UserName)
     {
@@ -92,7 +103,11 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
          */
         retval = Hpss_LoadDefaultThreadState(uid, Hpss_Umask(0), NULL);
         if (retval != HPSS_E_NOERROR)
-            return hpss_error_to_globus_result(retval);
+        {
+            ERROR("Could not log into HPSS. %s",
+              hpss_ErrnoString(hpss_error_get(retval).returned_value));
+            return GlobusGFSErrorLoginDenied();
+        }
     }
     return GLOBUS_SUCCESS;
 }
