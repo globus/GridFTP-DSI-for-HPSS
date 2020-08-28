@@ -37,7 +37,7 @@ stat_translate_stat(char *             Pathname,
         if (retval < 0)
         {
             stat_destroy(GFSStat);
-            return GlobusGFSErrorSystemError("hpss_Readlink", -retval);
+            return hpss_error_to_globus_result(retval);
         }
 
         /* Copy out the symlink target. */
@@ -78,7 +78,7 @@ stat_object(char *Pathname, globus_gfs_stat_t *GFSStat)
     hpss_stat_t hpss_stat_buf;
     int retval = Hpss_Stat(Pathname, &hpss_stat_buf);
     if (retval)
-        return GlobusGFSErrorSystemError("hpss_Stat", -retval);
+        return hpss_error_to_globus_result(retval);
     return stat_translate_stat(Pathname, &hpss_stat_buf, GFSStat);
 }
 
@@ -90,7 +90,7 @@ stat_link(char *Pathname, globus_gfs_stat_t *GFSStat)
     hpss_stat_t hpss_stat_buf;
     int         retval = Hpss_Lstat(Pathname, &hpss_stat_buf);
     if (retval)
-        return GlobusGFSErrorSystemError("hpss_Lstat", -retval);
+        return hpss_error_to_globus_result(retval);
     return stat_translate_stat(Pathname, &hpss_stat_buf, GFSStat);
 }
 
@@ -180,7 +180,7 @@ stat_translate_dir_entry(ns_ObjHandle_t *   ParentObjHandle,
         if (retval < 0)
         {
             stat_destroy(GFSStat);
-            return GlobusGFSErrorSystemError("hpss_ReadlinkHandle", -retval);
+            return hpss_error_to_globus_result(retval);
         }
 
         /* Copy out the symlink target. */
@@ -210,7 +210,7 @@ stat_directory(char      * Pathname,
     hpss_fileattr_t dir_attrs;
     if ((retval = Hpss_FileGetAttributes(Pathname, &dir_attrs)) < 0)
     {
-        result = GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
+        result = hpss_error_to_globus_result(retval);
         goto cleanup;
     }
 
@@ -220,7 +220,7 @@ stat_directory(char      * Pathname,
     dir_fd = Hpss_OpendirHandle(&dir_attrs.ObjectHandle, NULL);
     if (dir_fd < 0)
     {
-        result = GlobusGFSErrorSystemError("Hpss_OpendirHandle", -dir_fd);
+        result = hpss_error_to_globus_result(dir_fd);
         goto cleanup;
     }
 #endif
@@ -249,7 +249,7 @@ stat_directory(char      * Pathname,
 #endif
         if (count < 0)
         {
-            result = GlobusGFSErrorSystemError("hpss_ReadAttrsHandle", -count);
+            result = hpss_error_to_globus_result(count);
             goto cleanup;
         }
 

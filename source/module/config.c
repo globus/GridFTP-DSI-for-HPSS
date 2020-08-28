@@ -269,7 +269,7 @@ config_process_env()
      */
     retval = Hpss_GetConfiguration(&api_config);
     if (retval != 0)
-        return GlobusGFSErrorSystemError("hpss_GetConfiguration", -retval);
+        return hpss_error_to_globus_result(retval);
 
     if ((env_value = getenv("HPSS_API_DEBUG")))
         api_config.DebugValue = atoi(env_value);
@@ -281,7 +281,7 @@ config_process_env()
     api_config.Flags = API_USE_CONFIG;
     retval           = Hpss_SetConfiguration(&api_config);
     if (retval != 0)
-        return GlobusGFSErrorSystemError("hpss_SetConfiguration", -retval);
+        return hpss_error_to_globus_result(retval);
 
     return GLOBUS_SUCCESS;
 }

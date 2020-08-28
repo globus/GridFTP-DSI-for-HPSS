@@ -7,6 +7,7 @@
 /*
  * Local includes.
  */
+#include "hpss_error.h"
 #include "hpss_log.h"
 #include "hpss.h"
 
@@ -31,6 +32,9 @@ Hpss_ClearLastHPSSErrno(void);
 static hpss_errno_state_t
 Hpss_GetLastHPSSErrno();
  
+#define HPSS_ERROR(r, l)  \
+    r >= 0 ? r : hpss_error_put((hpss_error_t){r, __func__, l})
+
 void
 HpssAPI_ConvertTimeToPosixTime(
     const hpss_Attrs_t          *  Attrs,
@@ -82,14 +86,16 @@ Hpss_Chmod(
     mode_t                         Mode)
 {
     API_ENTER("hpss_Chmod", "Path=%s Mode=%s", CHAR_PTR(Path), MODE_T(Mode));
+
     Hpss_ClearLastHPSSErrno();
     int rv = hpss_Chmod(Path, Mode);
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
+
     API_EXIT("hpss_Chmod",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 char *
@@ -137,7 +143,7 @@ Hpss_Close(int Fildes)
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -153,7 +159,7 @@ Hpss_Closedir(int Dirdes)
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -177,7 +183,7 @@ Hpss_FileGetAttributes(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              HPSS_FILEATTR_T(AttrOut));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -205,7 +211,7 @@ Hpss_FileGetXAttributes(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              HPSS_XFILEATTR_T_PTR(AttrOut));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -255,7 +261,7 @@ Hpss_FilesetGetAttributes(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              NS_FILESETATTRS_T(FilesetAttrs));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 #if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION < 4)
@@ -282,7 +288,7 @@ Hpss_GetAsynchStatus(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              UNSIGNED_PTR(FilesetAttrs));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 #else
 int
@@ -306,7 +312,7 @@ Hpss_GetAsyncStatus(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              SIGNED_PTR(Status));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 #endif
 
@@ -342,7 +348,7 @@ Hpss_GetConfiguration(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              API_CONFIG_T_PTR(ConfigOut));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -362,7 +368,7 @@ Hpss_GetThreadUcred(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              SEC_CRED_T_PTR(RetUcred));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -385,7 +391,7 @@ Hpss_LoadDefaultThreadState(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -406,7 +412,7 @@ Hpss_Lstat(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              HPSS_STAT_T_PTR(Buf));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -424,7 +430,7 @@ Hpss_Mkdir(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -470,7 +476,7 @@ Hpss_net_getaddrinfo(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -507,11 +513,11 @@ Hpss_Open(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              HPSS_COS_HINTS_T_PTR(HintsOut));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 #if HPSS_MAJOR_VERSION >= 8
-int
+int // int
 Hpss_OpendirHandle(
     const ns_ObjHandle_t        *  DirHandle,
     const sec_cred_t            *  Ucred)
@@ -529,7 +535,7 @@ Hpss_OpendirHandle(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 #endif
 
@@ -583,7 +589,7 @@ Hpss_PIOEnd(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -626,7 +632,7 @@ Hpss_PIOExecute(
              HPSS_ERRNO_STATE_T(errno_state),
              HPSS_PIO_GAPINFO_T_PTR(GapInfo),
              UNSIGNED64_PTR(BytesMoved));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -652,7 +658,7 @@ Hpss_PIOExportGrp(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              UNSIGNED_PTR(BufLength));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -677,7 +683,7 @@ Hpss_PIOImportGrp(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -720,7 +726,7 @@ Hpss_PIORegister(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -743,7 +749,7 @@ Hpss_PIOStart(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 #if HPSS_MAJOR_VERSION >= 8
@@ -796,7 +802,7 @@ Hpss_ReadAttrsPlus(
              UNSIGNED_PTR(End),
              UNSIGNED64_PTR(OffsetOut),
              rv > 0 ? NS_DIRENTRY_T_ARRAY(DirentPtr, rv) : "{}");
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 #else
 int
@@ -852,7 +858,7 @@ Hpss_ReadAttrsHandle(
              UNSIGNED_PTR(End),
              UNSIGNED64_PTR(OffsetOut),
              rv > 0 ? NS_DIRENTRY_T_ARRAY(DirentPtr, rv) : "[]");
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 #endif
 
@@ -880,7 +886,7 @@ Hpss_Readlink(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              CHAR_PTR(Contents));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -911,7 +917,7 @@ Hpss_ReadlinkHandle(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              CHAR_PTR(Contents));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -930,7 +936,7 @@ Hpss_Rename(
              "last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -948,7 +954,7 @@ Hpss_Rmdir(
              "last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -968,7 +974,7 @@ Hpss_SetConfiguration(
              "last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -1000,7 +1006,7 @@ Hpss_SetCOSByHints(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              HPSS_COS_MD_T_PTR(COSPtr));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -1041,7 +1047,7 @@ Hpss_SetLoginCred(
              "last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -1095,7 +1101,7 @@ Hpss_StageCallBack(
              HPSS_ERRNO_STATE_T(errno_state),
              HPSS_REQID_T_PTR(ReqID),
              BFS_BITFILE_OBJ_HANDLE_T_PTR(BitfileObj));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -1116,7 +1122,7 @@ Hpss_Stat(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              HPSS_STAT_T_PTR(Buf));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -1137,7 +1143,7 @@ Hpss_Symlink(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -1158,7 +1164,7 @@ Hpss_Truncate(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 mode_t
@@ -1191,7 +1197,7 @@ Hpss_Unlink(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 int
@@ -1214,7 +1220,7 @@ Hpss_UnlinkHandle(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 #if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION < 4)
@@ -1239,7 +1245,7 @@ Hpss_UserAttrGetAttrs(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              HPSS_USERATTR_LIST_T_PTR(Attr));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 #else
 int
@@ -1265,7 +1271,7 @@ Hpss_UserAttrGetAttrs(
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              HPSS_USERATTR_LIST_T_PTR(Attr));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 #endif
 
@@ -1289,7 +1295,7 @@ Hpss_UserAttrSetAttrs(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }
 
 
@@ -1311,5 +1317,5 @@ Hpss_Utime(
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
-    return rv;
+    return HPSS_ERROR(rv, errno_state);
 }

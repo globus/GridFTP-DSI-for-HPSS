@@ -127,7 +127,7 @@ cksm_open_for_reading(char *Pathname, int *FileFD, int *FileStripeWidth)
                         &priorities,
                         &hints_out);
     if (*FileFD < 0)
-        return GlobusGFSErrorSystemError("hpss_Open", -(*FileFD));
+        return hpss_error_to_globus_result(*FileFD);
 
     /* Copy out the file stripe width. */
     *FileStripeWidth = hints_out.StripeWidth;
@@ -190,7 +190,7 @@ cksm_transfer_complete_callback(globus_result_t Result, void *UserArg)
 
     rc = Hpss_Close(cksm_info->FileFD);
     if (rc && !result)
-        result = GlobusGFSErrorSystemError("hpss_Close", -rc);
+        result = hpss_error_to_globus_result(rc);
 
     if (!result)
     {
@@ -255,7 +255,7 @@ cksm(globus_gfs_operation_t     Operation,
     rc = Hpss_Stat(CommandInfo->pathname, &hpss_stat_buf);
     if (rc)
     {
-        result = GlobusGFSErrorSystemError("hpss_Stat", -rc);
+        result = hpss_error_to_globus_result(rc);
         Callback(Operation, result, NULL);
         return;
     }
@@ -376,7 +376,7 @@ cksm_set_uda_checksum(char *Pathname, char *Checksum)
 
     retval = Hpss_UserAttrSetAttrs(Pathname, &attr_list, NULL);
     if (retval)
-        return GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
+        return hpss_error_to_globus_result(retval);
 
     return GLOBUS_SUCCESS;
 }
@@ -415,14 +415,11 @@ cksm_get_uda_checksum(char *  Pathname, char ** ChecksumString)
                                    HPSS_XML_SIZE - 1);
 #endif
 
-    switch (retval)
+    if (retval != HPSS_E_NOERROR)
     {
-    case 0:
-        break;
-    case -ENOENT:
-        return GLOBUS_SUCCESS;
-    default:
-        return GlobusGFSErrorSystemError("hpss_UserAttrGetAttrs", -retval);
+        if (hpss_error_status(retval) == -ENOENT)
+            return GLOBUS_SUCCESS;
+        return hpss_error_to_globus_result(retval);
     }
 
     tmp = Hpss_ChompXMLHeader(algorithm, NULL);
@@ -463,8 +460,8 @@ cksm_clear_uda_checksum(char *Pathname)
     attr_list.Pair[0].Value = "Invalid";
 
     retval = Hpss_UserAttrSetAttrs(Pathname, &attr_list, NULL);
-    if (retval && retval != -ENOENT)
-        return GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
+    if (retval != HPSS_E_NOERROR && hpss_error_status(retval) != -ENOENT)
+        return hpss_error_to_globus_result(retval);
 
     return GLOBUS_SUCCESS;
 }

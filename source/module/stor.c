@@ -24,7 +24,7 @@ stor_can_change_cos(char *Pathname, int *can_change_cos)
     memset(&fileattr, 0, sizeof(hpss_fileattr_t));
     retval = Hpss_FileGetAttributes(Pathname, &fileattr);
     if (retval)
-        return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
+        return hpss_error_to_globus_result(retval);
 
     fileset_attr_bits = orbit64m(0, NS_FS_ATTRINDEX_COS);
     memset(&fileset_attr, 0, sizeof(ns_FilesetAttrs_t));
@@ -35,7 +35,7 @@ stor_can_change_cos(char *Pathname, int *can_change_cos)
                                        fileset_attr_bits,
                                        &fileset_attr);
     if (retval)
-        return GlobusGFSErrorSystemError("hpss_FilesetGetAttributes", -retval);
+        return hpss_error_to_globus_result(retval);
 
     *can_change_cos = !fileset_attr.ClassOfService;
     return GLOBUS_SUCCESS;
@@ -109,7 +109,7 @@ stor_open_for_writing(char *        Pathname,
                         &hints_out);
     if (*FileFD < 0)
     {
-        result = GlobusGFSErrorSystemError("hpss_Open", -(*FileFD));
+        return hpss_error_to_globus_result(*FileFD);
         goto cleanup;
     }
 
@@ -127,7 +127,7 @@ stor_open_for_writing(char *        Pathname,
 
         if (retval)
         {
-            result = GlobusGFSErrorSystemError("hpss_SetCOSByHints", -(retval));
+            result = hpss_error_to_globus_result(*FileFD);
             goto cleanup;
         }
     }
@@ -474,7 +474,7 @@ stor_transfer_complete_callback(globus_result_t Result, void *UserArg)
 
     rc = Hpss_Close(stor_info->FileFD);
     if (rc && !result)
-        result = GlobusGFSErrorSystemError("hpss_Close", -rc);
+        result = hpss_error_to_globus_result(rc);
 
     pthread_mutex_destroy(&stor_info->Mutex);
     pthread_cond_destroy(&stor_info->Cond);
@@ -500,7 +500,7 @@ validate_restart(const char * Pathname,
     hpss_stat_t hpss_stat_buf;
     int retval = Hpss_Lstat((char *)Pathname, &hpss_stat_buf);
     if (retval)
-        return GlobusGFSErrorSystemError("hpss_Lstat", -retval);
+        return hpss_error_to_globus_result(retval);
 
     if (hpss_stat_buf.st_size < Offset)
         return globus_error_put(GlobusGFSErrorObjAppendNotSupported(GlobusGFSErrorObjGeneric("Bad restart marker found.")));

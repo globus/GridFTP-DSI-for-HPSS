@@ -136,8 +136,8 @@ _stat_dir_cb_rm_links(globus_gfs_stat_t * GFSStatArray,
         int retval = Hpss_UnlinkHandle(&cb_arg->DirAttrs.ObjectHandle,
                                        GFSStatArray[i].name,
                                        NULL);
-        if (retval != 0)
-            return GlobusGFSErrorSystemError("hpss_UnlinkHandle", -retval);
+        if (retval != HPSS_E_NOERROR)
+            return hpss_error_to_globus_result(retval);
 
     }
     return GLOBUS_SUCCESS;
@@ -154,7 +154,7 @@ fixup_rmd(char * Pathname, globus_result_t Result)
 
     int retval = Hpss_FileGetAttributes(Pathname, &cb_arg.DirAttrs);
     if (retval != HPSS_E_NOERROR)
-        return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
+        return hpss_error_to_globus_result(retval);
 
     cb_arg.DirIsAllBrokenSymlinks = 1;
     globus_result_t result = stat_directory(Pathname,
@@ -173,7 +173,7 @@ fixup_rmd(char * Pathname, globus_result_t Result)
         return result;
 
     retval = Hpss_Rmdir(Pathname);
-    if (retval != 0)
-        return GlobusGFSErrorSystemError("hpss_Rmdir", -retval);
+    if (retval != HPSS_E_NOERROR)
+        return hpss_error_to_globus_result(retval);
     return GLOBUS_SUCCESS;
 }

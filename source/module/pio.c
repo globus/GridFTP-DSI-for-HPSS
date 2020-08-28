@@ -96,8 +96,7 @@ pio_coordinator_thread(void *Arg)
                   gap_info.Length);
 
         if (rc != 0)
-            pio->CoordinatorResult =
-                GlobusGFSErrorSystemError("hpss_PIOExecute", -rc);
+            pio->CoordinatorResult = hpss_error_to_globus_result(rc);
 
         do
         {
@@ -171,16 +170,19 @@ pio_thread(void *Arg)
                           pio->ParticipantSG,
                           pio_register_callback,
                           pio);
-    if (rc != 0 && rc != PIO_END_TRANSFER)
-        result = GlobusGFSErrorSystemError("hpss_PIORegister", -rc);
+    if (rc != HPSS_E_NOERROR && hpss_error_status(rc) != PIO_END_TRANSFER)
+        result = hpss_error_to_globus_result(rc);
     safe_to_end_pio = 1;
 
 cleanup:
     if (safe_to_end_pio)
     {
         rc = Hpss_PIOEnd(pio->ParticipantSG);
-        if (rc != 0 && rc != PIO_END_TRANSFER && !result)
-            result = GlobusGFSErrorSystemError("hpss_PIOEnd", -rc);
+        if (rc != HPSS_E_NOERROR && hpss_error_status(rc) != PIO_END_TRANSFER)
+        {
+            if (result == GLOBUS_SUCCESS)
+                result = hpss_error_to_globus_result(rc);
+        }
     }
 
     if (coord_launched)
@@ -260,7 +262,7 @@ pio_start(hpss_pio_operation_t           PioOpType,
     int retval = Hpss_PIOStart(&pio_params, &pio->CoordinatorSG);
     if (retval != 0)
     {
-        result = GlobusGFSErrorSystemError("hpss_PIOStart", -retval);
+        result = hpss_error_to_globus_result(retval);
         goto cleanup;
     }
 
@@ -268,7 +270,7 @@ pio_start(hpss_pio_operation_t           PioOpType,
         Hpss_PIOExportGrp(pio->CoordinatorSG, &group_buffer, &buffer_length);
     if (retval != 0)
     {
-        result = GlobusGFSErrorSystemError("hpss_PIOExportGrp", -retval);
+        result = hpss_error_to_globus_result(retval);
         goto cleanup;
     }
 
@@ -276,7 +278,7 @@ pio_start(hpss_pio_operation_t           PioOpType,
         Hpss_PIOImportGrp(group_buffer, buffer_length, &pio->ParticipantSG);
     if (retval != 0)
     {
-        result = GlobusGFSErrorSystemError("hpss_PIOImportGrp", -retval);
+        result = hpss_error_to_globus_result(retval);
         goto cleanup;
     }
 

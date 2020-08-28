@@ -12,6 +12,22 @@
 #include <hpss_String.h>
 #include <hpss_version.h>
 
+/*
+ * Local includes.
+ */
+#include "hpss_error.h"
+
+/*
+ * A note about return values from our HPSS funcions.
+ *
+ * We return the same HPSS success codes (>= 0) that is typical of the HPSS
+ * API. The difference is with error values. Typically, HPSS API will return
+ * -<posix_error>. Instead, we return our own negative value which the caller
+ *  can exchange to get <-posix_error> _and_ the last errno.
+ *
+ *  See hpss_error.h for more details.
+ */
+
 void
 HpssAPI_ConvertTimeToPosixTime(
     const hpss_Attrs_t          *  Attrs,

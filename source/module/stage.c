@@ -51,7 +51,7 @@ check_request_status(bitfile_id_t *BitfileID, int *Status)
 #endif
 
     if (retval)
-        return GlobusGFSErrorSystemError("hpss_GetAsyncStatus", -retval);
+        return hpss_error_to_globus_result(retval);
 
     switch (*Status)
     {
@@ -83,7 +83,7 @@ submit_stage_request(const char *Pathname)
     hpss_fileattr_t fattrs;
     int retval = Hpss_FileGetAttributes((char *)Pathname, &fattrs);
     if (retval)
-        return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
+        return hpss_error_to_globus_result(retval);
 
     bfs_callback_addr_t callback_addr;
     memset(&callback_addr, 0, sizeof(callback_addr));
@@ -123,11 +123,9 @@ submit_stage_request(const char *Pathname)
             ERROR("Failed to set stage callback address %s: %d (%s) - %s",
                    callback_addr_str,
                    retval,
-                   gai_strerror(retval),
+                   gai_strerror(hpss_error_status(retval)),
                    errbuf);
-
-            return GlobusGFSErrorGeneric(
-                "Failed to set stage callback address");
+            return hpss_error_to_globus_result(retval);
         }
     }
 
@@ -150,7 +148,7 @@ submit_stage_request(const char *Pathname)
                                 &REQUEST_ID,
                                 &bitfile_id);
     if (retval)
-        return GlobusGFSErrorSystemError("hpss_StageCallBack()", -retval);
+        return hpss_error_to_globus_result(retval);
 
     return GLOBUS_SUCCESS;
 }
@@ -244,7 +242,7 @@ check_file_residency(const char *Pathname, residency_t *Residency)
                                      &xattr);
 
     if (retval)
-        return GlobusGFSErrorSystemError("hpss_FileGetXAttributes", -retval);
+        return hpss_error_to_globus_result(retval);
 
     *Residency = check_xattr_residency(&xattr);
 
@@ -301,7 +299,7 @@ get_bitfile_id(const char *Pathname, bitfile_id_t *bitfile_id)
     hpss_fileattr_t attrs;
     int retval = Hpss_FileGetAttributes((char *)Pathname, &attrs);
     if (retval)
-        return GlobusGFSErrorSystemError("hpss_FileGetAttributes", -retval);
+        return hpss_error_to_globus_result(retval);
 
     memcpy(bitfile_id, &ATTR_TO_BFID(attrs), sizeof(bitfile_id_t));
     return GLOBUS_SUCCESS;
