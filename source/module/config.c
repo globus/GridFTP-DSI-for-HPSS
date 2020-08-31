@@ -279,10 +279,6 @@ config_parse_file(char *ConfigFilePath, config_t *Config)
                    strncasecmp(key, "Authenticator", key_length) == 0)
         {
             Config->Authenticator = strndup(value, value_length);
-        } else if (key_length == strlen("QuotaSupport") &&
-                   strncasecmp(key, "QuotaSupport", key_length) == 0)
-        {
-            Config->QuotaSupport = config_get_bool_value(value, value_length);
         } else if (key_length == strlen("UDAChecksumSupport") &&
                    strncasecmp(key, "UDAChecksumSupport", key_length) == 0)
         {

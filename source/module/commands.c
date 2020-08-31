@@ -144,32 +144,6 @@ commands_rename(globus_gfs_operation_t     Operation,
            CommandInfo->from_pathname,
            CommandInfo->pathname));
 
-    if (Config->QuotaSupport)
-    {
-        hpss_userattr_list_t attr_list;
-
-        attr_list.len  = 1;
-        attr_list.Pair = malloc(sizeof(hpss_userattr_t));
-        if (!attr_list.Pair)
-        {
-            result = GlobusGFSErrorMemory("hpss_userattr_t");
-            goto cleanup;
-        }
-
-        attr_list.Pair[0].Key   = "/hpss/ncsa/quota/Renamed";
-        attr_list.Pair[0].Value = "1";
-
-        retval =
-            hpss_UserAttrSetAttrs(CommandInfo->from_pathname, &attr_list, NULL);
-        free(attr_list.Pair);
-        if (retval)
-        {
-            result =
-                GlobusGFSErrorSystemError("hpss_UserAttrSetAttrs", -retval);
-            goto cleanup;
-        }
-    }
-
     retval = hpss_Rename(CommandInfo->from_pathname, CommandInfo->pathname);
     if (retval)
         result = GlobusGFSErrorSystemError("hpss_Rename", -retval);

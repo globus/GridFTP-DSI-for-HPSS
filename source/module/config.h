@@ -53,7 +53,6 @@ typedef struct config
     char *LoginName;
     char *AuthenticationMech;
     char *Authenticator;
-    int   QuotaSupport;
     int   UDAChecksumSupport;
 } config_t;
 
