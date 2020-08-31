@@ -250,7 +250,7 @@ config_parse_file(char *ConfigFilePath, config_t *Config)
 
         /* Locate the value */
         config_find_next_word(key + key_length, &value, &value_length);
-        if (key == NULL)
+        if (value == NULL)
         {
             result = GlobusGFSErrorWrapFailed("Parsing config options",
                                               GlobusGFSErrorGeneric(buffer));
