@@ -305,7 +305,7 @@ Hpss_GetAsyncStatus(
     bfs_bitfile_obj_handle_t    *  BitfileObj,
     int32_t                     *  Status)
 {
-    API_ENTER("hpss_GetAsynchStatus",
+    API_ENTER("hpss_GetAsyncStatus",
               "CallBackId=%s "
               "BitfileObj=%s",
               HPSS_REQID_T(CallBackId),
@@ -315,7 +315,7 @@ Hpss_GetAsyncStatus(
     int rv = hpss_GetAsyncStatus(CallBackId, BitfileObj, Status);
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
-    API_EXIT("hpss_GetAsynchStatus",
+    API_EXIT("hpss_GetAsyncStatus",
              "return_value=%s last_hpss_errno=%s Status=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
@@ -395,7 +395,7 @@ Hpss_LoadDefaultThreadState(
     int rv = hpss_LoadDefaultThreadState(UserID, Umask, ClientFullName);
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
-    API_EXIT("Hpss_LoadDefaultThreadState",
+    API_EXIT("hpss_LoadDefaultThreadState",
              "return_value=%s last_hpss_errno=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state));
@@ -554,7 +554,7 @@ Hpss_ParseAuthString(
     hpss_rpc_auth_type_t   *  AuthenticatorType,   // OUT
     void                   ** Authenticator)       // OUT
 {
-    API_ENTER("Hpss_ParseAuthString",
+    API_ENTER("hpss_ParseAuthString",
               "AuthenticatorString=%s "
               "AuthnMechanism=%s "
               "AuthenticatorType=%s "
@@ -704,7 +704,7 @@ Hpss_PIORegister(
     const hpss_pio_cb_t            IOCallback,      // IN
     const void                  *  IOCallbackArg)   // IN
 {
-    API_ENTER("hpss_PIOImportGrp",
+    API_ENTER("hpss_PIORegister",
               "StripeElement=%s "
               "DataNetSockAddr=%s "
               "DataBuffer=%s "
@@ -887,7 +887,7 @@ Hpss_Readlink(
     int rv = hpss_Readlink(Path, Contents, BufferSize);
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
-    API_EXIT("hpss_ReadAttrsHandle",
+    API_EXIT("hpss_Readlink",
              "return_value=%s "
              "last_hpss_errno=%s "
              "Contents=%s",
