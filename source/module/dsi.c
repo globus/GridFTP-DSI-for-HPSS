@@ -23,6 +23,16 @@
 #include "hpss.h"
 #include "cksm.h"
 
+static void
+set_logging_task_id(globus_gfs_operation_t Operation)
+{
+    char * task_id = NULL;
+    globus_gridftp_server_get_task_id(Operation, &task_id);
+    logging_set_taskid(task_id);
+    if (task_id)
+        free(task_id);
+}
+
 void
 dsi_init(globus_gfs_operation_t     Operation,
          globus_gfs_session_info_t *SessionInfo)
@@ -71,7 +81,6 @@ dsi_init(globus_gfs_operation_t     Operation,
     result = commands_init(Operation);
 
 cleanup:
-// XXX log in successful / denied?
     /*
      * Inform the server that we are done. If we do not pass in a username, the
      * server will use the name we mapped to with GSI. If we do not pass in a
@@ -105,6 +114,8 @@ dsi_send(globus_gfs_operation_t      Operation,
          globus_gfs_transfer_info_t *TransferInfo,
          void *                      UserArg)
 {
+    set_logging_task_id(Operation);
+
     // Defering the INFO() call until inside of retr() since it has the
     // critical information.
     retr(Operation, TransferInfo);
@@ -116,6 +127,8 @@ dsi_recv(globus_gfs_operation_t      Operation,
          void *                      UserArg)
 {
     config_t * config = UserArg;
+
+    set_logging_task_id(Operation);
 
     // Defering the INFO() call until inside of stor() since it has the
     // critical information.
@@ -129,6 +142,8 @@ dsi_command(globus_gfs_operation_t     Operation,
 {
     globus_result_t result;
     config_t * config = UserArg;
+
+    set_logging_task_id(Operation);
 
     commands_callback Callback = globus_gridftp_server_finished_command;
 
@@ -197,10 +212,6 @@ dsi_command(globus_gfs_operation_t     Operation,
         result = commands_truncate(CommandInfo);
         globus_gridftp_server_finished_command(Operation, result, NULL);
         break;
-    case GLOBUS_GFS_CMD_SITE_TASKID:
-        INFO("Task ID %s", CommandInfo->pathname);
-        logging_set_taskid(CommandInfo->pathname);
-        break;
     default:
         globus_gridftp_server_finished_command(
             Operation,
@@ -250,6 +261,8 @@ dsi_stat(globus_gfs_operation_t   Operation,
          void *                   Arg)
 {
     globus_result_t   result = GLOBUS_SUCCESS;
+
+    set_logging_task_id(Operation);
 
     if (StatInfo->file_only)
     {
