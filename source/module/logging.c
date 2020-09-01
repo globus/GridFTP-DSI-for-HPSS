@@ -9,8 +9,8 @@
 
 GlobusDebugDefine(GLOBUS_GRIDFTP_SERVER_HPSS);
 
-static const char * TaskIDToLog = NULL;
-static const char * UserToLog = NULL;
+static char * TaskIDToLog = NULL;
+static char * UserToLog = NULL;
 
 void
 logging_init()
@@ -34,7 +34,11 @@ logging_set_user(const char * user)
 void
 logging_set_taskid(const char * taskid)
 {
-    TaskIDToLog = strdup(taskid);
+    if (TaskIDToLog)
+        free(TaskIDToLog);
+    TaskIDToLog = NULL;
+    if (taskid)
+        TaskIDToLog = strdup(taskid);
 }
 
 static const char *
