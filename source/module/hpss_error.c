@@ -111,7 +111,7 @@ hpss_error_to_globus_result(int error)
         format = "HPSS-Reason: %s\n"
                  "HPSS-Function: %s\n"
                  "HPSS-Last-Error: %s\n"
-                 "HPSS-Last-Function: ";
+                 "HPSS-Last-Function: %s";
     }
 
     return globus_error_put(GlobusGFSErrorObj(
