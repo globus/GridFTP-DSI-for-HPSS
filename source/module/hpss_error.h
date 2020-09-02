@@ -56,4 +56,20 @@ hpss_error_to_globus_result(int);
     )                                                        \
   )
 
+#define LOGIN_ERR "The HPSS connector could not log you into HPSS. " \
+                  "The issue must be resolved by the endpoint administrator."
+
+#define HPSSLoginDenied()                  \
+  globus_error_put(                        \
+    GlobusGFSErrorObj(                     \
+      NULL,                                \
+      500,                                 \
+      "LOGIN_DENIED",                      \
+      "GridFTP-Message: " LOGIN_ERR "\r\n" \
+      "GridFTP-JSON-Result: {"             \
+        "\"message\": \"" LOGIN_ERR "\""   \
+      "}"                                  \
+    )                                      \
+  )
+
 #endif /* _HPSS_ERROR_H_ */
