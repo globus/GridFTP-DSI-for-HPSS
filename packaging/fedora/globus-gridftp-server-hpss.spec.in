@@ -2,7 +2,7 @@ Summary: HPSS Connector for the Globus Transfer Service
 Name: @PACKAGE_NAME@-@HPSS_MAJOR@.@HPSS_MINOR@
 Version: @PACKAGE_VERSION@
 ## release candidates have `Release` of 0.X.rc
-Release: 0.1.rc%{?dist}
+Release: 0.2.rc%{?dist}
 ## releases have 'Release' of X
 #Release: 2%{?dist}
 License: ASL 2.0

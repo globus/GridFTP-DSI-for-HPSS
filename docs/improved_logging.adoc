@@ -1,0 +1,130 @@
+== Testing for Improved Logging
+This document will help to verify the new functionality in the improved logging
+release. These tests assume an existing, functional Globus Connect Server v4
+endpoint.
+
+=== Verify installation
+The RPM includes one additional file, /etc/gridftp.d/hpss_debug, which is used
+to configure debug logging. After installation of the RPM, verify that the file
+exists. If a previous copy of the file existed, it will be renamed to
+/etc/gridftp.d/hpss_debug.rpmsave.
+
+=== Verify standard logging
+Enable standard logging of the HPSS connector:
+
+1. In /etc/gridftp.d/globus-connect-server-gridftp-logging, set `log_level`
+   to `ERROR,WARN,INFO`. Note the value of `log_single` for step 2.
+2. Make sure the log file given as the value to `log_single` exists and is
+   writable by root.
+3. Log into globus.org and activate the HPSS endpoint.
+4. Perform these options and monitor the log file of messages.
+.. In the web app, refresh the directory listing of the endpoint. The log
+   file will generate messages with the `[HPSS CONNECTOR][INFO]` tags. These
+   entries will include Username but not TaskID.
+.. Transfer or delete files on the endpoint through the Web app. The log
+   entries will look similar to the previous test except now TaskID will be set.
+
+=== Verify improvements for configuration errors
+These tests verify that errors from parsing the connector`s configuration file
+generate  user errors that indicate a configuration error has occurred and
+log messages with details of the configuration issue. In the instructions
+below, the config file defaults to /var/hpss/etc/gridftp_hpss_dsi.conf but it
+may be located elsewhere as configured in /etc/gridftp.d/hpss. The log file
+defaults to /var/log/gridftp.log.
+
+1. Remove all read access to configuration file (ie. `chmod 0 <file>`) and try
+   to login into the endpoint through the web app. The web app will display
+   the error message (or similar):
++
+----
+The HPSS connector has a configuration issue that must be resolved by the endpoint administrator.
+----
++
+The log file will have the complete error message:
++
+----
+[18549] Wed Sep  2 11:23:27 2020 :: [HPSS Connector][ERROR] User=jasonalt :: Can not access the config file: Permission denied
+----
++
+Fix the configuration file`s permissions (chmod 644 <file>).
+
+2. Choose an empty line in the config file, type `foo`, save the file and
+   log into the endpoint through the web app. The web app will display the
+   same error message in (1). The log file will now have:
++
+----
+[29398] Wed Sep  2 11:57:34 2020 :: [HPSS Connector][ERROR] User=jasonalt :: Configuration error, no value given for option `foo` on line 9
+----
++
+Remove the option `foo` and save the config file.
+
+3. Choose an empty line in the config file, type `foo bar`, save the file and
+   log into the endpoint through the web app. The web app will display the
+   same error message in (1). The log file will now show:
++
+----
+[29621] Wed Sep  2 12:00:57 2020 :: [HPSS Connector][ERROR] User=jasonalt :: Configuration error, unsupported option `foo`
+----
++
+Remove `foo bar` and save the config file.
+
+4. In the config file, set `AuthenticationMech foo`, save the file and
+   log into the endpoint through the web app. The web app will display the
+   same error message in (1). The log file will now show:
++
+----
+[2579] Wed Sep  2 12:10:56 2020 :: [HPSS Connector][ERROR] User=jasonalt :: User could not log into because the configured authentication mechanism `foo` is not known to HPSS.
+----
++
+Remove `AuthenticationMech foo` and save the config file.
+
+5. In the config file, set `LoginName foo`, save the file and log into the
+   endpoint through the web app. The web app will display the same error
+   message in (1). The log file will now show:
++
+----
+[7443] Wed 02 Sep 2020 12:17:31 PM EDT :: [HPSS Connector][ERROR] User=jasonalt :: Could not log into HPSS as `foo`. Operation not permitted
+----
++
+Remove ` LoginName foo` and save the config file.
+
+=== Verify logging for authentication errors
+These tests will verify the responses associated with failed log in attempts.
+
+1. Create the file /etc/gridftp.d/hpss_test and add the line
+   `$HPSS_DSI_TEST INJECT_UNKNOWN_ACCOUNT`. Log into the endpoint through
+   the web app. The web app will display this user error message:
++
+----
+The HPSS connector could not log you into HPSS. The issue must be resolved by the endpoint administrator.
+----
++
+And this line will show in the log file:
++
+----
+[20112] Wed Sep  2 13:58:01 2020 :: [HPSS Connector][ERROR] User=jasonalt :: Unable to look up the user`s HPSS account with getpwnam()
+----
++
+Remove `$HPSS_DSI_TEST INJECT_UNKNOWN_ACCOUNT` from hpss_test.
+
+2. In the file /etc/gridftp.d/hpss_test, add the line
+   `$HPSS_DSI_TEST INJECT_LOGIN_FAILED`. Log into the endpoint through
+   the web app. The web app will display the same user error message as (1).
+   And this line will appear in the log file:
++
+----
+[22915] Wed Sep  2 14:23:49 2020 :: [HPSS Connector][ERROR] User=jasonalt :: Could not log into HPSS. Operation not permitted
+----
++
+Remove the file /etc/gridftp.d/hpss_test.
+
+=== Verify debug logging
+In the file /etc/gridftp.d/hpss_debug, uncomment the line:
+
+ $GLOBUS_GRIDFTP_SERVER_HPSS_DEBUG `ALL,/var/log/hpss_connector_debug.log`
+
+Make sure the file /var/log/hpss_connector_debug.log exists and is writable 
+by all users. Log into HPSS through the Globus web app. The log file will
+show TRACE events for all HPSS API calls.
+
+Disable debug logging by commenting out the line in hpss_debug.
