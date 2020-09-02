@@ -30,7 +30,10 @@ authenticate_get_uid(char *UserName, int *Uid)
         return GlobusGFSErrorSystemError("getpwnam_r", errno);
 
     if (passwd == NULL)
-        return GlobusGFSErrorGeneric("Account not found");
+    {
+        ERROR("Unable to look up the user's HPSS account with getpwnam()");
+        return HPSSLoginDenied();
+    }
 
     /* Copy out the uid */
     *Uid = passwd->pw_uid;
@@ -58,7 +61,7 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
         ERROR("User could not log into because the configured authentication "
               "mechanism \"%s\" is not known to HPSS.",
              authn_mech_string);
-        return GlobusGFSErrorLoginDenied();
+        return HPSSConfigurationError();
     }
 
     char * authenticator_string = Authenticator;
@@ -86,7 +89,7 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
         ERROR("Could not log into HPSS as \"%s\". %s",
               LoginName,
               hpss_ErrnoString(hpss_error_get(retval).returned_value));
-        return GlobusGFSErrorLoginDenied();
+        return HPSSConfigurationError();
     }
 
     if (UserName)
@@ -106,7 +109,7 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
         {
             ERROR("Could not log into HPSS. %s",
               hpss_ErrnoString(hpss_error_get(retval).returned_value));
-            return GlobusGFSErrorLoginDenied();
+            return HPSSLoginDenied();
         }
     }
     return GLOBUS_SUCCESS;

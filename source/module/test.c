@@ -23,7 +23,9 @@ struct {
     enum {
         INJECT_TRANSFER_FAILURE = 1,
         INJECT_BAD_RESTART_MARKER,
-        INJECT_BZ4719
+        INJECT_BZ4719,
+        INJECT_UNKNOWN_ACCOUNT,
+        INJECT_LOGIN_FAILED
     } Flags;
 } static TestPlan;
 
@@ -50,9 +52,7 @@ TestInit()
     if (!plan)
         return;
 
-    TestPlan.TestsEnabled = true;
-
-    WARN("!!!DSI testing is enabled!!!");
+    TestPlan.Flags = 0;
 
     if (strcmp(plan, "INJECT_TRANSFER_FAILURE") == 0)
         TestPlan.Flags = INJECT_TRANSFER_FAILURE;
@@ -60,6 +60,16 @@ TestInit()
         TestPlan.Flags = INJECT_BAD_RESTART_MARKER;
     else if (strcmp(plan, "INJECT_BZ4719") == 0)
         TestPlan.Flags = INJECT_BZ4719;
+    else if (strcmp(plan, "INJECT_UNKNOWN_ACCOUNT") == 0)
+        TestPlan.Flags = INJECT_UNKNOWN_ACCOUNT;
+    else if (strcmp(plan, "INJECT_LOGIN_FAILED") == 0)
+        TestPlan.Flags = INJECT_LOGIN_FAILED;
+
+    if (TestPlan.Flags != 0)
+    {
+        TestPlan.TestsEnabled = true;
+        WARN("!!!DSI testing is enabled!!!");
+    }
 }
 
 static bool
@@ -164,6 +174,31 @@ TestEventTransferFinished()
     TestPlan.TransferInProgress = false;
 }
 
+
+static void
+TestEventGetpwnam(struct passwd ** pwd)
+{
+    if (TestPlan.TestsEnabled == false)
+        return;
+
+    if (TestPlan.Flags != INJECT_UNKNOWN_ACCOUNT)
+        return;
+
+    *pwd = NULL;
+}
+
+static void
+TestEventLoadDefaultThreadState(int * Retval)
+{
+    if (TestPlan.TestsEnabled == false)
+        return;
+
+    if (TestPlan.Flags != INJECT_LOGIN_FAILED)
+        return;
+
+    *Retval = -EPERM;
+}
+
 void
 TestEventHandler(struct test_event * TestEvent)
 {
@@ -184,6 +219,12 @@ TestEventHandler(struct test_event * TestEvent)
         break;
     case TEST_EVENT_TYPE_PIO_RANGE_COMPLETE:
         TestEventRangeComplete(&TestEvent->_u.PioRangeComplete);
+        break;
+    case TEST_EVENT_TYPE_GETPWNAM:
+        TestEventGetpwnam(TestEvent->_u.Getpwnam);
+        break;
+    case TEST_EVENT_TYPE_LOAD_DEFAULT_THREAD_STATE:
+        TestEventLoadDefaultThreadState(TestEvent->_u.ReturnValue);
         break;
     }
 }

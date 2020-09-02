@@ -47,7 +47,9 @@ AM_LDFLAGS=$(TIRPC_LDFLAGS)   \
            $(HPSS_LDFLAGS)    \
            -Wl,--wrap=hpss_PIOExecute \
            -Wl,--wrap=globus_gridftp_server_begin_transfer \
-           -Wl,--wrap=globus_gridftp_server_finished_transfer
+           -Wl,--wrap=globus_gridftp_server_finished_transfer \
+           -Wl,--wrap=getpwnam_r \
+           -Wl,--wrap=hpss_LoadDefaultThreadState
 
 #
 # IU and NERSC report that using krb fails because libhpssgss.so doesn't link

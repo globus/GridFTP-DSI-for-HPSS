@@ -8,6 +8,8 @@ typedef enum {
     TEST_EVENT_TYPE_TRANSFER_FINISHED,
     TEST_EVENT_TYPE_PIO_RANGE_BEGIN,
     TEST_EVENT_TYPE_PIO_RANGE_COMPLETE,
+    TEST_EVENT_TYPE_GETPWNAM,
+    TEST_EVENT_TYPE_LOAD_DEFAULT_THREAD_STATE,
 } test_event_type_t;
 
 struct test_event {
@@ -26,6 +28,9 @@ struct test_event {
             uint64_t * BytesMovedOut;
             int      * ReturnValue;
         } PioRangeComplete;
+
+        struct passwd ** Getpwnam;
+        int           *  ReturnValue;
     } _u;
 };
 
@@ -54,6 +59,18 @@ struct test_event {
                  ._u.PioRangeComplete.BytesMovedIn = BYTES_IN,           \
                  ._u.PioRangeComplete.BytesMovedOut = BYTES_OUT,         \
                  ._u.PioRangeComplete.ReturnValue = &RETVAL              \
+              })
+
+#define TEST_EVENT_GETPWNAM(PWD)                            \
+    TestEventHandler(&(struct test_event){                  \
+                 .TestEventType = TEST_EVENT_TYPE_GETPWNAM, \
+                 ._u.Getpwnam = PWD                         \
+              })
+
+#define TEST_EVENT_LOAD_DEFAULT_THREAD_STATE(result)                         \
+    TestEventHandler(&(struct test_event){                                   \
+                 .TestEventType = TEST_EVENT_TYPE_LOAD_DEFAULT_THREAD_STATE, \
+                 ._u.ReturnValue = &result                                   \
               })
 
 void
