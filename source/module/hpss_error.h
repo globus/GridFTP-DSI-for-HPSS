@@ -40,4 +40,20 @@ hpss_error_status(int);
 globus_result_t
 hpss_error_to_globus_result(int);
 
+#define CONF_ERR "The HPSS connector has a configuration issue that must be " \
+                 "resolved by the endpoint administrator."
+
+#define HPSSConfigurationError()                             \
+  globus_error_put(                                          \
+    GlobusGFSErrorObj(                                       \
+      NULL,                                                  \
+      500,                                                   \
+      "CONFIGURATION_ERROR",                                 \
+      "GridFTP-Message: " CONF_ERR "\r\n" \
+      "GridFTP-JSON-Result: {"                               \
+        "\"message\": \"" CONF_ERR "\""  \
+      "}"                                                    \
+    )                                                        \
+  )
+
 #endif /* _HPSS_ERROR_H_ */

@@ -45,7 +45,7 @@ config_find_config_file(char **ConfigFilePath)
         if (retval)
         {
             ERROR("Could not open config file %s", *ConfigFilePath);
-            result = GlobusGFSErrorConfigurationError();
+            result = HPSSConfigurationError();
         }
         goto cleanup;
     }
@@ -90,8 +90,8 @@ config_find_config_file(char **ConfigFilePath)
          * All other cases indicate failure at some level.
          */
         default:
-            ERROR("Can not access config file: %s", strerror(errno));
-            result = GlobusGFSErrorConfigurationError();
+            ERROR("Can not access the config file: %s", strerror(errno));
+            result = HPSSConfigurationError();
             goto cleanup;
         }
     }
@@ -106,8 +106,8 @@ config_find_config_file(char **ConfigFilePath)
     /* All failures are error conditions at this stage. */
     if (retval != 0)
     {
-        ERROR("Can not access config file: %s", strerror(errno));
-        result = GlobusGFSErrorConfigurationError();
+        ERROR("Can not access the config file: %s", strerror(errno));
+        result = HPSSConfigurationError();
         goto cleanup;
     }
 
@@ -194,7 +194,7 @@ config_parse_file(char *ConfigFilePath, config_t *Config)
     if (!config_f)
     {
         ERROR("Can not open config file: %s", strerror(errno));
-        result = GlobusGFSErrorConfigurationError();
+        result = HPSSConfigurationError();
         goto cleanup;
     }
 
@@ -212,8 +212,9 @@ config_parse_file(char *ConfigFilePath, config_t *Config)
         config_find_next_word(key + key_length, &value, &value_length);
         if (value == NULL)
         {
-            ERROR("Configuration error, could not find key on line %d", l_no);
-            result = GlobusGFSErrorConfigurationError();
+            ERROR("Configuration error, no value given for option \"%.*s\" "
+                  "on line %d", key_length, key, l_no);
+            result = HPSSConfigurationError();
             goto cleanup;
         }
 
@@ -222,7 +223,7 @@ config_parse_file(char *ConfigFilePath, config_t *Config)
         if (tmp != NULL)
         {
             ERROR("Configuration error, found extra value on line %d", l_no);
-            result = GlobusGFSErrorConfigurationError();
+            result = HPSSConfigurationError();
             goto cleanup;
         }
 
@@ -246,8 +247,9 @@ config_parse_file(char *ConfigFilePath, config_t *Config)
                 config_get_bool_value(value, value_length);
         } else
         {
-            ERROR("Configuration error, unsupported option \"%s\"", key);
-            result = GlobusGFSErrorConfigurationError();
+            ERROR("Configuration error, unsupported option \"%.*s\"",
+                  key_length, key);
+            result = HPSSConfigurationError();
             goto cleanup;
         }
     }
