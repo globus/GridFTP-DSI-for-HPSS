@@ -49,7 +49,11 @@ HpssAPI_ConvertTimeToPosixTime(
               PTR(Mtime),
               PTR(Ctime));
 
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    API_ConvertTimeToPosixTime((hpss_Attrs_t *)Attrs, Atime, Mtime, Ctime);
+#else
     API_ConvertTimeToPosixTime(Attrs, Atime, Mtime, Ctime);
+#endif
 
     API_EXIT("API_ConvertTimeToPosixTime",
              "Atime=%s Mtime=%s Ctime=%s",
@@ -88,7 +92,11 @@ Hpss_Chmod(
     API_ENTER("hpss_Chmod", "Path=%s Mode=%s", CHAR_PTR(Path), MODE_T(Mode));
 
     Hpss_ClearLastHPSSErrno();
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_Chmod((char *)Path, Mode);
+#else
     int rv = hpss_Chmod(Path, Mode);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_Chmod",
@@ -175,7 +183,11 @@ Hpss_FileGetAttributes(
     memset(AttrOut, 0, sizeof(*AttrOut));
 
     Hpss_ClearLastHPSSErrno();
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_FileGetAttributes((char *)Path, AttrOut);
+#else
     int rv = hpss_FileGetAttributes(Path, AttrOut);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_FileGetAttributes",
@@ -203,7 +215,11 @@ Hpss_FileGetXAttributes(
     memset(AttrOut, 0, sizeof(*AttrOut));
 
     Hpss_ClearLastHPSSErrno();
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_FileGetXAttributes((char *)Path, Flags, StorageLevel, AttrOut);
+#else
     int rv = hpss_FileGetXAttributes(Path, Flags, StorageLevel, AttrOut);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_FileGetXAttributes",
@@ -252,12 +268,15 @@ Hpss_FilesetGetAttributes(
     memset(FilesetAttrs, 0, sizeof(*FilesetAttrs));
 
     Hpss_ClearLastHPSSErrno();
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_FilesetGetAttributes((char *)Name,
+                                       (uint64_t *)FilesetId,
+                                       (ns_ObjHandle_t *)FilesetHandle,
+                                       (hpss_uuid_t *)CoreServerUUID,
+#else
     int rv = hpss_FilesetGetAttributes(Name,
                                        FilesetId,
                                        FilesetHandle,
-#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION == 4
-                                       CoreServerUUID,
-#else
                                        CoreServerID,
 #endif
                                        FilesetAttrBits,
@@ -272,7 +291,7 @@ Hpss_FilesetGetAttributes(
     return HPSS_ERROR(rv, errno_state);
 }
 
-#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION < 4)
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
 int
 Hpss_GetAsynchStatus(
     signed32                       CallBackId,
@@ -295,7 +314,7 @@ Hpss_GetAsynchStatus(
              "return_value=%s last_hpss_errno=%s Status=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
-             UNSIGNED_PTR(FilesetAttrs));
+             SIGNED_PTR(Status));
     return HPSS_ERROR(rv, errno_state);
 }
 #else
@@ -412,7 +431,11 @@ Hpss_Lstat(
     memset(Buf, 0, sizeof(*Buf));
 
     Hpss_ClearLastHPSSErrno();
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    int rv = hpss_Lstat((char *)Path, Buf);
+#else
     int rv = hpss_Lstat(Path, Buf);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_Lstat",
@@ -431,7 +454,11 @@ Hpss_Mkdir(
     API_ENTER("hpss_Mkdir", "Path=%s Mode=%s", CHAR_PTR(Path), MODE_T(Mode));
 
     Hpss_ClearLastHPSSErrno();
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    int rv = hpss_Mkdir((char *)Path, Mode);
+#else
     int rv = hpss_Mkdir(Path, Mode);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_Mkdir",
@@ -513,7 +540,16 @@ Hpss_Open(
     memset(HintsOut, 0, sizeof(*HintsOut));
 
     Hpss_ClearLastHPSSErrno();
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    int rv = hpss_Open((char *)Path,
+                       Oflag,
+                       Mode,
+                       (hpss_cos_hints_t *)HintsIn,
+                       (hpss_cos_priorities_t *)HintsPri,
+                       HintsOut);
+#else
     int rv = hpss_Open(Path, Oflag, Mode, HintsIn, HintsPri, HintsOut);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_Open",
@@ -684,7 +720,11 @@ Hpss_PIOImportGrp(
     // hpss_pio_grp_t is opaque, no way to zero it
 
     Hpss_ClearLastHPSSErrno();
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_PIOImportGrp((void *)Buffer, BufLength, StripeGroup);
+#else
     int rv = hpss_PIOImportGrp(Buffer, BufLength, StripeGroup);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_PIOImportGrp",
@@ -722,12 +762,20 @@ Hpss_PIORegister(
 
     Hpss_ClearLastHPSSErrno();
     int rv = hpss_PIORegister(StripeElement,
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+                              (hpss_sockaddr_t *) DataNetSockAddr,
+#else
                               DataNetSockAddr,
+#endif
                               DataBuffer,
                               DataBufLen,
                               StripeGroup,
                               IOCallback,
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+                              (void *) IOCallbackArg);
+#else
                               IOCallbackArg);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_PIORegister",
@@ -845,9 +893,17 @@ Hpss_ReadAttrsHandle(
     memset(DirentPtr, 0, BufferSize);
 
     Hpss_ClearLastHPSSErrno();
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_ReadAttrsHandle((ns_ObjHandle_t *) ObjHandle,
+#else
     int rv = hpss_ReadAttrsHandle(ObjHandle,
+#endif
                                   OffsetIn,
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+                                  (sec_cred_t *)Ucred,
+#else
                                   Ucred,
+#endif
                                   BufferSize,
                                   GetAttributes,
                                   End,
@@ -884,7 +940,12 @@ Hpss_Readlink(
     memset(Contents, 0, BufferSize);
 
     Hpss_ClearLastHPSSErrno();
+
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_Readlink((char *)Path, Contents, BufferSize);
+#else
     int rv = hpss_Readlink(Path, Contents, BufferSize);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_Readlink",
@@ -915,7 +976,20 @@ Hpss_ReadlinkHandle(
     memset(Contents, 0, BufferSize);
 
     Hpss_ClearLastHPSSErrno();
-    int rv = hpss_ReadlinkHandle(ObjHandle, Path, Contents, BufferSize, Ucred);
+
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_ReadlinkHandle((ns_ObjHandle_t *)ObjHandle,
+                                 (char *)Path,
+                                 Contents,
+                                 BufferSize,
+                                 (sec_cred_t *)Ucred);
+#else
+    int rv = hpss_ReadlinkHandle(ObjHandle,
+                                 Path,
+                                 Contents,
+                                 BufferSize,
+                                 Ucred);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_ReadlinkHandle",
@@ -936,7 +1010,11 @@ Hpss_Rename(
     API_ENTER("hpss_Rename", "Old=%s New=%s", CHAR_PTR(Old), CHAR_PTR(New));
 
     Hpss_ClearLastHPSSErrno();
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_Rename((char *)Old, (char *)New);
+#else
     int rv = hpss_Rename(Old, New);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_Rename",
@@ -954,7 +1032,11 @@ Hpss_Rmdir(
     API_ENTER("hpss_Rmdir", "Path=%s", CHAR_PTR(Path));
 
     Hpss_ClearLastHPSSErrno();
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_Rmdir((char *)Path);
+#else
     int rv = hpss_Rmdir(Path);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_Rmdir",
@@ -974,7 +1056,11 @@ Hpss_SetConfiguration(
               API_CONFIG_T_PTR(ConfigIn));
 
     Hpss_ClearLastHPSSErrno();
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_SetConfiguration((api_config_t *)ConfigIn);
+#else
     int rv = hpss_SetConfiguration(ConfigIn);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_SetConfiguration",
@@ -1004,7 +1090,15 @@ Hpss_SetCOSByHints(
     memset(COSPtr, 0, sizeof(*COSPtr));
 
     Hpss_ClearLastHPSSErrno();
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_SetCOSByHints(Fildes,
+                                Flags,
+                                (hpss_cos_hints_t *)HintsPtr,
+                                (hpss_cos_priorities_t *)PrioPtr,
+                                COSPtr);
+#else
     int rv = hpss_SetCOSByHints(Fildes, Flags, HintsPtr, PrioPtr, COSPtr);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_SetCOSByHints",
@@ -1067,7 +1161,11 @@ Hpss_StageCallBack(
     bfs_callback_addr_t         *  CallBackPtr,  // IN
     uint32_t                       Flags,        // IN
     hpss_reqid_t                *  ReqID,        // IN/OUT
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    hpssoid_t                   *  BitfileID)    // OUT
+#else
     bfs_bitfile_obj_handle_t    *  BitfileObj)   // OUT
+#endif
 {
     API_ENTER("hpss_StageCallBack"
               "Path=%s "
@@ -1077,7 +1175,11 @@ Hpss_StageCallBack(
               "CallBackPtr=%s "
               "Flags=%s "
               "ReqId=%s "
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+              "BitfileID",
+#else
               "BitfileObj",
+#endif
               CHAR_PTR(Path),
               UNSIGNED64(Offset),
               UNSIGNED64(Length),
@@ -1085,30 +1187,54 @@ Hpss_StageCallBack(
               PTR(CallBackPtr),
               HEX(Flags),
               HPSS_REQID_T_PTR(ReqID),
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+              HPSSOID_T_PTR(BitfileID));
+#else
               PTR(BitfileObj));
+#endif
 
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    memset(BitfileID, 0, sizeof(*BitfileID));
+#else
     memset(BitfileObj, 0, sizeof(*BitfileObj));
+#endif
 
     Hpss_ClearLastHPSSErrno();
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    int rv = hpss_StageCallBack((char *)Path,
+#else
     int rv = hpss_StageCallBack(Path,
+#endif
                                 Offset,
                                 Length,
                                 StorageLevel,
                                 CallBackPtr,
                                 Flags,
                                 ReqID,
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+                                BitfileID);
+#else
                                 BitfileObj);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_StageCallBack",
              "return_value=%s "
              "last_hpss_errno=%s "
              "ReqID=%s "
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+             "BitfileID",
+#else
              "BitfileObj=%s",
+#endif
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              HPSS_REQID_T_PTR(ReqID),
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+             HPSSOID_T_PTR(BitfileID));
+#else
              BFS_BITFILE_OBJ_HANDLE_T_PTR(BitfileObj));
+#endif
     return HPSS_ERROR(rv, errno_state);
 }
 
@@ -1122,7 +1248,11 @@ Hpss_Stat(
     memset(Buf, 0, sizeof(*Buf));
 
     Hpss_ClearLastHPSSErrno();
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    int rv = hpss_Stat((char *)Path, Buf);
+#else
     int rv = hpss_Stat(Path, Buf);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_Stat",
@@ -1144,7 +1274,11 @@ Hpss_Symlink(
               CHAR_PTR(Contents));
 
     Hpss_ClearLastHPSSErrno();
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    int rv = hpss_Symlink((char *)Contents, (char *)Path);
+#else
     int rv = hpss_Symlink(Contents, Path);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_Symlink",
@@ -1165,7 +1299,11 @@ Hpss_Truncate(
               UNSIGNED64(Length));
 
     Hpss_ClearLastHPSSErrno();
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    int rv = hpss_Truncate((char *)Path, Length);
+#else
     int rv = hpss_Truncate(Path, Length);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_Truncate",
@@ -1198,7 +1336,11 @@ Hpss_Unlink(
     API_ENTER("hpss_Unlink", "Path=%s", CHAR_PTR(Path));
 
     Hpss_ClearLastHPSSErrno();
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    int rv = hpss_Unlink((char *)Path);
+#else
     int rv = hpss_Unlink(Path);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_Unlink",
@@ -1221,7 +1363,13 @@ Hpss_UnlinkHandle(
               SEC_CRED_T_PTR(Ucred));
 
     Hpss_ClearLastHPSSErrno();
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    int rv = hpss_UnlinkHandle((ns_ObjHandle_t *)ObjHandle,
+                               (char *)Path,
+                               (sec_cred_t *)Ucred);
+#else
     int rv = hpss_UnlinkHandle(ObjHandle, Path, Ucred);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_UnlinkHandle",
@@ -1231,7 +1379,7 @@ Hpss_UnlinkHandle(
     return HPSS_ERROR(rv, errno_state);
 }
 
-#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION < 4)
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
 int
 Hpss_UserAttrGetAttrs(
     char                        * Path,    // IN
@@ -1245,7 +1393,7 @@ Hpss_UserAttrGetAttrs(
               INT(XMLFlag));
 
     Hpss_ClearLastHPSSErrno();
-    int rv = hpss_UserAttrGetAttrs(Path, Attr, XMLFlag);
+    int rv = hpss_UserAttrGetAttrs((char *)Path, Attr, XMLFlag);
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_UserAttrGetAttrs",
@@ -1296,7 +1444,13 @@ Hpss_UserAttrSetAttrs(
               CHAR_PTR(Schema));
 
     Hpss_ClearLastHPSSErrno();
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    int rv = hpss_UserAttrSetAttrs((char *)Path,
+                                   (hpss_userattr_list_t *)Attr,
+                                   (char *)Schema);
+#else
     int rv = hpss_UserAttrSetAttrs(Path, Attr, Schema);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_UserAttrSetAttrs",
@@ -1318,7 +1472,11 @@ Hpss_Utime(
               STRUCT_UTIMBUF_PTR(Times));
 
     Hpss_ClearLastHPSSErrno();
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    int rv = hpss_Utime((char *)Path, Times);
+#else
     int rv = hpss_Utime(Path, Times);
+#endif
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_Utime",

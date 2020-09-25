@@ -406,7 +406,7 @@ cksm_get_uda_checksum(char *  Pathname, char ** ChecksumString)
     attr_list.Pair[2].Value = state;
 
 
-#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION < 4)
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
     retval = Hpss_UserAttrGetAttrs(Pathname, &attr_list, UDA_API_VALUE);
 #else
     retval = Hpss_UserAttrGetAttrs(Pathname,
