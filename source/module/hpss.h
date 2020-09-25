@@ -91,7 +91,7 @@ Hpss_FilesetGetAttributes(
     const char                  *  Name,
     const uint64_t              *  FilesetId,
     const ns_ObjHandle_t        *  FilesetHandle,
-#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION == 4)
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
     const hpss_uuid_t           *  CoreServerUUID,
 #else
     const hpss_srvr_id_t        *  CoreServerID,
@@ -99,7 +99,7 @@ Hpss_FilesetGetAttributes(
     ns_FilesetAttrBits_t           FilesetAttrBits,
     ns_FilesetAttrs_t           *  FilesetAttrs);
 
-#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION < 4)
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
 int
 Hpss_GetAsynchStatus(
     signed32                       CallBackId,
@@ -288,7 +288,11 @@ Hpss_StageCallBack(
     bfs_callback_addr_t         *  CallBackPtr,
     uint32_t                       Flags,
     hpss_reqid_t                *  ReqID,
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
+    hpssoid_t                   *  BitfileID);
+#else
     bfs_bitfile_obj_handle_t    *  BitfileObj);
+#endif
 
 int
 Hpss_Stat(
@@ -318,7 +322,7 @@ Hpss_UnlinkHandle(
     const char                  *  Path,
     const sec_cred_t            *  Ucred);
 
-#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION < 4)
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
 int
 Hpss_UserAttrGetAttrs(
     char                        *  Path,

@@ -117,6 +117,7 @@ _bf_vv_attrib_t(struct pool * pool, bf_vv_attrib_t a)
             PV_LIST_T(a.PVList));
 }
 
+#if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
 char *
 _bfs_bitfile_obj_handle_t(struct pool * pool, bfs_bitfile_obj_handle_t h)
 {
@@ -141,6 +142,7 @@ _bfs_bitfile_obj_handle_t_ptr(struct pool * pool,
         HPSS_DISTRIBUTIONKEY_T(p->BfHash),
         UNSIGNED(p->ValidHash));
 }
+#endif
 
 char *
 _hpss_attrs_t(struct pool * pool, hpss_Attrs_t a)
@@ -158,7 +160,11 @@ _hpss_attrs_t_ptr(struct pool * pool, const hpss_Attrs_t * p)
         pool,
         "{"
             "Account=%s, "             // acct_rec_t
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+            "BitfileId=%s, "           // hpssoid_t
+#else
             "BitfileObj=%s, "          // bfs_bitfile_obj_handle_t
+#endif
             "Comment=%s, "             // char *
             "CompositePerms=%s, "      // uint32_t
             "COSId=%s, "               // uint32_t
@@ -168,7 +174,11 @@ _hpss_attrs_t_ptr(struct pool * pool, const hpss_Attrs_t * p)
             "FamilyId=%s, "            // uint32_t
             "FilesetHandle=%s, "       // ns_ObjHandle_t
             "FilesetId=%s, "           // uint64_t
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+            "FilesetRootId=%s, "       // uint64_t
+#else
             "FilesetRootObjectId=%s, " // uint64_t
+#endif
             "FilesetStateFlags=%s, "   // uint32_t
             "FilesetType=%s, "         // uint32_t
             "GID=%s, "                 // uint32_t
@@ -193,7 +203,11 @@ _hpss_attrs_t_ptr(struct pool * pool, const hpss_Attrs_t * p)
             "WriteCount=%s"            // uint32_t
         "}",
             ACCT_REC_T(p->Account),
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+            HPSSOID_T(p->BitfileId),
+#else
             BFS_BITFILE_OBJ_HANDLE_T(p->BitfileObj),
+#endif
             CHAR_PTR(p->Comment),
             HEX(p->CompositePerms),
             UNSIGNED(p->COSId),
@@ -203,7 +217,11 @@ _hpss_attrs_t_ptr(struct pool * pool, const hpss_Attrs_t * p)
             UNSIGNED(p->FamilyId),
             NS_OBJHANDLE_T(p->FilesetHandle),
             UNSIGNED64(p->FilesetId),
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+            UNSIGNED64(p->FilesetRootId),
+#else
             UNSIGNED64(p->FilesetRootObjectId),
+#endif
             UNSIGNED(p->FilesetStateFlags),
             UNSIGNED(p->FilesetType),
             UNSIGNED(p->GID),
@@ -301,7 +319,9 @@ _hpss_cos_md_t_ptr(struct pool * pool, const hpss_cos_md_t * p)
             "ReadOps=%s, "           // unsigned32
             "StageCode=%s, "         // unsigned32
             "AllocMethod=%s, "       // unsigned32
+#if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
             "FileHashType=%s"        // hpss_hash_type_t
+#endif
         "}",
             UNSIGNED(p->COSId),
             UNSIGNED(p->HierId),
@@ -316,8 +336,12 @@ _hpss_cos_md_t_ptr(struct pool * pool, const hpss_cos_md_t * p)
             UNSIGNED(p->WriteOps),
             UNSIGNED(p->ReadOps),
             UNSIGNED(p->StageCode),
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+            UNSIGNED(p->AllocMethod));
+#else
             UNSIGNED(p->AllocMethod),
             HPSS_HASH_TYPE_T(p->FileHashType));
+#endif
 }
 
 char *
@@ -447,7 +471,7 @@ _hpss_trashrecord_t(struct pool * pool, hpss_TrashRecord_t t)
         pool,
         "{"
             "ParentId=%s, "           // u_signed64
-#if HPSS_MAJOR_VERSION >= 8
+#if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
             "ParentNsHash=%s, "       // hpss_distributionkey_t
 #endif
             "Handle=%s, "             // ns_ObjHandle_t
@@ -459,14 +483,16 @@ _hpss_trashrecord_t(struct pool * pool, hpss_TrashRecord_t t)
             "TimeModified=%s, "       // timestamp_sec_t
             "LengthAtDeleteTime=%s, " // u_signed64
             "BitfileId=%s, "          // hpssoid_t
-#if HPSS_MAJOR_VERSION >= 8
+#if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
             "BitfileHash=%s, "        // hpss_distributionkey_t
 #endif
             "Path=%s, "               // char[HPSS_MAX_TRASH_PATH]
             "Name=%s"                 // char[HPSS_MAX_TRASH_PATH]
         "}",
             UNSIGNED64(t.ParentId),
+#if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
             HPSS_DISTRIBUTIONKEY_T(t.ParentNsHash),
+#endif
             NS_OBJHANDLE_T(t.Handle),
             UNSIGNED(t.UID),
             UNSIGNED(t.RealmId),
@@ -476,7 +502,9 @@ _hpss_trashrecord_t(struct pool * pool, hpss_TrashRecord_t t)
             TIMESTAMP_SEC_T(t.TimeModified),
             UNSIGNED64(t.LengthAtDeleteTime),
             HPSSOID_T(t.BitfileId),
+#if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
             HPSS_DISTRIBUTIONKEY_T(t.BitfileHash),
+#endif
             CHAR_PTR(t.Path),
             CHAR_PTR(t.Name));
 }
@@ -560,6 +588,7 @@ _hpss_xfileattr_t_ptr(struct pool * pool, const hpss_xfileattr_t * p)
             BF_SC_ATTRIB_T(p->SCAttrib[4])); // HPSS_MAX_STORAGE_LEVELS
 }
 
+#if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
 char *
 _hpss_srvr_id_t_ptr(struct pool * pool, const hpss_srvr_id_t * p)
 {
@@ -567,6 +596,7 @@ _hpss_srvr_id_t_ptr(struct pool * pool, const hpss_srvr_id_t * p)
         return PTR(p);
     return UNSIGNED(*p);
 }
+#endif
 
 char *
 _hpss_stat_t_ptr(struct pool * pool, const hpss_stat_t * p)

@@ -23,14 +23,16 @@ _bf_sc_attrib_t(struct pool * pool, bf_sc_attrib_t a);
 char *
 _bf_vv_attrib_t(struct pool * pool, bf_vv_attrib_t a);
 
-#define BFS_BITFILE_OBJ_HANDLE_T(h) _bfs_bitfile_obj_handle_t(pool, h)
-char *
-_bfs_bitfile_obj_handle_t(struct pool * pool, bfs_bitfile_obj_handle_t h);
+#if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
+ #define BFS_BITFILE_OBJ_HANDLE_T(h) _bfs_bitfile_obj_handle_t(pool, h)
+ char *
+ _bfs_bitfile_obj_handle_t(struct pool * pool, bfs_bitfile_obj_handle_t h);
 
-#define BFS_BITFILE_OBJ_HANDLE_T_PTR(p) _bfs_bitfile_obj_handle_t_ptr(pool, p)
-char *
-_bfs_bitfile_obj_handle_t_ptr(struct pool * pool,
-                              const bfs_bitfile_obj_handle_t * p);
+ #define BFS_BITFILE_OBJ_HANDLE_T_PTR(p) _bfs_bitfile_obj_handle_t_ptr(pool, p)
+ char *
+ _bfs_bitfile_obj_handle_t_ptr(struct pool * pool,
+                               const bfs_bitfile_obj_handle_t * p);
+#endif
 
 #define HPSS_ATTRS_T(a) _hpss_attrs_t(pool, a) 
 char *
@@ -124,11 +126,16 @@ _hpss_uuid_t_ptr(struct pool * pool, const hpss_uuid_t * ptr);
 char *
 _hpss_xfileattr_t_ptr(struct pool * pool, const hpss_xfileattr_t * x);
 
-#define HPSS_SRVR_ID_T(i) UNSIGNED(i)
 
-#define HPSS_SRVR_ID_T_PTR(p) _hpss_srvr_id_t_ptr(pool, p)
-char *
-_hpss_srvr_id_t_ptr(struct pool * pool, const hpss_srvr_id_t * p);
+#if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
+ #define HPSS_SRVR_ID_T(i) UNSIGNED(i)
+
+ #define HPSS_SRVR_ID_T_PTR(p) _hpss_srvr_id_t_ptr(pool, p)
+ char *
+ _hpss_srvr_id_t_ptr(struct pool * pool, const hpss_srvr_id_t * p);
+#endif
+
+
 
 #define HPSS_STAT_T_PTR(p) _hpss_stat_t_ptr(pool, p)
 char *
