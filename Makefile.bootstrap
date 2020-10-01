@@ -29,12 +29,18 @@ download_asset: venv
 sign_asset: venv
 	./venv/bin/python3 ./scripts/sign_asset.py $(ASSET)
 
-upload_asset: venv
-	./venv/bin/python3 ./scripts/upload_asset.py $(TAG) $(ASSET)
+upload_asset:
+	./scripts/upload_asset.sh $(TAG) $(ASSET)
+
+DEFAULT_TAG:=$(shell git describe --tags)
+upload_assets:
+	$(foreach asset, \
+	 $(wildcard globus-gridftp-server-hpss-*rpm), \
+	 . ./scripts/upload_asset.sh $(DEFAULT_TAG) $(asset);)
 
 down_sign_up: venv
 	./venv/bin/python3 ./scripts/download_asset.py $(TAG) $(ASSET)
 	./venv/bin/python3 ./scripts/sign_asset.py $(ASSET)
-	./venv/bin/python3 ./scripts/upload_asset.py $(TAG) $(ASSET).asc
+	./venv/bin/python3 ./scripts/upload_asset.sh $(TAG) $(ASSET).asc
 
 .SILENT:
