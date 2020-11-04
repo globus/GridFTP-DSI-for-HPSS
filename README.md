@@ -1,26 +1,52 @@
 ## About
 GridFTP-DSI-for-HPSS is a Globus Connect Server Connector which allows HPSS administrators to create Globus Endpoints for HPSS installations. 
 
-
 ## Release Notes
 None at this time. New issues will appear here before being incorporated into the official documentation.
 
+## Verified HPSS Versions
+Although this connector supports all HPSS versions 7.3 and higher, I can only
+verify functionality for HPSS distributions on OS releases that I have access
+to.
+
 ## Installation
-If you are an admin that is planning to install the HPSS connector for production use, go to [https://docs.globus.org/premium-storage-connectors/hpss/](https://docs.globus.org/premium-storage-connectors/hpss/) for the most recent installation instructions.  
+If you are an admin planning to install the HPSS connector for production use,
+go to the
+[official docs](https://docs.globus.org/premium-storage-connectors/hpss/)
+for the most recent installation instructions. 
+
+RPMs are provided for HPSS/OS versions for sites that have graciously provided
+me with development access. Check the
+[release page](https://github.com/JasonAlt/GridFTP-DSI-for-HPSS/releases)
+for RPMs for your HPSS/OS versions. If no RPM is avialable for your
+configuration, you'll need to build the RPM as described below. Please consider
+making development resources available for your configuration so that I can
+provide RPMs as part of the release cycle.
+
+## Building RPMs for your OS and HPSS Versions
+
+RPM building and development require these packages:
+* make
+* gcc
+* autoconf
+* automake
+* libtool
+* rpm-build
+* openssl
+* globus-gridftp-server-devel
+* libtirpc-devel
+* hpss-lib-devel
+
+I highly recommend building the RPM from source distributions available on the [release page](https://github.com/JasonAlt/GridFTP-DSI-for-HPSS/releases). Download the source for the latest release, extracts its contents then from within the source directory build the RPM:
+```shell
+$ make -f Makefile.bootstrap release
+```
 
 ## Development
-
-The repository includes a helpful build file, `Makefile.bootstrap`, the simplifies setting up the dev environment and cutting releases. In order configure the code base for development:
 
 ```shell
 $ git clean -f -d -x
 $ make -f Makefile.bootstrap develop
-```
-
-To build the RPMs for distribution and testing:
-```shell
-$ git clean -f -d -x
-$ make -f Makefile.bootstrap release
 ```
 
 To see recent changes to the code base, see the [ChangeLog](ChangeLog).
