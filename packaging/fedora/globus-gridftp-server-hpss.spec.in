@@ -42,6 +42,8 @@ Requires: libtirpc
 Requires: globus-connect-server
 %else
 Requires: globus-connect-server54 >= 5.4.39
+Requires: jansson
+BuildRequires: jansson-devel
 %endif
 
 BuildRequires: globus-gridftp-server-devel >= 12

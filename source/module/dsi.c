@@ -70,7 +70,7 @@ dsi_init(globus_gfs_operation_t     Operation,
     /*
      * Read in the config.
      */
-    result = config_init(&config);
+    result = config_init(Operation, &config);
     if (result)
         goto cleanup;
 
