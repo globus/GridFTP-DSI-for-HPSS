@@ -707,6 +707,12 @@ _hpss_userattr_list_t_ptr(struct pool * pool, const hpss_userattr_list_t * p)
 char *
 _hpssoid_t(struct pool * pool, hpssoid_t o)
 {
+    return _hpssoid_t_ptr(pool, &o);
+}
+
+char *
+_hpssoid_t_ptr(struct pool * pool, const hpssoid_t * p)
+{
 #if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
     return _sprintf(
         pool,
@@ -722,16 +728,16 @@ _hpssoid_t(struct pool * pool, hpssoid_t o)
             "SubType=%s, "             // byte
             "Type=%s"                  // byte
         "}",
-            HPSS_UUID_T(o.ObjectID),
-            UNSIGNED(o.ServerDep1),
-            UNSIGNED16(o.ServerDep2),
-            UNSIGNED16(o.ServerDep3),
-            HEX8(o.ServerDep4),
-            HEX8(o.ServerDep5),
-            HEX8(o.SecurityLevel[0]), HEX8(o.SecurityLevel[1]),
-            HEX8(o.Reserved[0]), HEX8(o.Reserved[1]),
-            HEX8(o.SubType),
-            HEX8(o.Type));
+            HPSS_UUID_T(p->ObjectID),
+            UNSIGNED(p->ServerDep1),
+            UNSIGNED16(p->ServerDep2),
+            UNSIGNED16(p->ServerDep3),
+            HEX8(p->ServerDep4),
+            HEX8(p->ServerDep5),
+            HEX8(p->SecurityLevel[0]), HEX8(p->SecurityLevel[1]),
+            HEX8(p->Reserved[0]), HEX8(p->Reserved[1]),
+            HEX8(p->SubType),
+            HEX8(p->Type));
 #else
     return _sprintf(
         pool,
@@ -758,25 +764,25 @@ _hpssoid_t(struct pool * pool, hpssoid_t o)
                 "%s"   // 19 (KSOID)
             "}"
         "}",
-            HEX8(o.Bytes[ 0]),
-            HEX8(o.Bytes[ 1]),
-            HEX8(o.Bytes[ 2]),
-            HEX8(o.Bytes[ 3]),
-            HEX8(o.Bytes[ 4]),
-            HEX8(o.Bytes[ 5]),
-            HEX8(o.Bytes[ 6]),
-            HEX8(o.Bytes[ 7]),
-            HEX8(o.Bytes[ 8]),
-            HEX8(o.Bytes[ 9]),
-            HEX8(o.Bytes[10]),
-            HEX8(o.Bytes[11]),
-            HEX8(o.Bytes[12]),
-            HEX8(o.Bytes[13]),
-            HEX8(o.Bytes[14]),
-            HEX8(o.Bytes[15]),
-            HEX8(o.Bytes[16]),
-            HEX8(o.Bytes[17]),
-            HEX8(o.Bytes[18]));
+            HEX8(p->Bytes[ 0]),
+            HEX8(p->Bytes[ 1]),
+            HEX8(p->Bytes[ 2]),
+            HEX8(p->Bytes[ 3]),
+            HEX8(p->Bytes[ 4]),
+            HEX8(p->Bytes[ 5]),
+            HEX8(p->Bytes[ 6]),
+            HEX8(p->Bytes[ 7]),
+            HEX8(p->Bytes[ 8]),
+            HEX8(p->Bytes[ 9]),
+            HEX8(p->Bytes[10]),
+            HEX8(p->Bytes[11]),
+            HEX8(p->Bytes[12]),
+            HEX8(p->Bytes[13]),
+            HEX8(p->Bytes[14]),
+            HEX8(p->Bytes[15]),
+            HEX8(p->Bytes[16]),
+            HEX8(p->Bytes[17]),
+            HEX8(p->Bytes[18]));
 #endif
 }
 
