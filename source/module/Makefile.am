@@ -37,6 +37,11 @@ SOURCES = authenticate.c \
           test.c         \
           test.h
 
+if ENABLE_GCSV5
+SOURCES += gcsv5.c
+AM_CFLAGS = -DGCSV5
+endif
+
 libglobus_gridftp_server_hpss_real_la_SOURCES=$(SOURCES)
 
 AM_CPPFLAGS=$(TIRPC_CFLAGS) $(OPENSSL_CFLAGS) $(GLOBUS_CFLAGS) $(HPSS_CFLAGS)

@@ -6,6 +6,7 @@ AM_LDFLAGS=$(GLOBUS_LDFLAGS)
 if ENABLE_GCSV5
 AM_CFLAGS+=-DMODULE_NAME=globus_gridftp_server_hpss_module
 AM_CFLAGS+=-DMODULE_NAME_STRING=\"hpss\"
+AM_CFLAGS+=-DGCSV5
 lib_LTLIBRARIES = libglobus_gridftp_server_hpss.la   
 libglobus_gridftp_server_hpss_la_SOURCES=$(SOURCES)
 libglobus_gridftp_server_hpss_la_LIBADD = -ldl
