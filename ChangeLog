@@ -1,4 +1,7 @@
-Version 2.14.rc1: Mon Aug 31 10:04:45 EDT 2020
+Version 2.15rc1: Thu Jul 29 15:36:20 EDT 2021
+	- Added additional TRACE debug logging for STOR operations.
+
+Version 2.14: Mon Aug 31 10:04:45 EDT 2020
 	Feature release. Improved logging and error reporting.
 	- Error messages with severity ERROR, WARN and INFO are now sent to
 	  the GridFTP's server's log file.

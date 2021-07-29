@@ -159,7 +159,12 @@ stor_gridftp_callback(globus_gfs_operation_t Operation,
     stor_info_t *  stor_info   = stor_buffer->StorInfo;
 
     if (stor_buffer->Valid != VALID_TAG)
+    {
+        TRACE("Gridftp read callback with invalid tag.");
         return;
+    }
+
+    TRACE("Gridftp read callback. Result=%u, Length=%u, Offset=%lu, Eof=%d", Result, Length, Offset, Eof);
 
     // Make sure we have the right buffer / UserArg combo
     assert(stor_buffer->Buffer == (char *)Buffer);
@@ -307,6 +312,7 @@ stor_launch_gridftp_reads(stor_info_t *StorInfo)
             globus_list_insert(&StorInfo->AllBufferList, stor_buffer);
         }
 
+        TRACE("Register gridftp read with %d outstanding.", StorInfo->CurConnCnt);
         result = globus_gridftp_server_register_read(
             StorInfo->Operation,
             (globus_byte_t *)stor_buffer->Buffer,
@@ -315,7 +321,10 @@ stor_launch_gridftp_reads(stor_info_t *StorInfo)
             stor_buffer);
 
         if (result)
+        {
+            TRACE("Register gridftp read failed.");
             break;
+        }
 
         /* Increase the current connection count. */
         StorInfo->CurConnCnt++;
@@ -334,6 +343,8 @@ stor_pio_callout(char     * Buffer,
     uint64_t        copied_length = 0;
     stor_info_t *   stor_info     = CallbackArg;
     globus_result_t result        = GLOBUS_SUCCESS;
+
+    TRACE("PIO stor callout: Length:%u, Offset:%lu", *Length, Offset);
 
     pthread_mutex_lock(&stor_info->Mutex);
     {
@@ -377,6 +388,7 @@ stor_pio_callout(char     * Buffer,
     pthread_mutex_unlock(&stor_info->Mutex);
 
     int exit_code = !(result == GLOBUS_SUCCESS);
+    TRACE("PIO stor callout: exit_code:%d", exit_code);
 // XXX copied_length == *Length if exit_code == 0 (ALWAYS)
     return exit_code;
 }
