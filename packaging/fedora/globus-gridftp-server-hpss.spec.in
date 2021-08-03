@@ -2,7 +2,11 @@ Summary: HPSS Connector for the Globus Transfer Service
 Name: @PACKAGE_NAME@-@HPSS_MAJOR@.@HPSS_MINOR@
 Version: @PACKAGE_VERSION@
 ## release candidates have `Release` of 0.X.rc
-Release: 0.1.rc%{?dist}
+## This should be using the %{?dist} tag but CentOS 7.9 has renamed it to
+## el7_9. It's unclear if this denotes a compatibility constraint or their
+## own bookkeeping. I'm using 'el%{?rhel}' to force the desired tag.
+## You can find the system tags in /etc/rpm/macros.dist.
+Release: 0.1~rc.el%{?rhel}
 ## releases have 'Release' of X
 #Release: 1%{?dist}
 License: ASL 2.0
@@ -23,7 +27,9 @@ AutoReq: no
 
 Requires: globus-gridftp-server >= 12.24
 Requires: openssl
-Requires: hpss-lib
+# I would prefer to set this equal to @HPSS_MAJOR@.@HPSS_MINOR@ but HPSS version
+# comes out like hpss-lib-8.3.0.0-0.el7.x86_64
+Requires: hpss-lib >= @HPSS_MAJOR@.@HPSS_MINOR@
 Requires: libtirpc
 
 BuildRequires: globus-gridftp-server-devel >= 12

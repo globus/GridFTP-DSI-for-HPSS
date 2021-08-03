@@ -1,5 +1,6 @@
-Version 2.15rc1: Thu Jul 29 15:36:20 EDT 2021
+Version 2.15~rc2: Tue Aug  3 19:16:36 EDT 2021
 	- Added additional TRACE debug logging for STOR operations.
+	- RPM has hard requirements on the correct HPSS version.
 
 Version 2.14: Mon Aug 31 10:04:45 EDT 2020
 	Feature release. Improved logging and error reporting.
