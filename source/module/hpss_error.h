@@ -72,4 +72,20 @@ hpss_error_to_globus_result(int);
     )                                      \
   )
 
+#define WRONG_VERSION_ERR "The HPSS connector was not built for this version of HPSS. " \
+                          "The issue must be resolved by the endpoint administrator."
+
+#define HPSSWrongVersion()                         \
+  globus_error_put(                                \
+    GlobusGFSErrorObj(                             \
+      NULL,                                        \
+      500,                                         \
+      "WRONG_VERSION",                             \
+      "GridFTP-Message: " WRONG_VERSION_ERR "\r\n" \
+      "GridFTP-JSON-Result: {"                     \
+        "\"message\": \"" WRONG_VERSION_ERR "\""   \
+      "}"                                          \
+    )                                              \
+  )
+
 #endif /* _HPSS_ERROR_H_ */

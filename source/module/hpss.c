@@ -84,6 +84,18 @@ Hpss_AuthnMechTypeFromString(
     return rv;
 }
 
+/* Caller must free returned string */
+char *
+Hpss_BuildLevelString(void)
+{
+    API_ENTER("hpss_BuildLevelString", "");
+    char * rv = hpss_BuildLevelString();
+    API_EXIT("hpss_BuildLevelString",
+             "return_value=%s",
+             CHAR_PTR(rv));
+    return rv;
+}
+
 int
 Hpss_Chmod(
     const char                  *  Path,

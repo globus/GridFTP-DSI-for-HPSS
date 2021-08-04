@@ -58,6 +58,10 @@ Hpss_AuthnMechTypeFromString(
    const char                   *  AuthnMechString,
    hpss_authn_mech_t            *  AuthnMech);
 
+/* Caller must free returned string */
+char *
+Hpss_BuildLevelString(void);
+
 int
 Hpss_Chmod(
     const char                  *  Path,

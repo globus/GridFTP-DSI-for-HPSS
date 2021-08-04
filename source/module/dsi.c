@@ -46,6 +46,28 @@ dsi_init(globus_gfs_operation_t     Operation,
     logging_set_user(SessionInfo->username);
 
     /*
+     * Verify the HPSS version.
+     */
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+    // Runtime version string
+    char * version_string = Hpss_BuildLevelString();
+    if (version_string == NULL ||
+        strlen(version_string) < 3 ||
+        version_string[0] != TOSTRING(HPSS_MAJOR_VERSION)[0] ||
+        version_string[2] != TOSTRING(HPSS_MINOR_VERSION)[0])
+    {
+        ERROR("The HPSS connector was not built for this version of HPSS. "
+              "Runtime verion is %s. Buildtime version was %d.%d",
+              version_string,
+              HPSS_MAJOR_VERSION,
+              HPSS_MINOR_VERSION);
+        result  = HPSSWrongVersion();
+        goto cleanup;
+    }
+    free(version_string);
+
+    /*
      * Read in the config.
      */
     result = config_init(&config);
