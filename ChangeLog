@@ -1,3 +1,7 @@
+Version 2.16-rc1: Thu Dec  9 15:03:16 EST 2021
+	- Workaround for hung processes when transfers are aborted
+	- Fix for API_ENTER() in hpss_ReadAttrsPlus()
+
 Version 2.15: Fri Dec  3 20:17:43 EST 2021
 	- Added additional TRACE debug logging for STOR operations.
 	- RPM has hard requirements on the correct HPSS version.

@@ -323,6 +323,34 @@ dsi_stat(globus_gfs_operation_t   Operation,
         globus_gridftp_server_finished_stat(Operation, result, NULL, 0);
 }
 
+void
+_force_process_exit(void * arg)
+{
+    DEBUG("Forcing process exit");
+    _exit(1);
+}
+
+void
+dsi_trev(globus_gfs_event_info_t *           event_info,
+         void *                              user_arg)
+{
+    switch (event_info->type)
+    {
+    case GLOBUS_GFS_EVENT_TRANSFER_ABORT:
+        DEBUG("Abort received, forcing process exit in 10 seconds");
+        globus_reltime_t timer;
+        GlobusTimeReltimeSet(timer, 10, 0);
+        globus_callback_register_oneshot(
+            NULL,
+            &timer,
+            _force_process_exit,
+            NULL);
+        break;
+    default:
+        break;
+    }
+}
+
 globus_gfs_storage_iface_t hpss_dsi_iface = {
     /* Descriptor       */
     GLOBUS_GFS_DSI_DESCRIPTOR_SENDER | GLOBUS_GFS_DSI_DESCRIPTOR_BLOCKING |
@@ -333,7 +361,7 @@ globus_gfs_storage_iface_t hpss_dsi_iface = {
     NULL,        /* list_func        */
     dsi_send,    /* send_func        */
     dsi_recv,    /* recv_func        */
-    NULL,        /* trev_func        */
+    dsi_trev,    /* trev_func        */
     NULL,        /* active_func      */
     NULL,        /* passive_func     */
     NULL,        /* data_destroy     */

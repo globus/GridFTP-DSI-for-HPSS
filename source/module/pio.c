@@ -105,15 +105,8 @@ pio_coordinator_thread(void *Arg)
     } while (!rc && !eot);
 
     rc = Hpss_PIOEnd(pio->CoordinatorSG);
-    /*
-     * The returned value from hpss_PIOEnd() is not very useful. It doesn't
-     * have anything to do with the data we already transfered. If there is
-     * an error from hpss_PIOEnd(), it _is_ because we passed a bad arg which
-     * means a programming error and the transfer is likely to hang. All we 
-     * can really do is log a warning and hope the admin sees it.
-     */
-    if (rc != HPSS_E_NOERROR)
-        DEBUG("hpss_PIOEnd() returned %d", rc);
+    if (!pio->CoordinatorResult && rc != HPSS_E_NOERROR && hpss_error_status(rc) != PIO_END_TRANSFER)
+        pio->CoordinatorResult = hpss_error_to_globus_result(rc);
 
     return NULL;
 }
@@ -140,8 +133,6 @@ pio_thread(void *Arg)
     int             rc              = 0;
     pio_t *         pio             = Arg;
     globus_result_t result          = GLOBUS_SUCCESS;
-    int             coord_launched  = 0;
-    int             safe_to_end_pio = 0;
     pthread_t       thread_id;
     char *          buffer = NULL;
 
@@ -161,7 +152,6 @@ pio_thread(void *Arg)
     result = pio_launch_attached(pio_coordinator_thread, pio, &thread_id);
     if (result)
         goto cleanup;
-    coord_launched = 1;
 
     rc = Hpss_PIORegister(0,
                           NULL, /* DataNetSockAddr */
@@ -170,23 +160,19 @@ pio_thread(void *Arg)
                           pio->ParticipantSG,
                           pio_register_callback,
                           pio);
+
     if (rc != HPSS_E_NOERROR && hpss_error_status(rc) != PIO_END_TRANSFER)
         result = hpss_error_to_globus_result(rc);
-    safe_to_end_pio = 1;
 
-cleanup:
-    if (safe_to_end_pio)
+    rc = Hpss_PIOEnd(pio->ParticipantSG);
+    if (rc != HPSS_E_NOERROR && hpss_error_status(rc) != PIO_END_TRANSFER)
     {
-        rc = Hpss_PIOEnd(pio->ParticipantSG);
-        if (rc != HPSS_E_NOERROR && hpss_error_status(rc) != PIO_END_TRANSFER)
-        {
-            if (result == GLOBUS_SUCCESS)
-                result = hpss_error_to_globus_result(rc);
-        }
+        if (result == GLOBUS_SUCCESS)
+            result = hpss_error_to_globus_result(rc);
     }
 
-    if (coord_launched)
-        pthread_join(thread_id, NULL);
+    pthread_join(thread_id, NULL);
+cleanup:
     if (buffer)
         free(buffer);
 
