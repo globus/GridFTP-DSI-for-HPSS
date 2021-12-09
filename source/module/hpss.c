@@ -831,7 +831,7 @@ Hpss_ReadAttrsPlus(
     uint64_t                    *  OffsetOut,  // OUT
     ns_DirEntry_t               *  DirentPtr)  // OUT
 {
-    API_ENTER("hpss_ReadAttrsPlus"
+    API_ENTER("hpss_ReadAttrsPlus",
               "Dirdes=%s "
               "OffsetIn=%s "
               "BufferSize=%s "
