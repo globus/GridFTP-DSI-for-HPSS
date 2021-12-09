@@ -475,18 +475,24 @@ stor_transfer_complete_callback(globus_result_t Result, void *UserArg)
         pthread_mutex_unlock(&stor_info->Mutex);
     }
 
-    globus_gridftp_server_finished_transfer(stor_info->Operation, result);
-    stor_wait_for_gridftp(stor_info);
-
     /* Prefer our error over PIO's. */
     if (stor_info->Result)
-        result = stor_info->Result;
-    if (!result)
         result = stor_info->Result;
 
     rc = Hpss_Close(stor_info->FileFD);
     if (rc && !result)
         result = hpss_error_to_globus_result(rc);
+
+    globus_gridftp_server_finished_transfer(stor_info->Operation, result);
+
+    /*
+     * From this point on, if the server is shutting down, we have no guarantee
+     * that the process will exist long enough to complete this function. Therefore
+     * we get Hpss_Close() out of the way (above) and below we leave non consequential
+     * cleanup that only needs to be completed if the server is going to perform another
+     * transfer.
+     */
+    stor_wait_for_gridftp(stor_info);
 
     pthread_mutex_destroy(&stor_info->Mutex);
     pthread_cond_destroy(&stor_info->Cond);
