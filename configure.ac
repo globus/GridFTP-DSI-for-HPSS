@@ -1,4 +1,4 @@
-AC_INIT([globus-gridftp-server-hpss], [2.16], [Globus <support@globus.org>])
+AC_INIT([globus-gridftp-server-hpss], [2.17], [Globus <support@globus.org>])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 # automake 1.11.1 (RHEL 6.8) does not support AM_PROG_AR
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
@@ -11,6 +11,11 @@ CC="${CC} -std=gnu99"
 PKG_CHECK_MODULES([OPENSSL],[openssl])
 PKG_CHECK_MODULES([GLOBUS], [globus-gridftp-server >= 12])
 PKG_CHECK_MODULES([TIRPC],  [libtirpc])
+
+AC_ARG_ENABLE([gcsv5],
+    [AS_HELP_STRING([--enable-gcsv5], [Build for Globus Connect Server v5])])
+
+AM_CONDITIONAL([ENABLE_GCSV5], [test x$enable_gcsv5 = xyes])
 
 AC_ARG_WITH([hpss],
             [AS_HELP_STRING([--with-hpss=<path>],

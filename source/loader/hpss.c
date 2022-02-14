@@ -24,7 +24,8 @@
  */
 #include "version.h"
 
-GlobusExtensionDeclareModule(globus_gridftp_server_hpss_local);
+// GlobusExtensionDeclareModule(MODULE_NAME);
+globus_module_descriptor_t MODULE_NAME;
 
 /* Our handle reference which we hold between activate / deactivate. */
 static void *_real_module_handle = NULL;
@@ -103,22 +104,25 @@ loader_deactivate(const char *DsiName)
 
     return GLOBUS_SUCCESS;
 }
+
 int
 activate(void)
 {
-    return loader_activate("hpss_local",
+    return loader_activate(MODULE_NAME_STRING,
                            "hpss_dsi_iface",
-                           GlobusExtensionMyModule(globus_gridftp_server_hpss_local));
+                           // GlobusExtensionMyModule(MODULE_NAME)
+                           &MODULE_NAME);
 }
 
 int
 deactivate(void)
 {
-    return loader_deactivate("hpss_local");
+    return loader_deactivate(MODULE_NAME_STRING);
 }
 
-GlobusExtensionDefineModule(globus_gridftp_server_hpss_local) = {
-    "globus_gridftp_server_hpss_local",
+// GlobusExtensionDefineModule(MODULE_NAME) = {
+globus_module_descriptor_t MODULE_NAME = {
+    "globus_gridftp_server_" MODULE_NAME_STRING,
     activate,
     deactivate,
     GLOBUS_NULL,
