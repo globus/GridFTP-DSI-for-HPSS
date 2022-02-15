@@ -73,7 +73,7 @@ Remove `foo bar` and save the config file.
    same error message in (1). The log file will now show:
 +
 ----
-[2579] Wed Sep  2 12:10:56 2020 :: [HPSS Connector][ERROR] User=jasonalt :: User could not log into because the configured authentication mechanism `foo` is not known to HPSS.
+[2579] Wed Sep  2 12:10:56 2020 :: [HPSS Connector][ERROR] User=jasonalt :: User could not log into HPSS because the configured authentication mechanism `foo` is not known to HPSS.
 ----
 +
 Remove `AuthenticationMech foo` and save the config file.
@@ -113,7 +113,7 @@ Remove `$HPSS_DSI_TEST INJECT_UNKNOWN_ACCOUNT` from hpss_test.
    And this line will appear in the log file:
 +
 ----
-[22915] Wed Sep  2 14:23:49 2020 :: [HPSS Connector][ERROR] User=jasonalt :: Could not log into HPSS. Operation not permitted
+[22915] Wed Sep  2 14:23:49 2020 :: [HPSS Connector][ERROR] User=jasonalt :: Could not change active HPSS UID to <uid>. Operation not permitted
 ----
 +
 Remove the file /etc/gridftp.d/hpss_test.

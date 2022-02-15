@@ -58,9 +58,9 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
     int retval = Hpss_AuthnMechTypeFromString(authn_mech_string, &authn_mech);
     if (retval != HPSS_E_NOERROR)
     {
-        ERROR("User could not log into because the configured authentication "
-              "mechanism \"%s\" is not known to HPSS.",
-             authn_mech_string);
+        ERROR("User could not log into HPSS because the configured "
+              "authentication mechanism \"%s\" is not known to HPSS.",
+              authn_mech_string);
         return HPSSConfigurationError();
     }
 
@@ -107,7 +107,8 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
         retval = Hpss_LoadDefaultThreadState(uid, Hpss_Umask(0), NULL);
         if (retval != HPSS_E_NOERROR)
         {
-            ERROR("Could not log into HPSS. %s",
+            ERROR("Could not change active HPSS UID to %d. %s",
+              uid,
               hpss_ErrnoString(hpss_error_get(retval).returned_value));
             return HPSSLoginDenied();
         }
