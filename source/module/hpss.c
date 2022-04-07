@@ -218,7 +218,7 @@ Hpss_FileGetXAttributes(
     hpss_xfileattr_t            *  AttrOut)
 {
     API_ENTER("hpss_FileGetXAttributes",
-              "Path=%s Flags=%s StorageLevel=%s AttrOut",
+              "Path=%s Flags=%s StorageLevel=%s AttrOut=%s",
               CHAR_PTR(Path),
               HEX(Flags),
               HEX(StorageLevel),
@@ -312,7 +312,7 @@ Hpss_GetAsynchStatus(
 {
     API_ENTER("hpss_GetAsynchStatus",
               "CallBackId=%s "
-              "BitfileID=%s",
+              "BitfileID=%s "
               "Status=%s",
               UNSIGNED(CallBackId),
               HPSSOID_T_PTR(BitfileID),
@@ -1188,9 +1188,9 @@ Hpss_StageCallBack(
               "Flags=%s "
               "ReqId=%s "
 #if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
-              "BitfileID",
+              "BitfileID=%s",
 #else
-              "BitfileObj",
+              "BitfileObj=%s",
 #endif
               CHAR_PTR(Path),
               UNSIGNED64(Offset),

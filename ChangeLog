@@ -3,6 +3,7 @@ Version 2.17~rc1: Mon Feb 14 12:46:59 EST 2022
 	  tag '+gcsv4 or '+gcsv5' to denote which version of GCS to install it
 	  with.
 	- Improved log message when HPSS login fails.
+	- Fix for TRACE logging some HPSS calls
 
 Version 2.16: Fri Jan  7 15:24:27 EST 2022
 	- Workaround for hung processes when transfers are aborted
