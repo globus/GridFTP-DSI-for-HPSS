@@ -1179,7 +1179,7 @@ Hpss_StageCallBack(
     bfs_bitfile_obj_handle_t    *  BitfileObj)   // OUT
 #endif
 {
-    API_ENTER("hpss_StageCallBack"
+    API_ENTER("hpss_StageCallBack",
               "Path=%s "
               "Offset=%s "
               "Length=%s "
