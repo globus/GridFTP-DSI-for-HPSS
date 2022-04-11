@@ -13,7 +13,16 @@
 
 #define INFO(...) log_message(LOG_TYPE_INFO, __VA_ARGS__)
 
-#define DEBUG(...) log_message(LOG_TYPE_DEBUG, __VA_ARGS__)
+#define DEBUG(...) \
+    if (GlobusDebugTrue(GLOBUS_GRIDFTP_SERVER_HPSS, LOG_TYPE_DEBUG)) \
+    {                                                                \
+        struct pool * pool = &(struct pool){NULL, 0, 0};             \
+        pool_create(pool);                                           \
+        log_message(LOG_TYPE_DEBUG, ##__VA_ARGS__);                  \
+        pool_destroy(pool);                                          \
+    }
+
+
 
 #define TRACE(...) log_message(LOG_TYPE_TRACE, __VA_ARGS__)
 
