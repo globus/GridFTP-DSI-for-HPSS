@@ -35,37 +35,27 @@ SOURCES = authenticate.c \
           strings.c      \
           strings.h      \
           test.c         \
-          test.h
+          test.h         \
+          utils.c        \
+          utils.h
 
 if ENABLE_GCSV5
 SOURCES += gcsv5.c
-AM_CFLAGS = -DGCSV5
 endif
 
 libglobus_gridftp_server_hpss_real_la_SOURCES=$(SOURCES)
 
-AM_CPPFLAGS=$(TIRPC_CFLAGS) $(OPENSSL_CFLAGS) $(GLOBUS_CFLAGS) $(HPSS_CFLAGS)
+include Makefile.rules
 
-AM_LDFLAGS=$(TIRPC_LDFLAGS)   \
-           $(OPENSSL_LDFLAGS) \
-           $(GLOBUS_LDFLAGS)  \
-           $(HPSS_LDFLAGS)    \
-           -Wl,--wrap=hpss_PIOExecute \
-           -Wl,--wrap=globus_gridftp_server_begin_transfer \
-           -Wl,--wrap=globus_gridftp_server_finished_transfer \
-           -Wl,--wrap=getpwnam_r \
-           -Wl,--wrap=hpss_LoadDefaultThreadState
+AM_CPPFLAGS=$(MODULE_CPP_FLAGS)
+AM_CFLAGS=$(MODULE_C_FLAGS)
 
-#
-# IU and NERSC report that using krb fails because libhpssgss.so doesn't link
-# against libhpsskrbauth.so. NERSC reported that libhpssunixauth.so was
-# necessary in their environment. It is necessary to link these here; the
-# XDR/libtirpc issue causes the runtime dynamic linking to fail without this.
-#
-HPSS_LIBS=-lhpsskrb5auth -lhpssunixauth -lhpss -lhpsscs
+AM_LDFLAGS=                                                \
+	$(MODULE_LD_FLAGS)                                 \
+	-Wl,--wrap=hpss_PIOExecute                         \
+	-Wl,--wrap=globus_gridftp_server_begin_transfer    \
+	-Wl,--wrap=globus_gridftp_server_finished_transfer \
+	-Wl,--wrap=getpwnam_r                              \
+	-Wl,--wrap=hpss_LoadDefaultThreadState
 
-# TIRPC must always be first
-libglobus_gridftp_server_hpss_real_la_LIBADD=$(TIRPC_LIBS)   \
-                                             $(OPENSSL_LIBS) \
-                                             $(GLOBUS_LIBS)  \
-                                             $(HPSS_LIBS)
+libglobus_gridftp_server_hpss_real_la_LIBADD=$(MODULE_LIBS)

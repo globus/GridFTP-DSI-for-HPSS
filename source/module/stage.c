@@ -10,12 +10,94 @@
 /*
  * Local includes
  */
+#include "hpss_log.h"
 #include "logging.h"
 #include "stage.h"
+#include "utils.h"
 #include "hpss.h"
 
-#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) ||                     \
-    HPSS_MAJOR_VERSION >= 8
+/*
+ *
+ * The staging code in this DSI has gone through several iterations over the years
+ * to adjust as admins of different HPSS configurations find issues at their sites.
+ * Use this space to record the detailed history of staging with this DSI so that
+ * we know why we are heading in the direction we are heading.
+ *
+ * BACKGROUND: The Globus Transfer service drives the staging requests when a
+ * retrieve task is submitted for an HPSS endpoint/collection. The Transfer service
+ * connects via GridFTP and issues N (<=64) stage requests. Transfer's expectations
+ * on the response to the stage request are:
+ *
+ * - respond that the file is on disk
+ * - respond that the file is on a tape-only cos
+ * - respond that the file is being retrieved from archive
+ *
+ * The Transfer service does not keep any state about the staging process other than
+ * which files are reported as on-disk or tape-only. When one or more of the N files
+ * are known to be on disk, the staging GridFTP connection is terminated and a new 
+ * GridFTP connection is created for transferring the on-disk files. During those
+ * transfers, the remaining M files will continue to stage. Once the transfers are
+ * complete, the GridFTP transfer connection terminates, a new GridFTP staging
+ * session begins with N files; Transfer will backfill the stage queue with new
+ * files to replace those that have transferred successfully.
+ *
+ * Transfer uses the stage command by polling; it will continue to issue the command
+ * for a file until it becomes resident. It is the DSI's responsibility to make sure
+ * the re-issue of stage commands does not cause any problems.
+ *
+ * In our first attempt (very early on, possibly pre-release), the DSI used
+ * hpss_Open(O_NONBLOCK) and hpss_Stage(BFS_ASYNCH_CALL). However, that caused us to
+ * block in hpss_Close(). Given the transient use of the GridFTP staging process by
+ * Transfer, this was a real issue; the GridFTP processes could not exit until every
+ * file had been staged.
+ *
+ * So we used hpss_StageCallBack() to avoid blocking. We would (1) check file
+ * residency and (2) issue hpss_StageCallBack() if the file was not on disk. This caused
+ * two new issues:
+ *
+ * 1) We did not supply a callback address to hpss_StageCallBack() because the GridFTP
+ * process is transient and we wouldn't be around to receive it. This caused HPSS
+ * monitors to go red-ball-of-doom. So we provided a hack to blackhole the callback
+ * requests using 'nc' run from outside of the DSI.
+ *
+ * 2) The reuse of hpss_StageCallBack() caused the core server to run out of threads;
+ * every stage request, even for the same file, was occupying a new thread. HPSS patched
+ * the core server to consolidate threads to reduce thread count (or something to that
+ * extent).
+ *
+ * Life was good, however, a HPSS site admin noticed that even though the core server
+ * thread count was under control, RTMU (real time monitor) had a ridiculous number of
+ * entries for the same file. This made the RTMU unmanageable. So in order to avoid
+ * duplicate stage requests, the DSI started to use hpss_GetAsyncStatus() which allows us
+ * to check if a stage request already exists for the tuple (request ID, bitfile ID).
+ * Since the GridFTP process is transient and Transfer does not keep state, the 
+ * request ID had to be predictable so I tested with a hardcoded request ID and it seemed
+ * to do the trick; admins were happy that RTMU was no longer overloaded with requests.
+ *
+ * But there is always some catch. NERSC reported in Version 2.16 on HPSS 7.4.3 that it
+ * would take hours before the first stage request would show up in RTMU for a given task.
+ * Looking into the debug logs, turns out that (at least on 7.4.3), the constant request
+ * ID was gating stage requests between _all_ current HPSS transfer retrieve tasks. So
+ * their endpoint was only staging 1-3 files at a time across _all_ tasks.
+ *
+ * Since the Transfer service does not keep state, we need a way to produce independent
+ * but predictable request IDs per file per task in order to avoid gating stage requests
+ * and to give the DSI a way to query for existing stage requests for a (task, file) tuple.
+ * This version of staging does that by computing a request ID based on information known
+ * to the DSI at stage time:
+ *
+ * - The task ID is a UUID supplied by Transfer and is unique to this user's task
+ * - The bitfile's ID which is unique to this file.
+ *
+ * We xor specific contents of the bitfile ID with the Transfer task ID to produce a
+ * seemingly-random-but-predictable request ID that is hopefully unique to this
+ * (task,file) tuple.
+ *
+ * For what it's worth, there is a design (pending funding) to improve this which includes
+ * having Transfer keep some state between requests.
+ */
+
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
 #define bitfile_id_t bfs_bitfile_obj_handle_t
 #define ATTR_TO_BFID(x) (x.Attrs.BitfileObj.BfId)
 #else
@@ -23,31 +105,89 @@
 #define ATTR_TO_BFID(x) (x.Attrs.BitfileId)
 #endif
 
-typedef enum
-{
-    ARCHIVED,
-    RESIDENT,
-    TAPE_ONLY,
-} residency_t;
 
 /*
- * Use a constant request number for stage requests so that we can
- * query the stage request status between processes.
+ * Fallback to a constant request ID for stage requests when a task ID is not
+ * avilable so that we can query the stage request status between processes.
  */
 #if HPSS_MAJOR_VERSION >= 8
-static hpss_reqid_t REQUEST_ID = {0xdeadbeef, 0xdead, 0xbeef, 0xde, 0xad, {0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef}};
+static hpss_reqid_t DEFAULT_REQUEST_ID = {0xdeadbeef, 0xdead, 0xbeef, 0xde, 0xad, {0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef}};
 #else
-static hpss_reqid_t REQUEST_ID = 0xDEADBEEF;
+static hpss_reqid_t DEFAULT_REQUEST_ID = 0xDEADBEEF;
 #endif
 
-static globus_result_t
-check_request_status(bitfile_id_t *BitfileID, int *Status)
+static void
+_bitfile_id_to_bytes(bitfile_id_t * BitfileID, unsigned char Bytes[UUID_BYTE_COUNT])
 {
-#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) ||                     \
-    HPSS_MAJOR_VERSION >= 8
-    int retval = Hpss_GetAsyncStatus(REQUEST_ID, BitfileID, Status);
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
+    memcpy(Bytes, BitfileID->BfId.Bytes, UUID_BYTE_COUNT);
 #else
-    int retval = Hpss_GetAsynchStatus(REQUEST_ID, BitfileID, Status);
+    hpss_uuid_to_bytes(BitfileID->ObjectID, Bytes);
+#endif
+}
+
+static void
+_bytes_to_request_id(const unsigned char Bytes[UUID_BYTE_COUNT], hpss_reqid_t * RequestID)
+{
+#if HPSS_MAJOR_VERSION >= 8
+    // Convert to a UUID
+    bytes_to_hpss_uuid(Bytes, RequestID);
+#else
+    // Convert to unsigned
+    bytes_to_unsigned(Bytes, RequestID);
+#endif
+}
+
+static void
+_generate_request_id(const char * TaskID, bitfile_id_t * BitfileID, hpss_reqid_t * RequestID)
+{
+    // If we do not have a Task ID, log a warning and return the default.
+    if (!is_valid_uuid(TaskID))
+    {
+        WARN("No task ID available for stage request. Using the default request id.");
+        memcpy(RequestID, &DEFAULT_REQUEST_ID, sizeof(*RequestID));
+        return;
+    }
+
+    // Convert Task ID to a bytes array
+    unsigned char task_id_bytes[UUID_BYTE_COUNT];
+    uuid_str_to_bytes(TaskID, task_id_bytes);
+
+    // Convert BitfileID to a byte array
+    unsigned char bitfile_id_bytes[UUID_BYTE_COUNT];
+    _bitfile_id_to_bytes(BitfileID, bitfile_id_bytes);
+
+    // Combine the two byte arrays
+    unsigned char request_id_bytes[UUID_BYTE_COUNT];
+    for (int i = 0; i < UUID_BYTE_COUNT; i++)
+    {
+        request_id_bytes[i] = task_id_bytes[i] ^ bitfile_id_bytes[i];
+    }
+
+    // Convert our bytes array into a request ID.
+    _bytes_to_request_id(request_id_bytes, RequestID);
+
+    // This debug is here to allow us to verify the computation
+    DEBUG("Using request ID %s for Task ID %s and %s %s",
+        HPSS_REQID_T(*RequestID),
+        TaskID,
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
+        "bitfile ID",
+        HPSSOID_T(BitfileID->BfId)
+#else
+        "bitfile's ObjectID",
+        HPSS_UUID_T(BitfileID->ObjectID)
+#endif
+    );
+}
+
+static globus_result_t
+check_request_status(hpss_reqid_t RequestID, bitfile_id_t *BitfileID, int *Status)
+{
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
+    int retval = Hpss_GetAsyncStatus(RequestID, BitfileID, Status);
+#else
+    int retval = Hpss_GetAsynchStatus(RequestID, BitfileID, Status);
 #endif
 
     if (retval)
@@ -78,7 +218,7 @@ min(size_t x, size_t y)
 }
 
 static globus_result_t
-submit_stage_request(const char *Pathname)
+submit_stage_request(const char *Pathname, hpss_reqid_t RequestID)
 {
     hpss_fileattr_t fattrs;
     int retval = Hpss_FileGetAttributes((char *)Pathname, &fattrs);
@@ -129,7 +269,7 @@ submit_stage_request(const char *Pathname)
         }
     }
 
-    callback_addr.id = REQUEST_ID;
+    callback_addr.id = RequestID;
 
     DEBUG("Requesting stage for %s", Pathname);
 
@@ -145,7 +285,7 @@ submit_stage_request(const char *Pathname)
                                 0,
                                 &callback_addr,
                                 BFS_STAGE_ALL,
-                                &REQUEST_ID,
+                                &RequestID,
                                 &bitfile_id);
     if (retval)
         return hpss_error_to_globus_result(retval);
@@ -160,19 +300,19 @@ check_xattr_residency(hpss_xfileattr_t *XFileAttr)
     if (XFileAttr->Attrs.Type != NS_OBJECT_TYPE_FILE &&
         XFileAttr->Attrs.Type != NS_OBJECT_TYPE_HARD_LINK)
     {
-        return RESIDENT;
+        return RESIDENCY_RESIDENT;
     }
 
     /* Check if the top level is tape. */
     if (XFileAttr->SCAttrib[0].Flags & BFS_BFATTRS_LEVEL_IS_TAPE)
     {
-        return TAPE_ONLY;
+        return RESIDENCY_TAPE_ONLY;
     }
 
     /* Handle zero length files. */
     if (eqz64m(XFileAttr->Attrs.DataLength))
     {
-        return RESIDENT;
+        return RESIDENCY_RESIDENT;
     }
 
     /*
@@ -196,11 +336,11 @@ check_xattr_residency(hpss_xfileattr_t *XFileAttr)
         {
             /* File is purged if more bytes are on tape. */
             if (gt64(XFileAttr->SCAttrib[level].BytesAtLevel, max_bytes))
-                return ARCHIVED;
+                return RESIDENCY_ARCHIVED;
         }
     }
 
-    return RESIDENT;
+    return RESIDENCY_RESIDENT;
 }
 
 static void
@@ -251,13 +391,13 @@ check_file_residency(const char *Pathname, residency_t *Residency)
 
     switch (*Residency)
     {
-    case ARCHIVED:
+    case RESIDENCY_ARCHIVED:
         DEBUG("File is ARCHIVED: %s", Pathname);
         break;
-    case RESIDENT:
+    case RESIDENCY_RESIDENT:
         DEBUG("File is RESIDENT: %s", Pathname);
         break;
-    case TAPE_ONLY:
+    case RESIDENCY_TAPE_ONLY:
         DEBUG("File is TAPE_ONLY: %s", Pathname);
         break;
     }
@@ -308,11 +448,11 @@ get_bitfile_id(const char *Pathname, bitfile_id_t *bitfile_id)
 static char *
 generate_output(const char *Pathname, residency_t Residency)
 {
-    if (Residency == RESIDENT)
+    if (Residency == RESIDENCY_RESIDENT)
         return globus_common_create_string(
             "250 Stage of file %s succeeded.\r\n", Pathname);
 
-    if (Residency == TAPE_ONLY)
+    if (Residency == RESIDENCY_TAPE_ONLY)
         return globus_common_create_string(
             "250 %s is on a tape only class of service.\r\n", Pathname);
 
@@ -336,36 +476,45 @@ pause_1_second(time_t StartTime, int Timeout)
     return 0;
 }
 
-static globus_result_t
-stage_internal(const char *Path, int Timeout, residency_t *Residency)
+// Utils entry point
+globus_result_t
+stage_ex(
+    const char   * Path,
+    int            Timeout,
+    const char   * TaskID,
+    hpss_reqid_t * RequestID,
+    residency_t  * Residency)
 {
     int             time_elapsed = 0;
     time_t          start_time   = time(NULL);
     bitfile_id_t    bitfile_id;
     globus_result_t result;
 
-    *Residency = ARCHIVED;
+    *Residency = RESIDENCY_ARCHIVED;
 
     result = get_bitfile_id(Path, &bitfile_id);
     if (result)
         goto cleanup;
 
-    while (*Residency == ARCHIVED && !time_elapsed)
+    while (*Residency == RESIDENCY_ARCHIVED && !time_elapsed)
     {
         result = check_file_residency(Path, Residency);
         if (result)
             goto cleanup;
-        if (*Residency != ARCHIVED)
+        if (*Residency != RESIDENCY_ARCHIVED)
             break;
 
+        // Generate request ID
+        _generate_request_id(TaskID, &bitfile_id, RequestID);
+
         int status;
-        result = check_request_status(&bitfile_id, &status);
+        result = check_request_status(*RequestID, &bitfile_id, &status);
         if (result)
             goto cleanup;
 
         if (status == HPSS_STAGE_STATUS_UNKNOWN)
         {
-            result = submit_stage_request(Path);
+            result = submit_stage_request(Path, *RequestID);
             if (result)
                 goto cleanup;
         }
@@ -377,6 +526,7 @@ cleanup:
     return result;
 }
 
+// DSI entry point
 void
 stage(globus_gfs_operation_t     Operation,
       globus_gfs_command_info_t *CommandInfo,
@@ -384,15 +534,19 @@ stage(globus_gfs_operation_t     Operation,
 {
     int             timeout;
     char *          command_output = NULL;
-    residency_t     residency      = ARCHIVED;
     globus_result_t result;
 
     result = stage_get_timeout(Operation, CommandInfo, &timeout);
     if (result)
         goto cleanup;
 
-    result = stage_internal(CommandInfo->pathname, timeout, &residency);
-    if (result != GLOBUS_SUCCESS)
+    char * task_id = NULL;
+    globus_gridftp_server_get_task_id(Operation, &task_id);
+
+    hpss_reqid_t request_id;
+    residency_t residency;
+    result = stage_ex(CommandInfo->pathname, timeout, task_id, &request_id, &residency);
+    if (result)
         goto cleanup;
 
     command_output = generate_output(CommandInfo->pathname, residency);
@@ -401,4 +555,6 @@ cleanup:
     Callback(Operation, result, command_output);
     if (command_output)
         globus_free(command_output);
+    if (task_id)
+        free(task_id);
 }

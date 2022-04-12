@@ -1,14 +1,15 @@
-#include <stdlib.h>
-#include <dlfcn.h>
 #include <pio.h>
+#include <stdlib.h>
+
 #include <testing.h>
 #include <mocking.h>
+#include "driver.h"
 
 #define CREATE_SHORTCUT(Name, Value) typeof((Value)) Name = (Value)
 #define RANGE(O, L) &(struct range){O, L}
 #define RANGES(...) (struct range *[]){__VA_ARGS__, NULL}
 
-void (*pio_coordinator_thread)(void * Arg);
+void (*pio_coordinator_thread)(void * Arg) = NULL;
 
 struct range {
     globus_off_t Offset;
@@ -192,6 +193,9 @@ assert(0);
 test_status_t
 test_setup(void * Arg)
 {
+    if (!pio_coordinator_thread)
+        pio_coordinator_thread = lookup_symbol("pio_coordinator_thread");
+
     struct test_pio * test_pio = Arg;
 
     memset(test_pio, 0, sizeof(*test_pio));
@@ -335,39 +339,18 @@ test_bad_bytes_moved(void * Arg)
 // XXX check for log message too
 }
 
-int
-main()
-{
-    dlerror();
-    void * module = dlopen(MODULE, RTLD_LAZY);
-    if (!module)
-    {
-        printf("Failed to open %s: %s\n", MODULE, dlerror());
-        return 1;
-    }
-
-    dlerror();
-    pio_coordinator_thread = dlsym(module, "pio_coordinator_thread");
-    if (!module)
-    {
-        printf("Failed to find %s: %s\n", "pio_coordinator_thread", dlerror());
-        return 1;
-    }
-
-    struct test_case * tc = (struct test_case[]) {
+struct test_suite TEST_SUITE = {
+    .setup = test_setup,
+    .teardown = test_teardown,
+    .test_cases = (struct test_case[]) {
         {"test_single_range",     test_single_range},
         {"test_multi_range",      test_multi_range},
         {"test_good_bytes_moved", test_good_bytes_moved},
         {"test_bad_bytes_moved",  test_bad_bytes_moved},
         {.name = NULL}
-    };
+    }
+};
 
-    struct test_suite ts = {
-        .setup = test_setup,
-        .teardown = test_teardown,
-        .test_cases = tc
-    };
+static struct test_pio test_pio;
 
-    struct test_pio test_pio;
-    return !(run_suite(&ts, &test_pio) == TEST_SUCCESS);
-}
+void * TEST_SUITE_ARG = &test_pio;

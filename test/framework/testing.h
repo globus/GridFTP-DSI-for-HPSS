@@ -18,8 +18,8 @@ struct test_case {
 };
 
 struct test_suite {
-    test_fixture       setup;
-    test_fixture       teardown;
+    test_fixture       setup; // Run before each test case
+    test_fixture       teardown; // Run after each test case
     struct test_case * test_cases;
 };
 

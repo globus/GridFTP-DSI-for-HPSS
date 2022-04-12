@@ -12,7 +12,7 @@ Version: @PACKAGE_VERSION@
 ## own bookkeeping. I'm using 'el%{?rhel}' to force the desired tag.
 ## You can find the system tags in /etc/rpm/macros.dist.
 ## use this for release candidates
-Release: 1~rc1.el%{?rhel}+%{_gcs_tag}
+Release: 1~rc2.el%{?rhel}+%{_gcs_tag}
 ## use this for a release
 #Release: 1%{?dist}+%{_gcs_tag}
 License: ASL 2.0

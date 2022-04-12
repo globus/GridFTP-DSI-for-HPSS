@@ -9,7 +9,7 @@ AC_PROG_CC
 CC="${CC} -std=gnu99"
 
 PKG_CHECK_MODULES([OPENSSL],[openssl])
-PKG_CHECK_MODULES([GLOBUS], [globus-gridftp-server >= 12])
+PKG_CHECK_MODULES([GLOBUS], [globus-gridftp-server >= 12 globus-common])
 PKG_CHECK_MODULES([TIRPC],  [libtirpc])
 
 AC_ARG_ENABLE([gcsv5],
@@ -67,6 +67,7 @@ AC_CONFIG_FILES([source/Makefile])
 AC_CONFIG_FILES([source/loader/Makefile])
 AC_CONFIG_FILES([source/loader/version.h])
 AC_CONFIG_FILES([source/module/Makefile])
+AC_CONFIG_FILES([source/utils/Makefile])
 AC_CONFIG_FILES([test/Makefile])
 AC_CONFIG_FILES([test/framework/Makefile])
 AC_CONFIG_FILES([test/utils/Makefile])

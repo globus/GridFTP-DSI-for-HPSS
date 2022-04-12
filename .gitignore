@@ -20,6 +20,9 @@ missing
 *.lo
 *.la
 .libs/
+*.trs
+*.log
+*.swp
 
 source/loader/version.h
 source/module/Makefile.rules

@@ -1,0 +1,23 @@
+MODULE_CPP_FLAGS=        \
+	@TIRPC_CFLAGS@   \
+	@OPENSSL_CFLAGS@ \
+	@GLOBUS_CFLAGS@  \
+	@HPSS_CFLAGS@
+
+MODULE_LD_FLAGS=@HPSS_LDFLAGS@
+
+if ENABLE_GCSV5
+MODULE_C_FLAGS=-DGCSV5
+endif
+
+#
+# IU and NERSC report that using krb fails because libhpssgss.so doesn't link
+# against libhpsskrbauth.so. NERSC reported that libhpssunixauth.so was
+# necessary in their environment. It is necessary to link these here; the
+# XDR/libtirpc issue causes the runtime dynamic linking to fail without this.
+#
+MODULE_LIBS=           \
+	@TIRPC_LIBS@   \
+	@OPENSSL_LIBS@ \
+	@GLOBUS_LIBS@  \
+	-lhpsskrb5auth -lhpssunixauth -lhpss -lhpsscs

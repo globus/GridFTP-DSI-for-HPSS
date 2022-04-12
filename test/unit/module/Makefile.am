@@ -1,4 +1,7 @@
-check_PROGRAMS = test_pio
+check_PROGRAMS = \
+	test_pio \
+	test_utils
+
 TESTS = $(check_PROGRAMS)
 
 FRAMEWORK = $(top_srcdir)/test/framework
@@ -17,8 +20,12 @@ AM_CPPFLAGS= \
 AM_LDFLAGS=$(GLOBUS_LDFLAGS) $(HPSS_LDFLAGS) -ldl -rdynamic
 
 test_pio_SOURCES =      \
-	test_pio.c      \
+	driver.c        \
 	gridftp_mocks.c \
-	hpss_mocks.c
+	hpss_mocks.c    \
+	test_pio.c
 
 test_pio_LDADD = $(FRAMEWORK)/libframework.a
+
+test_utils_SOURCES = driver.c test_utils.c
+test_utils_LDADD = $(FRAMEWORK)/libframework.a
