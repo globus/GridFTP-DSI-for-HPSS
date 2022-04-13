@@ -124,6 +124,10 @@ _unsigned64(struct pool * pool, unsigned long u);
 char *
 _unsigned64_ptr(struct pool * pool, const unsigned long * p);
 
+#define UNSIGNED_CHAR_PTR(p) _unsigned_char_ptr(pool, p)
+char *
+_unsigned_char_ptr(struct pool * pool, const unsigned char * p);
+
 void
 logging_init();
 

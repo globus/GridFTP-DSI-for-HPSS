@@ -516,18 +516,21 @@ _hpss_uuid_t(struct pool * pool, hpss_uuid_t u)
 }
 
 char *
-_hpss_uuid_t_ptr(struct pool * pool, const hpss_uuid_t * p)
+_hpss_uuid_t_ptr(struct pool * pool, const hpss_uuid_t * uuid_ptr)
 {
-    if (p== NULL)
-        return PTR(p);
-
-    unsigned32 status;
     char * uuid_str = NULL;
 
+    if (uuid_ptr == NULL)
+        return PTR(uuid_ptr);
+
 #if HPSS_MAJOR_VERSION ==  7 && HPSS_MINOR_VERSION == 4
-    uuid_to_string(p, &uuid_str, &status);
+    // HPSS 7.4
+    signed32 status = 0;
+    uuid_to_string(uuid_ptr, &uuid_str, &status);
 #else
-    status = hpss_uuid_to_string(p, &uuid_str);
+    // HPSS 8.3
+    int status = 0;
+    status = hpss_uuid_to_string(uuid_ptr, &uuid_str);
 #endif
 
     if (status == 0)
@@ -547,17 +550,17 @@ _hpss_uuid_t_ptr(struct pool * pool, const hpss_uuid_t * p)
             "clock_seq_low=%s, "             // uint8_t
             "node=%s"                        // char[6]
         "}",
-            UNSIGNED(p->time_low),
-            UNSIGNED16(p->time_mid),
-            UNSIGNED16(p->time_hi_and_version),
-            UNSIGNED8(p->clock_seq_hi_and_reserved),
-            UNSIGNED8(p->clock_seq_low),
-            HEX8(p->node[0]),
-            HEX8(p->node[1]),
-            HEX8(p->node[2]),
-            HEX8(p->node[3]),
-            HEX8(p->node[4]),
-            HEX8(p->node[5]));
+            UNSIGNED(uuid_ptr->time_low),
+            UNSIGNED16(uuid_ptr->time_mid),
+            UNSIGNED16(uuid_ptr->time_hi_and_version),
+            UNSIGNED8(uuid_ptr->clock_seq_hi_and_reserved),
+            UNSIGNED8(uuid_ptr->clock_seq_low),
+            HEX8(uuid_ptr->node[0]),
+            HEX8(uuid_ptr->node[1]),
+            HEX8(uuid_ptr->node[2]),
+            HEX8(uuid_ptr->node[3]),
+            HEX8(uuid_ptr->node[4]),
+            HEX8(uuid_ptr->node[5]));
 }
 
 char *
@@ -862,7 +865,11 @@ _ns_filesetattrs_t_ptr(struct pool * pool, const ns_FilesetAttrs_t * p)
 #endif
             UNSIGNED(p->StateFlags),
             UNSIGNED(p->SubSystemId),
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+            BYTES_PTR(p->UserData),
+#else
             CHAR_PTR(p->UserData),
+#endif
             UNSIGNED64(p->DirectoryCount),
             UNSIGNED64(p->FileCount),
             UNSIGNED64(p->HardLinkCount),

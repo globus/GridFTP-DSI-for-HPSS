@@ -305,3 +305,11 @@ _unsigned64_ptr(struct pool * pool, const unsigned long * p)
         return PTR(p);
     return UNSIGNED64(*p);
 }
+
+char *
+_unsigned_char_ptr(struct pool * pool, const unsigned char * uc_ptr)
+{
+    if (uc_ptr == NULL)
+        return PTR(uc_ptr);
+    return _sprintf(pool, "\"%s\"", uc_ptr);
+}

@@ -34,6 +34,8 @@ _bf_vv_attrib_t(struct pool * pool, bf_vv_attrib_t a);
                                const bfs_bitfile_obj_handle_t * p);
 #endif
 
+#define BYTES_PTR(p) UNSIGNED_CHAR_PTR(p)
+
 #define HPSS_ATTRS_T(a) _hpss_attrs_t(pool, a) 
 char *
 _hpss_attrs_t(struct pool * pool, hpss_Attrs_t a);

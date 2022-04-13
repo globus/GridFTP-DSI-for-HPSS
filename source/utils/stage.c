@@ -37,7 +37,7 @@ static int
 _request_id_to_str(const hpss_reqid_t * RequestID, char * Str, size_t Len)
 {
 #if HPSS_MAJOR_VERSION <= 7
-    snprintf(Str, Len, "%u", RequestID);
+    snprintf(Str, Len, "%u", *RequestID);
     return 0;
 #else
     return hpss_uuid_snprintf(Str, Len, RequestID);

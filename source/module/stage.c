@@ -122,7 +122,7 @@ _bitfile_id_to_bytes(bitfile_id_t * BitfileID, unsigned char Bytes[UUID_BYTE_COU
 #if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
     memcpy(Bytes, BitfileID->BfId.Bytes, UUID_BYTE_COUNT);
 #else
-    hpss_uuid_to_bytes(BitfileID->ObjectID, Bytes);
+    hpss_uuid_to_bytes(&BitfileID->ObjectID, Bytes);
 #endif
 }
 
