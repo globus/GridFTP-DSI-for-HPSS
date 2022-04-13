@@ -8,14 +8,28 @@ AC_PROG_CC
 # -std=gnu99 is not supported on RHEL 6.8
 CC="${CC} -std=gnu99"
 
-PKG_CHECK_MODULES([OPENSSL],[openssl])
-PKG_CHECK_MODULES([GLOBUS], [globus-gridftp-server >= 12 globus-common])
-PKG_CHECK_MODULES([TIRPC],  [libtirpc])
-
 AC_ARG_ENABLE([gcsv5],
     [AS_HELP_STRING([--enable-gcsv5], [Build for Globus Connect Server v5])])
 
 AM_CONDITIONAL([ENABLE_GCSV5], [test x$enable_gcsv5 = xyes])
+
+PKG_CHECK_MODULES([OPENSSL],[openssl])
+PKG_CHECK_MODULES([TIRPC],  [libtirpc])
+
+# GCSv4 ships globus-gridftp-server-devel. GCSv5 ships
+# globus-connect-gridftp-server-devel. pkg-config reports
+# globus-connect-gridftp-server-devel as globus-gridftp-server-devel. So, do
+# look for globus-gridftp-server-devel for GCSv4 and GCSv5, and do allow
+# GCSv5 versions to be used for the GCSv4 build. Do not search for
+# globus-connect-gridftp-server-devel.
+
+MIN_GCS_VERSION=12.24
+if [[ x$enable_gcsv5 = xyes ]];
+then
+    MIN_GCS_VERSION=15.91
+fi
+
+PKG_CHECK_MODULES([GLOBUS], [globus-gridftp-server >= $MIN_GCS_VERSION globus-common])
 
 AC_ARG_WITH([hpss],
             [AS_HELP_STRING([--with-hpss=<path>],
@@ -54,6 +68,7 @@ HPSS_MAJOR=`grep -E "#define HPSS_MAJOR_VERSION" /opt/hpss/include/hpss_version.
 HPSS_MINOR=`grep -E "#define HPSS_MINOR_VERSION" /opt/hpss/include/hpss_version.h | sed "s/VERSION *0/VERSION /"  | awk '{print $3}'`
 
 
+AC_SUBST(MIN_GCS_VERSION)
 AC_SUBST(HPSS_CFLAGS)
 AC_SUBST(HPSS_LDFLAGS)
 AC_SUBST([MAJOR_VERSION], [${PACKAGE_VERSION%%.*}])

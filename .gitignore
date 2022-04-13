@@ -31,3 +31,6 @@ test-driver
 test/utils/symlink
 test/framework/libframework.a
 packaging/fedora/globus-gridftp-server-hpss.spec
+
+globus-gridftp-server-hpss-*
+rpmbuild/
