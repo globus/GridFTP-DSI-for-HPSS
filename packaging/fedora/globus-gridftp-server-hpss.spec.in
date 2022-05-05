@@ -7,14 +7,7 @@
 Summary: HPSS Connector for the Globus Transfer Service
 Name: @PACKAGE_NAME@-@HPSS_MAJOR@.@HPSS_MINOR@
 Version: @PACKAGE_VERSION@
-## Release should be using the %{?dist} tag but CentOS 7.9 has renamed it to
-## el7_9. It's unclear if this denotes a compatibility constraint or their
-## own bookkeeping. I'm using 'el%{?rhel}' to force the desired tag.
-## You can find the system tags in /etc/rpm/macros.dist.
-## use this for release candidates
-Release: 1~rc3.el%{?rhel}+%{_gcs_tag}
-## use this for a release
-#Release: 1%{?dist}+%{_gcs_tag}
+Release: 1%{?dist}+%{_gcs_tag}
 License: ASL 2.0
 URL: https://github.com/JasonAlt/GridFTP-DSI-for-HPSS
 Source: @PACKAGE_NAME@-%{version}.tar.gz
