@@ -1,7 +1,14 @@
 #ifndef _STRINGS_H_
 #define _STRINGS_H_
 
+/*
+ * System includes
+ */
 #include <stdarg.h>
+
+/*
+ * Local includes
+ */
 #include "pool.h"
 
 char *

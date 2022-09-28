@@ -1,7 +1,14 @@
 #ifndef HPSS_DSI_UTILS_H
 #define HPSS_DSI_UTILS_H
 
+/*
+ * System includes
+ */
 #include <stdbool.h>
+
+/*
+ * Local includes
+ */
 #include "hpss.h"
 
 bool

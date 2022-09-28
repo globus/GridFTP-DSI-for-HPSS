@@ -1,16 +1,16 @@
 /*
- * System includes.
+ * System includes
  */
 #include <sys/types.h>
 #include <pwd.h>
 
 /*
- * Globus includes.
+ * Globus includes
  */
-#include <globus_gridftp_server.h>
+#include <_globus_gridftp_server.h>
 
 /*
- * Local includes.
+ * Local includes
  */
 #include "hpss.h"
 #include "test.h"

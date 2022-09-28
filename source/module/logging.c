@@ -1,9 +1,20 @@
+/*
+ * System includes
+ */
 #define _GNU_SOURCE /* See feature_test_macros(7) */
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <time.h>
-#include <globus_gridftp_server.h>
+
+/*
+ * Globus includes
+ */
+#include <_globus_gridftp_server.h>
+
+/*
+ * Local includes
+ */
 #include "logging.h"
 #include "strings.h"
 

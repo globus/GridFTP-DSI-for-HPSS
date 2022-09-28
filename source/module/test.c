@@ -1,4 +1,6 @@
-/* System includes. */
+/*
+ * System includes
+ */
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -6,10 +8,14 @@
 #include <string.h>
 #include <time.h>
 
-/* HPSS includes. */
+/*
+ * HPSS includes
+ */
 #include <hpss_errno.h>
 
-/* Local includes. */
+/*
+ * Local includes
+ */
 #include "logging.h"
 #include "test.h"
 

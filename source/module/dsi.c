@@ -6,7 +6,7 @@
 /*
  * Globus includes
  */
-#include <globus_gridftp_server.h>
+#include <_globus_gridftp_server.h>
 
 /*
  * Local includes

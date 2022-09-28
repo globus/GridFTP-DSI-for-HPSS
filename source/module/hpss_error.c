@@ -1,5 +1,5 @@
 /*
- * System includes.
+ * System includes
  */
 #include <pthread.h>
 #include <stdlib.h>
@@ -7,12 +7,12 @@
 #include <errno.h>
 
 /*
- * Globus includes.
+ * Globus includes
  */
-#include <globus_gridftp_server.h>
+#include <_globus_gridftp_server.h>
 
 /*
- * HPSS includes.
+ * HPSS includes
  */
 #include <hpss_String.h>
 #include <hpss_errno.h>

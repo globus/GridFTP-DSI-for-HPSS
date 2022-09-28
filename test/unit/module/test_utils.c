@@ -159,6 +159,7 @@ struct test_suite TEST_SUITE = {
         {"test_hpss_uuid_to_bytes", test_hpss_uuid_to_bytes},
         {"test_bytes_to_hpss_uuid", test_bytes_to_hpss_uuid},
         {"test_bytes_to_unsigned",  test_bytes_to_unsigned},
+        {NULL,  NULL},
     }
 };
 

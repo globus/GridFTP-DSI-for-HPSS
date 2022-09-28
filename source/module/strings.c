@@ -1,7 +1,13 @@
+/*
+ * System includes
+ */
 #define _GNU_SOURCE         /* See feature_test_macros(7) */
 #include <string.h>
 #include <stdio.h>
 
+/*
+ * Local includes
+ */
 #include "strings.h"
 
 char *

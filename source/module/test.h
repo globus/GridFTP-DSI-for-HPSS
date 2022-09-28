@@ -1,6 +1,9 @@
 #ifndef _TEST_EVENT_H_
 #define _TEST_EVENT_H_
 
+/*
+ * System includes
+ */
 #include <inttypes.h>
 
 typedef enum {

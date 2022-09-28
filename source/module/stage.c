@@ -1,10 +1,10 @@
 /*
  * System includes
  */
+#include <sys/select.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/select.h>
 #include <time.h>
 
 /*

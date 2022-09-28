@@ -1,11 +1,11 @@
 /*
- * System includes.
+ * System includes
  */
 #include <stdbool.h>
 #include <string.h>
 
 /*
- * Local includes.
+ * Local includes
  */
 #include "hpss_error.h"
 #include "hpss_log.h"

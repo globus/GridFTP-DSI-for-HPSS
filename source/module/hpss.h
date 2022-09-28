@@ -2,24 +2,6 @@
 #define _HPSS_H_
 
 /*
- * This is a hack for GCC 4.4.7 on RHEL 6.8. These two files include the same
- * definition of OM_uint32:
- *   /usr/include/globus/gssapi.h
- *   /opt/hpss/include/hpss_gasapi.h
- *
- * The Globus version correctly sets _GSSAPI_H_ but doesn't gate on it.
- * The HPSS version correctly gates on _GSSAPI_H_ but doesn't set it.
- *
- * This isn't a problem with later versions of GCC (ie 4.8.5) and from what I've
- * read, somewhere around version 4.6, GCC made duplicate typedefs a non issue.
- * I haven't found a pragma or compiler switch to allow the duplicate typedef
- * definition with older compilers. So this will have to do.
- */
-#if (__GNUC__ == 4 && __GNUC_MINOR__ < 6)
-#include <globus_gridftp_server.h>
-#endif
-
-/*
  * HPSS includes
  */
 #include <hpss_api.h>
@@ -31,7 +13,7 @@
 #include <hpss_version.h>
 
 /*
- * Local includes.
+ * Local includes
  */
 #include "hpss_error.h"
 

@@ -1,4 +1,11 @@
+/*
+ * HPSS includes
+ */
 #include <hpss_api.h>
+
+/*
+ * Project includes
+ */
 #include <mocking.h>
 
 int

@@ -4,7 +4,7 @@
 /*
  * Globus includes
  */
-#include <globus_gridftp_server.h>
+#include <_globus_gridftp_server.h>
 
 globus_result_t
 stat_object(char *Pathname, globus_gfs_stat_t *);

@@ -1,9 +1,18 @@
+/*
+ * System includes
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
+/*
+ * HPSS includes
+ */
 #include <hpss_uuid.h>
 
+/*
+ * Project includes
+ */
 #include <stage.h>
 #include <logging.h>
 #include <authenticate.h>

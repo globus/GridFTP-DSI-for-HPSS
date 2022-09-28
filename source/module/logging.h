@@ -1,10 +1,21 @@
 #ifndef _LOGGING_H_
 #define _LOGGING_H_
 
+/*
+ * System includes
+*/
 #include <sys/types.h>
 #include <stdarg.h>
 #include <utime.h>
+
+/*
+ * Globus includes
+ */
 #include <globus_common.h>
+
+/*
+ * Local includes
+ */
 #include "pool.h"
 
 #define ERROR(...) log_message(LOG_TYPE_ERROR, __VA_ARGS__)

@@ -1,3 +1,5 @@
+include ../../../source/module/Makefile.rules
+
 check_PROGRAMS = \
 	test_pio \
 	test_utils
@@ -5,19 +7,21 @@ check_PROGRAMS = \
 TESTS = $(check_PROGRAMS)
 
 FRAMEWORK = $(top_srcdir)/test/framework
-MODULE = $(top_srcdir)/source/module
+MODULE= $(top_srcdir)/source/module
 
 # -rdynamic forces the DSI to use our mocks/hooks
 AM_CPPFLAGS= \
-	$(GLOBUS_CFLAGS) \
-	$(HPSS_CFLAGS)   \
+	$(MODULE_CPP_FLAGS) \
 	-I$(FRAMEWORK)   \
 	-I$(MODULE)      \
 	-ggdb3           \
 	-rdynamic        \
 	-DMODULE="\"$(MODULE)/.libs/libglobus_gridftp_server_hpss_real.so\""
 
-AM_LDFLAGS=$(GLOBUS_LDFLAGS) $(HPSS_LDFLAGS) -ldl -rdynamic
+AM_CFLAGS= \
+	$(MODULE_C_FLAGS)
+
+AM_LDFLAGS=$(MODULE_LD_FLAGS) -ldl -rdynamic
 
 test_pio_SOURCES =      \
 	driver.c        \

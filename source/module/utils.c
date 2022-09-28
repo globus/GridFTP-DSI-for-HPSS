@@ -1,8 +1,14 @@
-#include <ctype.h>
-#include <assert.h>
-#include <string.h>
+/*
+ * System includes
+ */
 #include <stdbool.h>
+#include <string.h>
+#include <assert.h>
+#include <ctype.h>
 
+/*
+ * Local includes
+ */
 #include "utils.h"
 
 

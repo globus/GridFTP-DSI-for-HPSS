@@ -1,6 +1,7 @@
 lib_LTLIBRARIES = libglobus_gridftp_server_hpss_real.la
 
-SOURCES = authenticate.c \
+SOURCES = _globus_gridftp_server.h \
+          authenticate.c \
           authenticate.h \
           cksm.c         \
           cksm.h         \

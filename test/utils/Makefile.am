@@ -1,11 +1,15 @@
+include ../../source/module/Makefile.rules
+
 noinst_PROGRAMS = symlink
 
 symlink_SOURCES = symlink.c
 
+AM_CPPFLAGS= \
+	$(MODULE_CPP_FLAGS) \
+	-ggdb3
 
-AM_CPPFLAGS=$(TIRPC_CFLAGS) $(HPSS_CFLAGS) -ggdb3
-AM_LDFLAGS=$(TIRPC_LDFLAGS) $(HPSS_LDFLAGS)
+AM_CFLAGS= $(MODULE_C_FLAGS)
 
-HPSS_LIBS=-lhpsskrb5auth -lhpssunixauth -lhpss -lhpsscs
+AM_LDFLAGS=$(MODULE_LD_FLAGS)
 
-symlink_LDADD = $(TIRPC_LIBS) $(HPSS_LIBS)
+symlink_LDADD = $(MODULE_LIBS)

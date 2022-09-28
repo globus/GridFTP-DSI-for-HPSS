@@ -1,4 +1,7 @@
-#include <globus_gridftp_server.h>
+/*
+ * Globus includes
+ */
+#include <_globus_gridftp_server.h>
 
 const int GlobusError = 0x0123ABCD;
 

@@ -1,8 +1,18 @@
+/*
+ * System includes
+ */
 #include <pio.h>
 #include <stdlib.h>
 
+/*
+ * Project includes
+ */
 #include <testing.h>
 #include <mocking.h>
+
+/*
+ * Local includes
+ */
 #include "driver.h"
 
 #define CREATE_SHORTCUT(Name, Value) typeof((Value)) Name = (Value)

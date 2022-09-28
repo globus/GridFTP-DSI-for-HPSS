@@ -1,6 +1,9 @@
 #ifndef _HPSS_LOG_H_
 #define _HPSS_LOG_H_
 
+/*
+ * HPSS includes
+ */
 #include <hpss_api.h>
 #include <hpss_version.h>
 

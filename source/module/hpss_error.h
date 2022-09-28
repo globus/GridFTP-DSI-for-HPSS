@@ -2,12 +2,12 @@
 #define _HPSS_ERROR_H_
 
 /*
- * Globus includes.
+ * Globus includes
  */
-#include <globus_gridftp_server.h>
+#include <_globus_gridftp_server.h>
 
 /*
- * HPSS includes.
+ * HPSS includes
  */
 #include <hpss_api.h>
 

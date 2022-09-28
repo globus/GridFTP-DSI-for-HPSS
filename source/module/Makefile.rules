@@ -1,8 +1,11 @@
-MODULE_CPP_FLAGS=        \
-	@TIRPC_CFLAGS@   \
-	@OPENSSL_CFLAGS@ \
-	@GLOBUS_CFLAGS@  \
-	@HPSS_CFLAGS@
+
+_GLOBUS_CFLAGS=`echo $(GLOBUS_CFLAGS) | sed 's,-I,-idirafter,g'`
+
+MODULE_CPP_FLAGS=         \
+	$(TIRPC_CFLAGS)   \
+	$(OPENSSL_CFLAGS) \
+	$(_GLOBUS_CFLAGS) \
+	$(HPSS_CFLAGS)
 
 MODULE_LD_FLAGS=@HPSS_LDFLAGS@
 
@@ -16,8 +19,10 @@ endif
 # necessary in their environment. It is necessary to link these here; the
 # XDR/libtirpc issue causes the runtime dynamic linking to fail without this.
 #
-MODULE_LIBS=           \
-	@TIRPC_LIBS@   \
-	@OPENSSL_LIBS@ \
-	@GLOBUS_LIBS@  \
-	-lhpsskrb5auth -lhpssunixauth -lhpss -lhpsscs
+MODULE_LIBS=            \
+	$(TIRPC_LIBS)   \
+	$(OPENSSL_LIBS) \
+	$(GLOBUS_LIBS)  \
+	-lhpss -lhpsscs
+
+#	-lhpsskrb5auth -lhpssunixauth -lhpss -lhpsscs

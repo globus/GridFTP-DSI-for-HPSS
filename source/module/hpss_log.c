@@ -1,9 +1,15 @@
+/*
+ * HPSS includes
+ */
 #if HPSS_MAJOR_VERSION >= 8
 #include <hpss_RequestID.h>
 #endif
 #include <hpss_types.h>
 #include <hpss_uuid.h>
 
+/*
+ * Local includes
+ */
 #include "hpss_log.h"
 #include "strings.h"
 
