@@ -1,3 +1,6 @@
+Version 2.18-rc1: Thu Sep 29 10:37:11 EDT 2022
+	- Added support for HPSS 9.3
+
 Version 2.17: Thu May  5 10:48:50 EDT 2022
 	- Added support for Globus Connect Server v5.4. Packages have a new
 	  tag '+gcsv4 or '+gcsv5' to denote which version of GCS to install it

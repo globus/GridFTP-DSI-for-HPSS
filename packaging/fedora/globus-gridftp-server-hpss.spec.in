@@ -4,7 +4,7 @@
     %global _gcs_tag gcsv4
 %endif
 
-Summary: HPSS Connector for the Globus Transfer Service
+Summary: HPSS Connector for Globus
 Name: @PACKAGE_NAME@-@HPSS_MAJOR@.@HPSS_MINOR@
 Version: @PACKAGE_VERSION@
 Release: 1%{?dist}+%{_gcs_tag}

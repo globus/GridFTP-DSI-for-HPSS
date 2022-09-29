@@ -1,4 +1,5 @@
-AC_INIT([globus-gridftp-server-hpss], [2.17], [Globus <support@globus.org>])
+# Use fedora version formatting, ie. 2.17, 2.17~rc1.
+AC_INIT([globus-gridftp-server-hpss], [2.18~rc1], [Globus <support@globus.org>])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 # automake 1.11.1 (RHEL 6.8) does not support AM_PROG_AR
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
@@ -72,7 +73,8 @@ AC_SUBST(MIN_GCS_VERSION)
 AC_SUBST(HPSS_CFLAGS)
 AC_SUBST(HPSS_LDFLAGS)
 AC_SUBST([MAJOR_VERSION], [${PACKAGE_VERSION%%.*}])
-AC_SUBST([MINOR_VERSION], [${PACKAGE_VERSION##*.}])
+_MINOR_VERSION="${PACKAGE_VERSION#*.}"
+AC_SUBST([MINOR_VERSION], [${_MINOR_VERSION%~*}])
 AC_SUBST(PACKAGE_NAME)
 AC_SUBST(HPSS_MAJOR)
 AC_SUBST(HPSS_MINOR)
