@@ -8,7 +8,7 @@
 /*
  * Local includes
  */
-#include "strings.h"
+#include "local_strings.h"
 
 char *
 _sprintf(struct pool * pool, const char * format, ...)

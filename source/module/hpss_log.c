@@ -11,7 +11,7 @@
  * Local includes
  */
 #include "hpss_log.h"
-#include "strings.h"
+#include "local_strings.h"
 
 char *
 _api_config_t_ptr(struct pool * pool, const api_config_t * p)

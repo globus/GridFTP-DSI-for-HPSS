@@ -16,7 +16,7 @@
  * Local includes
  */
 #include "logging.h"
-#include "strings.h"
+#include "local_strings.h"
 
 GlobusDebugDefine(GLOBUS_GRIDFTP_SERVER_HPSS);
 

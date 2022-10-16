@@ -48,7 +48,7 @@
 /*
  * Local includes
  */
-#include "strings.h"
+#include "local_strings.h"
 
 static int
 login(char *  AuthenticationMech,

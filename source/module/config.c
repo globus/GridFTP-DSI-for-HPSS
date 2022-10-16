@@ -1,6 +1,7 @@
 /*
  * System includes
  */
+#include <strings.h>
 #include <stdlib.h>
 #ifdef GCSV5
 #include <jansson.h>

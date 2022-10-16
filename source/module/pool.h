@@ -2,6 +2,11 @@
 #define _POOL_H_
 
 /*
+ * System includes
+ */
+#include <stddef.h>
+
+/*
  * A pool is just a record of memory allocations that can be easily
  * released with a call to pool_destroy(). This is mainly for making
  * logging calls cleaner.
