@@ -43,7 +43,9 @@ HPSS_CFLAGS="-DLINUX -DLITTLEEND -I${HPSS_ROOT}/include"
 HPSS_LDFLAGS="-L${HPSS_ROOT}/lib -Wl,-rpath,${HPSS_ROOT}/lib"
 
 SAVE_CPPFLAGS="${CPPFLAGS}"
-CPPFLAGS="${HPSS_CFLAGS}"
+# RHEL 8.4 doesn't supply /usr/include/rpc/rpc.h do we need to pass through the
+# tirpc module includes found above.
+CPPFLAGS="${TIRPC_CFLAGS} ${HPSS_CFLAGS}"
 AC_CHECK_HEADERS([hpss_String.h \
                   hpss_errno.h \
                   hpss_mech.h \
@@ -53,7 +55,7 @@ AC_CHECK_HEADERS([hpss_String.h \
                   hpss_Getenv.h \
                   hpss_net.h \
                   hpss_stat.h],
-                 [], 
+                 [DONT_POLLUTE_INCLUDES=], 
                  [AC_MSG_ERROR(hpss-lib-devel is not installed)])
 CPPFLAGS="${SAVE_CPPFLAGS}"
 
