@@ -1,6 +1,6 @@
 Version 2.18-rc2: Sun Oct 16 14:21:49 EDT 2022
 	- Added support for HPSS 9.3
-	- Fixed several build issues on EL8.6 with HPSS 8.3
+	- Fixed several build issues on EL8.6 with HPSS 9.3
 	- Detect Globus Community Toolkit packages
 
 Version 2.17: Thu May  5 10:48:50 EDT 2022
