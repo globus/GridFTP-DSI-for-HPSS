@@ -1,3 +1,4 @@
+compile
 venv
 Makefile.in
 .deps/
