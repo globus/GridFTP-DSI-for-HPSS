@@ -41,6 +41,6 @@ upload_assets:
 down_sign_up: venv
 	./venv/bin/python3 ./scripts/download_asset.py $(TAG) $(ASSET)
 	./venv/bin/python3 ./scripts/sign_asset.py $(ASSET)
-	./venv/bin/python3 ./scripts/upload_asset.sh $(TAG) $(ASSET).asc
+	bash ./scripts/upload_asset.sh $(TAG) $(ASSET).asc
 
 .SILENT:

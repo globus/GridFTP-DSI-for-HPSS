@@ -56,7 +56,7 @@ ASSET=$2
 if [[ -z "${GITHUB_TOKEN}" || -z "${TAG}" || -z "${ASSET}" ]]
 then
     echo "Usage: GITHUB_TOKEN=<token> upload_asset.sh <tag> <asset>"
-    [[ $_ != $0 ]] && return 1 || exit 1
+    [[ $_ != $0 ]] && exit 1 || return 1
 fi
 
 upload_asset $REPO $TAG $GITHUB_TOKEN $ASSET
