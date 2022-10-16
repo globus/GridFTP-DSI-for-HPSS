@@ -54,7 +54,7 @@ HPSS Connector for the Globus Transfer Service
 %if %{_gcs_tag} == gcsv4
 ./configure --libdir=/usr/lib64
 %else
-CFLAGS="-DGCSv5" ./configure --libdir=/usr/lib64 --enable-gcsv5
+./configure --libdir=/usr/lib64 --enable-gcsv5
 %endif
 make
 
