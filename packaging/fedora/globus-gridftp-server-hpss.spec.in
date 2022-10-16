@@ -33,6 +33,9 @@ Requires: libtirpc
 
 %if %{_gcs_tag} == gcsv4
 Requires: globus-connect-server
+# Avoid Globus Community Toolkit versions 13.x & 14.x
+Conflicts: globus-gridftp-server >= 13, globus-gridftp-server < 15
+Conflicts: globus-gridftp-server-devel >= 13, globus-gridftp-server-devel < 15
 %else
 Requires: globus-connect-server54 >= 5.4.43
 Requires: jansson
