@@ -9,34 +9,116 @@ AC_PROG_CC
 # -std=gnu99 is not supported on RHEL 6.8
 CC="${CC} -std=gnu99"
 
+#
+# Configure Options
+#
+
 AC_ARG_ENABLE([gcsv5],
     [AS_HELP_STRING([--enable-gcsv5], [Build for Globus Connect Server v5])])
 
 AM_CONDITIONAL([ENABLE_GCSV5], [test x$enable_gcsv5 = xyes])
-
-PKG_CHECK_MODULES([OPENSSL],[openssl])
-PKG_CHECK_MODULES([TIRPC],  [libtirpc])
-
-# GCSv4 ships globus-gridftp-server-devel. GCSv5 ships
-# globus-connect-gridftp-server-devel. pkg-config reports
-# globus-connect-gridftp-server-devel as globus-gridftp-server-devel. So, do
-# look for globus-gridftp-server-devel for GCSv4 and GCSv5, and do allow
-# GCSv5 versions to be used for the GCSv4 build. Do not search for
-# globus-connect-gridftp-server-devel.
-
-MIN_GCS_VERSION=12.24
-if [[ x$enable_gcsv5 = xyes ]];
-then
-    MIN_GCS_VERSION=15.91
-fi
-
-PKG_CHECK_MODULES([GLOBUS], [globus-gridftp-server >= $MIN_GCS_VERSION globus-common])
 
 AC_ARG_WITH([hpss],
             [AS_HELP_STRING([--with-hpss=<path>],
                             [path to HPSS installation. [default=/opt/hpss]])],
             [HPSS_ROOT=$withval],
             [HPSS_ROOT=/opt/hpss])
+
+#
+# Globus Dependencies
+#
+
+# - GCSv4 ships globus-gridftp-server-devel.
+# - GCSv5 ships globus-connect-gridftp-server-devel.
+# - pkg-config reports globus-connect-gridftp-server-devel as globus-gridftp-server-devel.
+# - look for globus-gridftp-server-devel for GCSv4 and GCSv5
+# - allow GCSv5 versions to be used for the GCSv4 build
+# - Do not search for globus-connect-gridftp-server-devel
+
+MIN_GCSV4_GRIDFTP_VERSION=12.24
+MIN_GCSV5_GRIDFTP_VERSION=15.91
+MIN_GCSV5_VERSION=5.4.43
+
+# - Do not check for globus-connect-server version MIN_GCSV5_VERSION. We leave that
+#   as a Requires in the packaging so that we can build GCSv5 releases on hosts running
+#   GCSv4.
+
+# If the caller is enabling GCSv5 support, do not let the following PKG_CHECK_MODULE
+# succced on the V4 GridFTP version check.
+MIN_GRIDFTP_VERSION=$MIN_GCSV4_GRIDFTP_VERSION
+if [[ x$enable_gcsv5 = xyes ]];
+then
+	MIN_GRIDFTP_VERSION=$MIN_GCSV5_GRIDFTP_VERSION
+fi
+
+# - Track whether it is possible to build GCSv5 versions, regardless of whether or not
+#   the user asked us to build it, so that we can notify the release build system.
+_GCSV5_BUILD_AVAILABLE=0
+
+# - Check whether we have the v5 or v4 version of the gridftp server libraries.
+PKG_CHECK_MODULES(
+	[GLOBUS],
+	[globus-gridftp-server >= $MIN_GCSV5_GRIDFTP_VERSION globus-common],
+	[_GCSV5_BUILD_AVAILABLE=1],
+	[PKG_CHECK_MODULES(
+		[GLOBUS],
+		[globus-gridftp-server >= $MIN_GRIDFTP_VERSION globus-common]
+	)]
+)
+
+# - Do not use Globus Community Toolkit versions
+_REPO_URL="https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm"
+_GCT_MSG="Globus Community Toolkit versions (13.x) are not compatible. "`
+	`"This happens when Globus is installed from EPEL. Use the RPM repo "`
+	`"definitions at $_REPO_URL and install globus-gridftp-server-devel version 12.x or 15.x."
+
+PKG_CHECK_MODULES(
+	[GCT],
+	[globus-gridftp-server >= 13 globus-gridftp-server < 15],
+	[AC_MSG_ERROR($_GCT_MSG)],
+	[]
+)
+
+
+#
+# Always-Required Third-Party Dependencies
+#
+
+PKG_CHECK_MODULES([OPENSSL],[openssl])
+PKG_CHECK_MODULES([TIRPC],  [libtirpc])
+
+#
+# GCSv5-Required Third-Party Dependencies
+#
+
+# We need to check for GCSv5 dependencies in two scenarios:
+# - if the user is building for GCSv5, the dependencies _must_ be installed
+# - we want to tell automake whether a GCSv5 release build is possible, in which
+#   case the dependencies may or may not be installed
+if [[ x$enable_gcsv5 = xyes ]];
+then
+	PKG_CHECK_MODULES([JANSSON], [jansson])
+elif [[ x$_GCSV5_BUILD_AVAILABLE = x1 ]];
+then
+	PKG_CHECK_MODULES([JANSSON], [jansson], [], [_GCSV5_BUILD_AVAILABLE=0])
+fi
+
+#
+# HPSS Dependencies
+#
+
+# - HPSS detection occurs after Third-Party detection because of HPSS < 7.5 lack of pkg_config
+# - We can use this after we iron out HPSS_CFLAGS, HPSS_LDFLAGS, etc in each Makefile
+
+# export PKG_CONFIG_PATH=/opt/hpss/lib
+# PKG_CHECK_MODULES(
+#	[HPSS],
+#	[hpss],
+#	[_HPSS_LIB_FOUND=1],
+#	[_HPSS_LIB_FOUND=0],
+#)
+
+# - We can change this to only apply to HPSS < 7.5
 
 # hpss-clnt-devel-7.5 has a pkg config but 7.3, 7.4 does not
 HPSS_CFLAGS="-DLINUX -DLITTLEEND -I${HPSS_ROOT}/include"
@@ -70,8 +152,18 @@ LDFLAGS="${SAVE_LDFLAGS}"
 HPSS_MAJOR=`grep -E "#define HPSS_MAJOR_VERSION" /opt/hpss/include/hpss_version.h | sed "s/HPSS_MAJOR_VERSION *0/HPSS_MAJOR_VERSION /"  | awk '{print $3}'`
 HPSS_MINOR=`grep -E "#define HPSS_MINOR_VERSION" /opt/hpss/include/hpss_version.h | sed "s/VERSION *0/VERSION /"  | awk '{print $3}'`
 
+#
+# Output
+#
 
-AC_SUBST(MIN_GCS_VERSION)
+# - This is used by the release process to know whether or not to attempt to
+#   build v5 packages.
+AM_CONDITIONAL([GCSV5_BUILD_AVAILABLE], [test x$_GCSV5_BUILD_AVAILABLE = x1])
+
+
+AC_SUBST(MIN_GCSV4_GRIDFTP_VERSION)
+AC_SUBST(MIN_GCSV5_GRIDFTP_VERSION)
+AC_SUBST(MIN_GCSV5_VERSION)
 AC_SUBST(HPSS_CFLAGS)
 AC_SUBST(HPSS_LDFLAGS)
 AC_SUBST([MAJOR_VERSION], [${PACKAGE_VERSION%%.*}])

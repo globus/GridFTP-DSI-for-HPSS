@@ -24,7 +24,6 @@ Packager: Jason Alt <jasonalt@globus.org>
 #  For more details: http://ftp.rpm.org/max-rpm/s1-rpm-depend-auto-depend.html
 AutoReq: no
 
-Requires: globus-gridftp-server >= @MIN_GCS_VERSION@
 Requires: openssl
 # I would prefer to set this equal to @HPSS_MAJOR@.@HPSS_MINOR@ but HPSS version
 # comes out like hpss-lib-8.3.0.0-0.el7.x86_64
@@ -33,16 +32,19 @@ Requires: libtirpc
 
 %if %{_gcs_tag} == gcsv4
 Requires: globus-connect-server
+Requires: globus-gridftp-server >= @MIN_GCSV4_GRIDFTP_VERSION@
 # Avoid Globus Community Toolkit versions 13.x & 14.x
 Conflicts: globus-gridftp-server >= 13, globus-gridftp-server < 15
 Conflicts: globus-gridftp-server-devel >= 13, globus-gridftp-server-devel < 15
+BuildRequires: globus-gridftp-server-devel >= @MIN_GCSV4_GRIDFTP_VERSION@
 %else
-Requires: globus-connect-server54 >= 5.4.43
+Requires: globus-connect-server54 >= @MIN_GCSV5_VERSION@
+Requires: globus-gridftp-server >= @MIN_GCSV5_GRIDFTP_VERSION@
 Requires: jansson
 BuildRequires: jansson-devel
+BuildRequires: globus-gridftp-server-devel >= @MIN_GCSV5_GRIDFTP_VERSION@
 %endif
 
-BuildRequires: globus-gridftp-server-devel >= @MIN_GCS_VERSION@
 BuildRequires: openssl-devel
 BuildRequires: hpss-lib-devel
 BuildRequires: libtirpc-devel
