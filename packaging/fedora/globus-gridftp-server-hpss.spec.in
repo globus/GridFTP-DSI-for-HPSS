@@ -34,9 +34,9 @@ Requires: libtirpc
 Requires: globus-connect-server
 Requires: globus-gridftp-server >= @MIN_GCSV4_GRIDFTP_VERSION@
 # Avoid Globus Community Toolkit versions 13.x & 14.x
-Conflicts: globus-gridftp-server >= 13, globus-gridftp-server < 15
-Conflicts: globus-gridftp-server-devel >= 13, globus-gridftp-server-devel < 15
+Conflicts: globus-gridftp-server = 13, globus-gridftp-server = 14
 BuildRequires: globus-gridftp-server-devel >= @MIN_GCSV4_GRIDFTP_VERSION@
+BuildConflicts: globus-gridftp-server-devel = 13, globus-gridftp-server-devel = 14
 %else
 Requires: globus-connect-server54 >= @MIN_GCSV5_VERSION@
 Requires: globus-gridftp-server >= @MIN_GCSV5_GRIDFTP_VERSION@
