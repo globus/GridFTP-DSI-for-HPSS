@@ -1,7 +1,7 @@
-Version 2.19a1: Wed Nov 16 14:02:46 EST 2022
-	- Fixed RPM dependencies for GCSv4 installation
+Version 2.18-2: Tue Dec 13 11:15:31 EST 2022
+	- Fixed rpm conflicts with GCSv4 packages
 
-Version 2.18: Fri Oct 21 14:10:33 EDT 2022
+Version 2.18-1: Fri Oct 21 14:10:33 EDT 2022
 	- Added support for HPSS 9.3
 	- Fixed several build issues on EL8.6 with HPSS 9.3
 	- Detect Globus Community Toolkit packages
