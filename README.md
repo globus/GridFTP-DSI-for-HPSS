@@ -12,7 +12,7 @@ to.
 ## Installation
 If you are an admin planning to install the HPSS connector for production use,
 go to the
-[official docs](https://docs.globus.org/premium-storage-connectors/hpss/)
+[official docs](https://docs.globus.org/premium-storage-connectors/v5.4/hpss/)
 for the most recent installation instructions. 
 
 RPMs are provided for HPSS/OS versions for sites that have graciously provided
