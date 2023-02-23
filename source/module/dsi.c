@@ -2,6 +2,7 @@
  * System includes
  */
 #include <string.h>
+#include <stdlib.h>
 
 /*
  * Globus includes
@@ -47,19 +48,25 @@ dsi_init(globus_gfs_operation_t     Operation,
 
     /*
      * Verify the HPSS version.
+     *
+     * HPSS_MAJOR_VERSION could be either double digits, ie 07 for pre HPSS 8.x or
+     * single digit, ie 8, for HPSS 8.x and later.
      */
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
     // Runtime version string
     char * version_string = Hpss_BuildLevelString();
+    char major[2] = {version_string[0]};
+    char minor[2] = {version_string[2]};
+
     if (version_string == NULL ||
         strlen(version_string) < 3 ||
-        version_string[0] != TOSTRING(HPSS_MAJOR_VERSION)[0] ||
-        version_string[2] != TOSTRING(HPSS_MINOR_VERSION)[0])
+        atoi(major) != HPSS_MAJOR_VERSION ||
+        atoi(minor) != HPSS_MINOR_VERSION)
     {
         ERROR("The HPSS connector was not built for this version of HPSS. "
-              "Runtime verion is %s. Buildtime version was %d.%d",
-              version_string,
+              "Runtime version is %s. Buildtime version was %d.%d",
+              version_string ? version_string : "NULL",
               HPSS_MAJOR_VERSION,
               HPSS_MINOR_VERSION);
         result  = HPSSWrongVersion();
