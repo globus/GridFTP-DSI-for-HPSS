@@ -314,7 +314,12 @@ config_parse_json(const char * JsonConfig, config_t * Config)
         goto unpack_fail;
     }
 
-    Config->LoginName = strdup("hpssftp");
+    // Allow renamed hpssftp accounts
+    const char * login_name = getenv("HPSS_DSI_LOGIN_NAME");
+    if (login_name == NULL)
+        login_name = "hpssftp";
+
+    Config->LoginName = strdup(login_name);
     Config->AuthenticationMech = strdup(authentication_mech);
     Config->Authenticator = strdup(authenticator);
     Config->UDAChecksumSupport = 0;

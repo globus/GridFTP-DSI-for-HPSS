@@ -1,4 +1,7 @@
-Version 2.18-2: Tue Dec 13 11:15:31 EST 2022
+Version 2.20-rc1: Tue Jun 27 14:35:26 EDT 2023
+	- Allow setting HPSS login name via HPSS_DSI_LOGIN_NAME.
+
+Version 2.19-2: Tue Dec 13 11:15:31 EST 2022
 	- Fixed rpm conflicts with GCSv4 packages
 
 Version 2.18-1: Fri Oct 21 14:10:33 EDT 2022
