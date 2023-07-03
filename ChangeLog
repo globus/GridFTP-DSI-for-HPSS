@@ -1,4 +1,4 @@
-Version 2.20-rc1: Tue Jun 27 14:35:26 EDT 2023
+Version 2.20-rc2: Mon Jul  3 09:52:11 EDT 2023
 	- Allow setting HPSS login name via HPSS_DSI_LOGIN_NAME.
 
 Version 2.19-2: Tue Dec 13 11:15:31 EST 2022

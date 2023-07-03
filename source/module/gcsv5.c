@@ -185,8 +185,13 @@ login(char *  AuthenticationMech,
         return retval;
     }
 
+    /* Allow renamed hpssftp accounts */
+    const char * login_name = getenv("HPSS_DSI_LOGIN_NAME");
+    if (login_name == NULL)
+        login_name = "hpssftp";
+
     /* Now log into HPSS using our configured 'super user' */
-    retval = hpss_SetLoginCred("hpssftp",
+    retval = hpss_SetLoginCred(login_name,
                                authn_mech,
                                hpss_rpc_cred_client,
                                auth_type,
