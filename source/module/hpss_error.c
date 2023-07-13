@@ -19,7 +19,7 @@
 #include <hpss_error.h>
 
 #define MAX_HPSS_ERRORS 64
-static hpss_error_t ErrorTable[64];
+static hpss_error_t ErrorTable[MAX_HPSS_ERRORS];
 static int ErrorTableIndex;
 static pthread_mutex_t ErrorTableMutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -87,7 +87,7 @@ hpss_error_to_globus_result(int error)
         type = "NOT_A_DIRECTORY";
         break;
     case -ENOSPC:
-       code = 451;
+        code = 451;
         type = "NO_SPACE_LEFT";
         break;
     case -EDQUOT:
@@ -97,7 +97,7 @@ hpss_error_to_globus_result(int error)
     case -EPERM:
     case -EACCES:
         code = 550;
-       type = "PERMISSION_DENIED";
+        type = "PERMISSION_DENIED";
         break;
     default:
         break;
@@ -112,6 +112,7 @@ hpss_error_to_globus_result(int error)
                  "HPSS-Function: %s\n"
                  "HPSS-Last-Error: %s\n"
                  "HPSS-Last-Function: %s";
+// XXX include request ID?
     }
 
     return globus_error_put(GlobusGFSErrorObj(

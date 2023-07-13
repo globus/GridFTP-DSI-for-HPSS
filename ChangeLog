@@ -1,5 +1,7 @@
-Version 2.20-rc2: Mon Jul  3 09:52:11 EDT 2023
-	- Allow setting HPSS login name via HPSS_DSI_LOGIN_NAME.
+Version 2.20-rc3: Thu Jul 13 12:20:25 EDT 2023
+	- Allow setting HPSS login name via the HPSS_DSI_LOGIN_NAME
+	  environment variable.
+	- Fix for cleanup after failed hpss_Open().
 
 Version 2.19-2: Tue Dec 13 11:15:31 EST 2022
 	- Fixed rpm conflicts with GCSv4 packages

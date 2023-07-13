@@ -366,7 +366,7 @@ cleanup:
         globus_gridftp_server_finished_transfer(Operation, result);
         if (retr_info)
         {
-            if (retr_info->FileFD != -1)
+            if (retr_info->FileFD >= 0)
                 Hpss_Close(retr_info->FileFD);
             pthread_mutex_destroy(&retr_info->Mutex);
             pthread_cond_destroy(&retr_info->Cond);

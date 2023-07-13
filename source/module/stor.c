@@ -109,7 +109,7 @@ stor_open_for_writing(char *        Pathname,
                         &hints_out);
     if (*FileFD < 0)
     {
-        return hpss_error_to_globus_result(*FileFD);
+        result = hpss_error_to_globus_result(*FileFD);
         goto cleanup;
     }
 
@@ -122,12 +122,11 @@ stor_open_for_writing(char *        Pathname,
     {
         hpss_cos_md_t cos_md;
 
-        retval =
-            Hpss_SetCOSByHints(*FileFD, 0, &hints_in, &priorities, &cos_md);
+        retval = Hpss_SetCOSByHints(*FileFD, 0, &hints_in, &priorities, &cos_md);
 
         if (retval)
         {
-            result = hpss_error_to_globus_result(*FileFD);
+            result = hpss_error_to_globus_result(retval);
             goto cleanup;
         }
     }
@@ -138,7 +137,7 @@ stor_open_for_writing(char *        Pathname,
 cleanup:
     if (result)
     {
-        if (*FileFD != -1)
+        if (*FileFD >= 0)
             Hpss_Close(*FileFD);
         *FileFD = -1;
     }
@@ -622,7 +621,7 @@ cleanup:
         globus_gridftp_server_finished_transfer(Operation, result);
         if (stor_info)
         {
-            if (stor_info->FileFD != -1)
+            if (stor_info->FileFD >= 0)
                 Hpss_Close(stor_info->FileFD);
             pthread_mutex_destroy(&stor_info->Mutex);
             pthread_cond_destroy(&stor_info->Cond);
