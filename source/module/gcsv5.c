@@ -51,10 +51,11 @@
 #include "local_strings.h"
 
 static int
-login(char *  AuthenticationMech,
-      char *  Authenticator,
-      char *  UserName,
-      char ** ErroMsg);
+login(const char *  AuthenticationMech,
+      const char *  Authenticator,
+      const char *  LoginName,
+      const char *  UserName,
+      const char ** ErroMsg);
 
 static void logout();
 
@@ -118,11 +119,12 @@ release_lock()
 
 // returns home directory or NULL on error
 int
-get_home_directory(char *  AuthenticationMech, // Location of credentials
-                   char *  Authenticator, // <type>:<path>
-                   char *  UserName, // User to switch to
-                   char ** HomeDirectory, // Username's HPSS home directory
-                   char ** ErrorMsg) // Error message to log
+get_home_directory(const char *  AuthenticationMech, // Location of credentials
+                   const char *  Authenticator, // <type>:<path>
+                   const char *  LoginName, // HPSS super user
+                   const char *  UserName, // User to switch to
+                   const char ** HomeDirectory, // Username's HPSS home directory
+                   const char ** ErrorMsg) // Error message to log
 {
     *HomeDirectory = NULL;
     *ErrorMsg = NULL;
@@ -131,7 +133,7 @@ get_home_directory(char *  AuthenticationMech, // Location of credentials
     // bottleneck, consider caching results.
     get_exclusive_lock();
 
-    int retval = login(AuthenticationMech, Authenticator, UserName, ErrorMsg);
+    int retval = login(AuthenticationMech, Authenticator, LoginName, UserName, ErrorMsg);
     if (retval != HPSS_E_NOERROR)
         goto cleanup;
 
@@ -156,10 +158,11 @@ cleanup:
 }
 
 static int
-login(char *  AuthenticationMech,
-      char *  Authenticator,
-      char *  UserName,
-      char ** ErrorMsg)
+login(const char *  AuthenticationMech,
+      const char *  Authenticator,
+      const char *  LoginName,
+      const char *  UserName,
+      const char ** ErrorMsg)
 {
     *ErrorMsg = NULL;
 
@@ -174,7 +177,7 @@ login(char *  AuthenticationMech,
 
     hpss_rpc_auth_type_t auth_type; // enum {invalid, krb5, unix, gsi, spkm}
     char * authenticator;
-    retval = hpss_ParseAuthString(Authenticator,
+    retval = hpss_ParseAuthString((char *)Authenticator,
                                   &authn_mech,
                                   &auth_type,
                                   (void **)&authenticator);
@@ -185,13 +188,8 @@ login(char *  AuthenticationMech,
         return retval;
     }
 
-    /* Allow renamed hpssftp accounts */
-    const char * login_name = getenv("HPSS_DSI_LOGIN_NAME");
-    if (login_name == NULL)
-        login_name = "hpssftp";
-
     /* Now log into HPSS using our configured 'super user' */
-    retval = hpss_SetLoginCred(login_name,
+    retval = hpss_SetLoginCred((char *)LoginName,
                                authn_mech,
                                hpss_rpc_cred_client,
                                auth_type,

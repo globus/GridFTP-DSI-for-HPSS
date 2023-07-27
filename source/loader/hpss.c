@@ -113,7 +113,7 @@ unload_module()
 }
 
 static void *
-find_symbol(const char * symbol_name, char ** error_msg)
+find_symbol(const char * symbol_name, const char ** error_msg)
 {
     /* Clear any previous errors. */
     dlerror();
@@ -140,11 +140,11 @@ activate(void)
     if (rc != GLOBUS_SUCCESS)
         return rc;
 
-    char * error_msg = load_module();
+    const char * error_msg = load_module();
     if (error_msg)
     {
         loader_log_to_syslog(error_msg);
-        free(error_msg);
+        free((void *)error_msg);
         return GLOBUS_FAILURE;
     }
 
@@ -152,7 +152,7 @@ activate(void)
     if (!dsi_interface)
     {
         loader_log_to_syslog(error_msg);
-        free(error_msg);
+        free((void *)error_msg);
         return GLOBUS_FAILURE;
     }
 
@@ -198,44 +198,72 @@ globus_module_descriptor_t MODULE_NAME = {
  */
 
 int
-get_home_directory(char *  AuthenticationMech, // Location of credentials
-                   char *  Authenticator, // <type>:<path>
-                   char *  UserName, // User to switch to
-                   void (*callback)(char *))
+get_home_directory_ex(const char *  AuthenticationMech, // Location of credentials
+                      const char *  Authenticator, // <type>:<path>
+                      const char *  LoginName, // HPSS super user
+                      const char *  UserName, // User to switch to
+                      void          (*callback)(const char *))
 {
-    char * error_msg = load_module();
+    const char * error_msg = load_module();
     if (error_msg)
     {
         callback(error_msg);
-        free(error_msg);
+        free((void *)error_msg);
         return GLOBUS_FAILURE;
     }
 
-    int (*_get_home_directory)(char *  AuthenticationMech,
-                               char *  Authenticator,
-                               char *  UserName,
-                               char ** HomeDirectory,
-                               char ** ErrorMsg);
+    int (*_get_home_directory)(const char *  AuthenticationMech,
+                               const char *  Authenticator,
+                               const char *  LoginName,
+                               const char *  UserName,
+                               const char ** HomeDirectory,
+                               const char ** ErrorMsg);
 
     _get_home_directory = find_symbol("get_home_directory", &error_msg);
     if (!_get_home_directory)
     {
         callback(error_msg);
-        free(error_msg);
+        free((void *)error_msg);
         return GLOBUS_FAILURE;
     }
 
-    char * home_directory = NULL;
+    /*
+     * Allow renamed hpssftp accounts. This overrides the gateway setting as a
+     * means to provide an upgrade path. On initial upgrade of gcsv5, the gateway
+     * will be giving us the wrong LoginName.
+     */
+    const char * env_login_name = getenv("HPSS_DSI_LOGIN_NAME");
+    if (env_login_name)
+        LoginName = env_login_name;
+
+    const char * home_directory = NULL;
     error_msg = NULL;
     int rc = _get_home_directory(AuthenticationMech,
-                                Authenticator,
-                                UserName,
-                                &home_directory,
-                                &error_msg);
+                                 Authenticator,
+                                 LoginName,
+                                 UserName,
+                                 &home_directory,
+                                 &error_msg);
     if (rc)
         callback(error_msg);
     else
         callback(home_directory);
     return rc;
+}
+
+/*
+ * Older version which did not include LoginName.
+ */
+int
+get_home_directory(const char *  AuthenticationMech, // Location of credentials
+                   const char *  Authenticator, // <type>:<path>
+                   const char *  UserName, // User to switch to
+                   void          (*callback)(const char *))
+{
+    return get_home_directory_ex(AuthenticationMech,
+                                 Authenticator,
+                                 "hpssftp",
+                                 UserName,
+                                 callback);
 }
 #endif /* GCSV5 */

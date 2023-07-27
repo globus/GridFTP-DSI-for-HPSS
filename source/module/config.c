@@ -273,8 +273,9 @@ config_parse_json(const char * JsonConfig, config_t * Config)
     int                                 rc = 0;
     json_t *                            json = NULL;
     json_error_t                        json_error = {0};
-    char *                              authentication_mech = NULL;
-    char *                              authenticator = NULL;
+    const char *                        authentication_mech = NULL;
+    const char *                        authenticator = NULL;
+    const char *                        login_name = NULL;
     int                                 uda_checksum = 0;
 
     json = json_loads(JsonConfig, 0, &json_error);
@@ -293,13 +294,30 @@ config_parse_json(const char * JsonConfig, config_t * Config)
             json,
             &json_error,
             0,
-            "{s:s, s:s, s:b}",
+            "{s:s, s:s, s:s, s:b}",
             "authentication_mech",
             &authentication_mech,
             "authenticator",
             &authenticator,
+            "login_name",
+            &login_name,
             "uda_checksum",
             &uda_checksum);
+
+    if (rc != 0)
+    {
+        rc = json_unpack_ex(
+                json,
+                &json_error,
+                0,
+                "{s:s, s:s, s:b}",
+                "authentication_mech",
+                &authentication_mech,
+                "authenticator",
+                &authenticator,
+                "uda_checksum",
+                &uda_checksum);
+    }
 
     if (rc != 0)
     {
@@ -314,8 +332,14 @@ config_parse_json(const char * JsonConfig, config_t * Config)
         goto unpack_fail;
     }
 
-    // Allow renamed hpssftp accounts
-    const char * login_name = getenv("HPSS_DSI_LOGIN_NAME");
+    // Allow renamed hpssftp accounts. This overrides the gateway setting as a
+    // means to provide an upgrade path. On initial upgrade of gcsv5, the gateway
+    // will be giving us the wrong login_name.
+    const char * env_login_name = getenv("HPSS_DSI_LOGIN_NAME");
+    if (env_login_name)
+        login_name = env_login_name;
+
+    // If there is no setting, fallback to the default.
     if (login_name == NULL)
         login_name = "hpssftp";
 
