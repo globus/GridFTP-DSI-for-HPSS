@@ -62,6 +62,21 @@ hpss_error_status(int error)
     return ErrorTable[-error].returned_value;
 }
 
+void
+_errno_string(int err, char * buf, size_t buflen)
+{
+    const char * unknown_error_msg = "unknown error code";
+
+    const char * error_msg = hpss_ErrnoName(-abs(err));
+    if (strcmp(error_msg, "unknown error code") != 0)
+    {
+        strncpy(buf, error_msg, buflen);
+        return;
+    }
+
+    strerror_r(abs(err), buf, buflen);
+}
+
 globus_result_t
 hpss_error_to_globus_result(int error)
 {
@@ -106,13 +121,18 @@ hpss_error_to_globus_result(int error)
     const char * format = "HPSS-Reason: %s\n"
                           "HPSS-Function: %s";
 
+    char rv_reason[64];
+    char errno_reason[64];
+
+    _errno_string(he.returned_value, rv_reason, sizeof(rv_reason));
+
     if (he.errno_state.hpss_errno != 0)
     {
         format = "HPSS-Reason: %s\n"
                  "HPSS-Function: %s\n"
                  "HPSS-Last-Error: %s\n"
                  "HPSS-Last-Function: %s";
-// XXX include request ID?
+        _errno_string(he.errno_state.hpss_errno, errno_reason, sizeof(errno_reason));
     }
 
     return globus_error_put(GlobusGFSErrorObj(
@@ -120,8 +140,8 @@ hpss_error_to_globus_result(int error)
         code,
         type,
         format,
-        hpss_ErrnoString(he.returned_value),
+        rv_reason,
         he.function,
-        hpss_ErrnoString(he.errno_state.hpss_errno),
+        errno_reason,
         he.errno_state.func));
 }
