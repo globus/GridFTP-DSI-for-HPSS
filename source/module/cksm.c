@@ -387,13 +387,17 @@ cksm_get_uda_checksum(char *  Pathname, char ** ChecksumString)
     int                  retval = 0;
     char *               tmp    = NULL;
     char                 value[HPSS_XML_SIZE];
-    char                 state[HPSS_XML_SIZE];
     char                 algorithm[HPSS_XML_SIZE];
     char                 checksum[HPSS_XML_SIZE];
+    char                 state[HPSS_XML_SIZE];
     hpss_userattr_t      user_attrs[3];
     hpss_userattr_list_t attr_list;
 
     *ChecksumString = NULL;
+
+    memset(algorithm, 0, sizeof(algorithm));
+    memset(checksum, 0, sizeof(checksum));
+    memset(state, 0, sizeof(state));
 
     attr_list.len  = sizeof(user_attrs) / sizeof(*user_attrs);
     attr_list.Pair = user_attrs;
