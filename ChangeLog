@@ -1,4 +1,4 @@
-Version 2.20-rc5: Fri Jul 28 15:31:16 EDT 2023
+Version 2.20: Wed Aug  9 08:44:48 EDT 2023
 	- Allow setting HPSS login name via the HPSS_DSI_LOGIN_NAME
 	  environment variable.
 	- Fix for cleanup after failed hpss_Open().
