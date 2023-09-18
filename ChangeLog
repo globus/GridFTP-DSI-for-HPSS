@@ -1,3 +1,6 @@
+Version 2.21~rc1: Mon Sep 18 09:28:20 EDT 2023
+	- Changed how HPSS libraries and includes are discovered.
+
 Version 2.20: Wed Aug  9 08:44:48 EDT 2023
 	- Allow setting HPSS login name via the HPSS_DSI_LOGIN_NAME
 	  environment variable.

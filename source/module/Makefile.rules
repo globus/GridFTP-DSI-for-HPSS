@@ -5,7 +5,7 @@ MODULE_CPP_FLAGS=         \
 	$(TIRPC_CFLAGS)   \
 	$(OPENSSL_CFLAGS) \
 	$(_GLOBUS_CFLAGS) \
-	$(HPSS_CFLAGS)
+	$(HPSS_CPPFLAGS)
 
 MODULE_LD_FLAGS=@HPSS_LDFLAGS@
 
@@ -23,6 +23,5 @@ MODULE_LIBS=            \
 	$(TIRPC_LIBS)   \
 	$(OPENSSL_LIBS) \
 	$(GLOBUS_LIBS)  \
-	-lhpss -lhpsscs
+	$(HPSS_LIBS)
 
-#	-lhpsskrb5auth -lhpssunixauth -lhpss -lhpsscs
