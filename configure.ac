@@ -1,5 +1,5 @@
 # Use fedora version formatting, ie. 2.17, 2.17~rc1.
-AC_INIT([globus-gridftp-server-hpss], [2.21~rc1], [Globus <support@globus.org>])
+AC_INIT([globus-gridftp-server-hpss], [2.21~rc2], [Globus <support@globus.org>])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 # automake 1.11.1 (RHEL 6.8) does not support AM_PROG_AR
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
@@ -116,7 +116,7 @@ HPSS_MINOR=`grep -E "#define HPSS_MINOR_VERSION" ${HPSS_ROOT}/include/hpss_versi
 
 
 # HPSS < 7.5 did not have a pkg_config
-if [[[ $HPSS_MAJOR -gt 7 || $HPSS_MINOR -lt 5 ]]];
+if [[[ $HPSS_MAJOR -gt 7 || $HPSS_MINOR -ge 5 ]]];
 then
     export PKG_CONFIG_PATH=${HPSS_ROOT}/lib
     PKG_CHECK_MODULES(
