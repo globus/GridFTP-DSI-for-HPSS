@@ -93,6 +93,10 @@ hpss_error_to_globus_result(int error)
 
     switch (he.returned_value)
     {
+    case -ENOENT:
+        code = 404;
+        type = "PATH_NOT_FOUND";
+        break;
     case -EISDIR:
         code = 553;
         type = "IS_A_DIRECTORTY";
