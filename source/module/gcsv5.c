@@ -1,4 +1,3 @@
-#ifdef GCSV5
 /*******************************************************************************
  * This file provides functions used by Globus Connect Server v5. 
  *
@@ -241,4 +240,3 @@ logout()
     // Drop connections to the core server
     hpss_ClientAPIReset();
 }
-#endif /* GCSV5 */

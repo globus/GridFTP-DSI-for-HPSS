@@ -1,13 +1,7 @@
-# This variable determines if we are building for GCSv4 or GCSv5. Each has
-# it's own set of configured defines and files to package.
-%if 0%{?!_gcs_tag:1}
-    %global _gcs_tag gcsv4
-%endif
-
 Summary: HPSS Connector for Globus
 Name: @PACKAGE_NAME@-@HPSS_MAJOR@.@HPSS_MINOR@
 Version: @PACKAGE_VERSION@
-Release: 1%{?dist}+%{_gcs_tag}
+Release: 1%{?dist}+gcsv5
 License: ASL 2.0
 URL: https://github.com/JasonAlt/GridFTP-DSI-for-HPSS
 Source: @PACKAGE_NAME@-%{version}.tar.gz
@@ -30,18 +24,11 @@ Requires: openssl
 Requires: hpss-lib >= @HPSS_MAJOR@.@HPSS_MINOR@
 Requires: libtirpc
 
-%if %{_gcs_tag} == gcsv4
-Requires: globus-connect-server
-# Using 1: as the epoch avoids GCT versions
-Requires: globus-gridftp-server >= 1:@MIN_GCSV4_GRIDFTP_VERSION@
-BuildRequires: globus-gridftp-server-devel >= @MIN_GCSV4_GRIDFTP_VERSION@
-%else
 Requires: globus-connect-server54 >= @MIN_GCSV5_VERSION@
 Requires: globus-gridftp-server >= @MIN_GCSV5_GRIDFTP_VERSION@
 Requires: jansson
 BuildRequires: jansson-devel
 BuildRequires: globus-gridftp-server-devel >= @MIN_GCSV5_GRIDFTP_VERSION@
-%endif
 
 BuildRequires: openssl-devel
 BuildRequires: hpss-lib-devel
@@ -54,23 +41,11 @@ HPSS Connector for the Globus Transfer Service
 %setup -n @PACKAGE_NAME@-%{version}
 
 %build
-%if %{_gcs_tag} == gcsv4
 ./configure --libdir=/usr/lib64
-%else
-./configure --libdir=/usr/lib64 --enable-gcsv5
-%endif
 make
 
 %install
 make install DESTDIR=$RPM_BUILD_ROOT
-
-%if %{_gcs_tag} == gcsv4
-mkdir -p $RPM_BUILD_ROOT/etc/gridftp.d/
-mkdir -p $RPM_BUILD_ROOT/var/hpss/etc
-install -m 644 data/hpss $RPM_BUILD_ROOT/etc/gridftp.d/
-install -m 644 data/hpss_debug $RPM_BUILD_ROOT/etc/gridftp.d/
-install -m 644 data/gridftp_hpss_dsi.conf $RPM_BUILD_ROOT/var/hpss/etc/
-%endif
 
 # Remove libtool archives (.la files)
 find $RPM_BUILD_ROOT%{_libdir} -name 'lib*.la' -exec rm -v '{}' \;
@@ -78,16 +53,6 @@ find $RPM_BUILD_ROOT%{_libdir} -name 'lib*.la' -exec rm -v '{}' \;
 %files
 %defattr(-,root,root,-)
 /usr/lib64/*
-
-%if %{_gcs_tag} == gcsv4
-%attr(644, -, -) /etc/gridftp.d/hpss
-%attr(644, -, -) /etc/gridftp.d/hpss_debug
-%attr(644, -, -) /var/hpss/etc/gridftp_hpss_dsi.conf
-
-%config /etc/gridftp.d/hpss
-%config /etc/gridftp.d/hpss_debug
-%config /var/hpss/etc/gridftp_hpss_dsi.conf
-%endif
 
 %pre
 %post

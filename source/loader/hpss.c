@@ -9,8 +9,8 @@
 
 /*******************************************************************************
  * This loader now exports two interfaces:
- *   - the traditional gridftp dsi interface for transfers (GCSv4, GCSv5)
- *   - a new gcsv5 interface for access to HPSS API calls (GCSv5)
+ *   - the traditional gridftp dsi interface for transfers
+ *   - a new gcsv5 interface for access to HPSS API calls
  ******************************************************************************/
 
 /*
@@ -182,7 +182,6 @@ globus_module_descriptor_t MODULE_NAME = {
     &version
 };
 
-#ifdef GCSV5
 /*******************************************************************************
  * THIS IS THE GCSV5 INTERFACE
  ******************************************************************************/
@@ -266,4 +265,3 @@ get_home_directory(const char *  AuthenticationMech, // Location of credentials
                                  UserName,
                                  callback);
 }
-#endif /* GCSV5 */

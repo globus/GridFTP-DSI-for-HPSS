@@ -9,10 +9,6 @@ MODULE_CPP_FLAGS=         \
 
 MODULE_LD_FLAGS=@HPSS_LDFLAGS@
 
-if ENABLE_GCSV5
-MODULE_C_FLAGS=-DGCSV5
-endif
-
 #
 # IU and NERSC report that using krb fails because libhpssgss.so doesn't link
 # against libhpsskrbauth.so. NERSC reported that libhpssunixauth.so was

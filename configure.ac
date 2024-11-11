@@ -1,5 +1,5 @@
 # Use fedora version formatting, ie. 2.17, 2.17~rc1.
-AC_INIT([globus-gridftp-server-hpss], [2.23~rc1], [Globus <support@globus.org>])
+AC_INIT([globus-gridftp-server-hpss], [2.23~rc2], [Globus <support@globus.org>])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 # automake 1.11.1 (RHEL 6.8) does not support AM_PROG_AR
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
@@ -13,11 +13,6 @@ CC="${CC} -std=gnu99"
 # Configure Options
 #
 
-AC_ARG_ENABLE([gcsv5],
-    [AS_HELP_STRING([--enable-gcsv5], [Build for Globus Connect Server v5])])
-
-AM_CONDITIONAL([ENABLE_GCSV5], [test x$enable_gcsv5 = xyes])
-
 AC_ARG_WITH([hpss],
             [AS_HELP_STRING([--with-hpss=<path>],
                             [path to HPSS installation. [default=/opt/hpss]])],
@@ -28,47 +23,16 @@ AC_ARG_WITH([hpss],
 # Globus Dependencies
 #
 
-# - GCSv4 ships globus-gridftp-server-devel.
-# - GCSv5 ships globus-connect-gridftp-server-devel.
-# - pkg-config reports globus-connect-gridftp-server-devel as globus-gridftp-server-devel.
-# - look for globus-gridftp-server-devel for GCSv4 and GCSv5
-# - allow GCSv5 versions to be used for the GCSv4 build
-# - Do not search for globus-connect-gridftp-server-devel
+#  GCSv5 ships globus-connect-gridftp-server-devel but pkg-config reports it as
+#  globus-gridftp-server-devel.
 
-MIN_GCSV4_GRIDFTP_VERSION=12.24
 MIN_GCSV5_GRIDFTP_VERSION=15.91
 MIN_GCSV5_VERSION=5.4.43
 
-# - Do not check for globus-connect-server version MIN_GCSV5_VERSION. We leave that
-#   as a Requires in the packaging so that we can build GCSv5 releases on hosts running
-#   GCSv4.
-
-# If the caller is enabling GCSv5 support, do not let the following PKG_CHECK_MODULE
-# succced on the V4 GridFTP version check.
-MIN_GRIDFTP_VERSION=$MIN_GCSV4_GRIDFTP_VERSION
-if [[ x$enable_gcsv5 = xyes ]];
-then
-	MIN_GRIDFTP_VERSION=$MIN_GCSV5_GRIDFTP_VERSION
-fi
-
-# - Track whether it is possible to build GCSv5 versions, regardless of whether or not
-#   the user asked us to build it, so that we can notify the release build system.
-_GCSV5_BUILD_AVAILABLE=0
-
-# - Check whether we have the v5 or v4 version of the gridftp server libraries.
 PKG_CHECK_MODULES(
 	[GLOBUS],
-	[globus-gridftp-server >= $MIN_GCSV5_GRIDFTP_VERSION globus-common],
-	[_GCSV5_BUILD_AVAILABLE=1],
-	[PKG_CHECK_MODULES(
-		[GLOBUS],
-		[globus-gridftp-server >= $MIN_GRIDFTP_VERSION globus-common]
-	)]
+	[globus-gridftp-server >= $MIN_GCSV5_GRIDFTP_VERSION globus-common]
 )
-
-# - This is used by the release process to know whether or not to attempt to
-#   build v5 packages.
-AM_CONDITIONAL([GCSV5_BUILD_AVAILABLE], [test x$_GCSV5_BUILD_AVAILABLE = x1])
 
 # - Do not use Globus Community Toolkit versions
 _REPO_URL="https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm"
@@ -90,22 +54,7 @@ PKG_CHECK_MODULES(
 
 PKG_CHECK_MODULES([OPENSSL],[openssl])
 PKG_CHECK_MODULES([TIRPC],  [libtirpc])
-
-#
-# GCSv5-Required Third-Party Dependencies
-#
-
-# We need to check for GCSv5 dependencies in two scenarios:
-# - if the user is building for GCSv5, the dependencies _must_ be installed
-# - we want to tell automake whether a GCSv5 release build is possible, in which
-#   case the dependencies may or may not be installed
-if [[ x$enable_gcsv5 = xyes ]];
-then
-	PKG_CHECK_MODULES([JANSSON], [jansson])
-elif [[ x$_GCSV5_BUILD_AVAILABLE = x1 ]];
-then
-	PKG_CHECK_MODULES([JANSSON], [jansson], [], [_GCSV5_BUILD_AVAILABLE=0])
-fi
+PKG_CHECK_MODULES([JANSSON], [jansson])
 
 #
 # HPSS Dependencies
@@ -186,7 +135,6 @@ LDFLAGS="${SAVE_LDFLAGS}"
 #
 
 
-AC_SUBST(MIN_GCSV4_GRIDFTP_VERSION)
 AC_SUBST(MIN_GCSV5_GRIDFTP_VERSION)
 AC_SUBST(MIN_GCSV5_VERSION)
 AC_SUBST(HPSS_CPPFLAGS)

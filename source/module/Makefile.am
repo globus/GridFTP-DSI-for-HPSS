@@ -12,6 +12,7 @@ SOURCES = _globus_gridftp_server.h \
           dsi.c           \
           fixups.c        \
           fixups.h        \
+          gcsv5.c         \
           hooks.c         \
           hpss.c          \
           hpss.h          \
@@ -40,9 +41,6 @@ SOURCES = _globus_gridftp_server.h \
           utils.c         \
           utils.h
 
-if ENABLE_GCSV5
-SOURCES += gcsv5.c
-endif
 
 libglobus_gridftp_server_hpss_real_la_SOURCES=$(SOURCES)
 

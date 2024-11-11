@@ -6,10 +6,6 @@
  */
 #include <_globus_gridftp_server.h>
 
-#ifndef GCSV5
-#define DEFAULT_CONFIG_FILE "/var/hpss/etc/gridftp_hpss_dsi.conf"
-#endif /* GCSV5 */
-
 typedef struct config
 {
     char *LoginName;
