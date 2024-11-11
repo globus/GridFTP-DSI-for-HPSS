@@ -1,3 +1,6 @@
+Version 2.23~rc1: Mon Nov 11 10:30:49 EST 2024
+	- Support for HPSS 10.3
+
 Version 2.22: Wed Jan 10 15:54:26 EST 2024
 	- Fix for ENOENT responses
 

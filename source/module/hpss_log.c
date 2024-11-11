@@ -980,9 +980,29 @@ _pv_list_t_ptr(struct pool * pool, const pv_list_t * l)
                 "List_val=%s"   // pv_list_element_t[]
             "}"
         "}",
-            UNSIGNED(l->List.List_len),
-            _pv_list_val(pool, l->List.List_len, l->List.List_val));
+        UNSIGNED(l->List.List_len),
+        _pv_list_val(pool, l->List.List_len, l->List.List_val));
 }
+
+#if HPSS_MAJOR_VERSION >= 10
+char *
+_hpss_group_ids_t_ptr(struct pool * pool, const hpss_group_ids_t * p)
+{
+    if (p == NULL)
+        return PTR(p);
+
+    return _sprintf(
+        pool,
+        "{"
+            "List={"
+                "List_len=%s, " // u_int
+                "List_val=%s"   // uint32_t[]
+            "}"
+        "}",
+        UNSIGNED(p->List.List_len),
+        UNSIGNED_ARRAY(p->List.List_val, p->List.List_len));
+}
+#endif /* HPSS_MAJOR_VERSION >= 10 */
 
 char *
 _sec_cred_t_ptr(struct pool * pool, const sec_cred_t * p)
@@ -1017,7 +1037,11 @@ _sec_cred_t_ptr(struct pool * pool, const sec_cred_t * p)
             ACCT_REC_T(p->DefAccount),
             ACCT_REC_T(p->CurAccount),
             UNSIGNED(p->NumGroups),
+#if HPSS_MAJOR_VERSION < 10
             UNSIGNED_ARRAY(p->AltGroups, p->NumGroups));
+#else /* HPSS_MAJOR_VERSION < 10 */
+            _hpss_group_ids_t_ptr(pool, &p->AltGroups));
+#endif /* HPSS_MAJOR_VERSION < 10 */
 }
 
 char *
