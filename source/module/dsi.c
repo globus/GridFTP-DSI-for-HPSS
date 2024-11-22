@@ -56,11 +56,19 @@ dsi_init(globus_gfs_operation_t     Operation,
 #define TOSTRING(x) STRINGIFY(x)
     // Runtime version string
     char * version_string = Hpss_BuildLevelString();
-    char major[2] = {version_string[0]};
-    char minor[2] = {version_string[2]};
+    char * major = NULL;
+    char * minor = NULL;
+
+    if (version_string != NULL)
+    {
+        major = strtok(version_string, ".");
+	if (major != NULL)
+            minor = strtok(NULL, ".");
+    }
 
     if (version_string == NULL ||
-        strlen(version_string) < 3 ||
+        major == NULL ||
+        minor == NULL ||
         atoi(major) != HPSS_MAJOR_VERSION ||
         atoi(minor) != HPSS_MINOR_VERSION)
     {

@@ -1,6 +1,7 @@
-Version 2.23~rc2: Mon Nov 11 13:21:51 EST 2024
+Version 2.23~rc3: Fri Nov 22 13:28:05 EST 2024
 	- Support for HPSS 10.3
 	- Removed support for GCSv4
+	- Fixed runtime version comparison
 
 Version 2.22: Wed Jan 10 15:54:26 EST 2024
 	- Fix for ENOENT responses
