@@ -1,4 +1,4 @@
-Version 2.23~rc3: Fri Nov 22 13:28:05 EST 2024
+Version 2.23: Tue Dec 17 06:44:36 AM CST 2024
 	- Support for HPSS 10.3
 	- Removed support for GCSv4
 	- Fixed runtime version comparison
