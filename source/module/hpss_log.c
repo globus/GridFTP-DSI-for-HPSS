@@ -1,11 +1,14 @@
 /*
  * HPSS includes
  */
+#include <hpss_version.h>
 #if HPSS_MAJOR_VERSION >= 8
 #include <hpss_RequestID.h>
 #endif
 #include <hpss_types.h>
+#if HPSS_MAJOR_VERSION < 11
 #include <hpss_uuid.h>
+#endif
 
 /*
  * Local includes
@@ -533,10 +536,14 @@ _hpss_uuid_t_ptr(struct pool * pool, const hpss_uuid_t * uuid_ptr)
     // HPSS 7.4
     signed32 status = 0;
     uuid_to_string(uuid_ptr, &uuid_str, &status);
-#else
+#elif HPSS_MAJOR_VERSION < 11
     // HPSS 8.3
     int status = 0;
     status = hpss_uuid_to_string(uuid_ptr, &uuid_str);
+#else
+    // HPSS 11, no uuid->string function but a request_id is a hpss_uuid
+    uuid_str = hpss_RequestIDtoString(uuid_ptr);
+    int status = (uuid_str != NULL);
 #endif
 
     if (status == 0)

@@ -3,12 +3,18 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 /*
  * HPSS includes
  */
+#include <hpss_version.h>
+#if (HPSS_MAJOR_VERSION < 11)
 #include <hpss_uuid.h>
+#else
+#include <hpss_limits.h>
+#endif
 
 /*
  * Project includes
@@ -48,8 +54,17 @@ _request_id_to_str(const hpss_reqid_t * RequestID, char * Str, size_t Len)
 #if HPSS_MAJOR_VERSION <= 7
     snprintf(Str, Len, "%u", *RequestID);
     return 0;
-#else
+#elif HPSS_MAJOR_VERSION < 11
     return hpss_uuid_snprintf(Str, Len, RequestID);
+#else
+    char * uuid_str = hpss_RequestIDtoString(RequestID);
+    if (uuid_str == NULL)
+        return 0;
+
+    assert(strlen(uuid_str) < (Len-1));
+    strcpy(Str, uuid_str);
+    free(uuid_str);
+    return 0;
 #endif
 }
 
@@ -200,7 +215,11 @@ main(int argc, char * argv[])
         exit(1);
     }
 
+#if HPSS_MAJOR_VERSION >= 11
+    char request_id_str[HPSS_MAX_UUID_STRING];
+#else
     char request_id_str[MAX_UUID_STR_LEN];
+#endif
     switch(residency)
     {
     case RESIDENCY_ARCHIVED:
