@@ -65,8 +65,6 @@ hpss_error_status(int error)
 void
 _errno_string(int err, char * buf, size_t buflen)
 {
-    const char * unknown_error_msg = "unknown error code";
-
     const char * error_msg = hpss_ErrnoName(-abs(err));
     if (strcmp(error_msg, "unknown error code") != 0)
     {
