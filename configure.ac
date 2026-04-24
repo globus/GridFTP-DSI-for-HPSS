@@ -1,5 +1,5 @@
 # Use fedora version formatting, ie. 2.17, 2.17~rc1.
-AC_INIT([globus-gridftp-server-hpss], [2.24], [Globus <support@globus.org>])
+AC_INIT([globus-gridftp-server-hpss], [2.25~a1], [Globus <support@globus.org>])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 # automake 1.11.1 (RHEL 6.8) does not support AM_PROG_AR
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
@@ -26,7 +26,8 @@ AC_ARG_WITH([hpss],
 #  GCSv5 ships globus-connect-gridftp-server-devel but pkg-config reports it as
 #  globus-gridftp-server-devel.
 
-MIN_GCSV5_GRIDFTP_VERSION=15.91
+# 16.16 introduced API necessary for the improved staging development
+MIN_GCSV5_GRIDFTP_VERSION=16.16
 MIN_GCSV5_VERSION=5.4.43
 
 PKG_CHECK_MODULES(

@@ -83,6 +83,15 @@ dsi_init(globus_gfs_operation_t     Operation,
     free(version_string);
 
     /*
+     * Enable the 'STAGE' FEAT so Transfer knows we support improved staging.
+     */
+
+    const char * feat_stage_value = "sort:x.tape.id,x.tape.sec,x.tape.off;";
+    result = globus_gridftp_server_set_staging_support(Operation, feat_stage_value);
+    if (result != GLOBUS_SUCCESS)
+        goto cleanup;
+
+    /*
      * Read in the config.
      */
     result = config_init(Operation, &config);
