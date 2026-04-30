@@ -73,6 +73,15 @@ Hpss_FileGetXAttributes(
     hpss_xfileattr_t            *  AttrOut);
 
 int
+Hpss_FileGetXAttributesHandle(
+    const ns_ObjHandle_t        *  ObjHandle,
+    const char                  *  Path,
+    const sec_cred_t            *  Ucred,
+    uint32_t                       Flags,
+    uint32_t                       StorageLevel,
+    hpss_xfileattr_t            *  AttrOut);
+
+int
 Hpss_FilesetGetAttributes(
     const char                  *  Name,
     const uint64_t              *  FilesetId,
