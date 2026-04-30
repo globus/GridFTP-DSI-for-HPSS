@@ -242,6 +242,52 @@ Hpss_FileGetXAttributes(
     return HPSS_ERROR(rv, errno_state);
 }
 
+// This function was added while developing with HPSS 9.3. I am unsure how older
+// HPSS versions declared this.
+int
+Hpss_FileGetXAttributesHandle(
+    const ns_ObjHandle_t        *  ObjHandle,
+    const char                  *  Path,
+    const sec_cred_t            *  Ucred,
+    uint32_t                       Flags,
+    uint32_t                       StorageLevel,
+    hpss_xfileattr_t            *  AttrOut)
+{
+    API_ENTER("hpss_FileGetXAttributesHandle",
+              "ObjHandle=%s "
+              "Path=%s "
+              "Ucred=%s "
+              "Flags=%s "
+              "StorageLevel=%s "
+              "AttrOut=%s",
+              NS_OBJHANDLE_T_PTR(ObjHandle),
+              CHAR_PTR(Path),
+              SEC_CRED_T_PTR(Ucred),
+              HEX(Flags),
+              HEX(StorageLevel),
+              PTR(AttrOut));
+
+    memset(AttrOut, 0, sizeof(*AttrOut));
+
+    Hpss_ClearLastHPSSErrno();
+
+    int rv = hpss_FileGetXAttributesHandle(ObjHandle,
+                                           Path,
+                                           Ucred,
+                                           Flags,
+                                           StorageLevel,
+                                           AttrOut);
+
+    hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
+
+    API_EXIT("hpss_FileGetXAttributesHandle",
+             "return_value=%s last_hpss_errno=%s AttrOut=%s",
+             INT(rv),
+             HPSS_ERRNO_STATE_T(errno_state),
+             HPSS_XFILEATTR_T_PTR(AttrOut));
+    return HPSS_ERROR(rv, errno_state);
+}
+
 int
 Hpss_FilesetGetAttributes(
     const char                  *  Name,            // IN

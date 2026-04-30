@@ -1,5 +1,6 @@
-Version 2.26~a1: Fri Apr 24 08:37:47 AM CDT 2026
+Version 2.26~a2: Thu Apr 30 17:13:34 UTC 2026
 	- Addeed 'FEAT STAGE' response
+	- Added tape id/sec/pos facts to MLST output
 
 Version 2.25: Mon Jun 29 11:14:06 2026 -0700
 	- Fix for new error code in HPSS 11.3 for hpss_UserAttrGetAttrs() (SciNet)

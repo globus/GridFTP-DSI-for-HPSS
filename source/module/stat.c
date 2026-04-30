@@ -9,6 +9,133 @@
 #include "stat.h"
 #include "hpss.h"
 
+
+static void
+_free_xfileattr(hpss_xfileattr_t *XFileAttr)
+{
+    int level    = 0;
+    int vv_index = 0;
+
+    /* Free the extended information. */
+    for (level = 0; level < HPSS_MAX_STORAGE_LEVELS; level++)
+    {
+        for (vv_index = 0; vv_index < XFileAttr->SCAttrib[level].NumberOfVVs; vv_index++)
+        {
+            if (XFileAttr->SCAttrib[level].VVAttrib[vv_index].PVList != NULL)
+            {
+                free(XFileAttr->SCAttrib[level].VVAttrib[vv_index].PVList);
+            }
+        }
+    }
+}
+
+static globus_result_t
+_get_tape_facts(hpss_xfileattr_t *  XFileAttr,
+                char             ** TapeFacts)
+{
+    int retval = 0;
+
+    *TapeFacts = NULL;
+
+    for (int level = 0; level < HPSS_MAX_STORAGE_LEVELS; level++)
+    {
+        if (!(XFileAttr->SCAttrib[level].Flags & BFS_BFATTRS_LEVEL_IS_TAPE))
+            continue;
+
+        // XFileAttr->SCAttrib[level].VVAttrib[BFS_MAX_VV_TO_RETURN_AT_LEVEL]
+        // XFileAttr->SCAttrib[level].NumberOfVVs
+        // XFileAttr->SCAttrib[level].VVAttrib[0].VVID
+        // XFileAttr->SCAttrib[level].VVAttrib[0].RelPosition
+        // XFileAttr->SCAttrib[level].VVAttrib[0].RelPositionOffset
+
+        const char * tape_facts_format = "\\X.tape.id=%s;X.tape.sec=%"PRId32";X.tape.off=%"PRIu64";";
+
+        // The file's COS has a tape level but first VV on the COS has not yet
+        // been assigned PVs. This file is on disk and not yet purged so no need
+        // to report tape attributes.
+        if (XFileAttr->SCAttrib[level].VVAttrib[0].PVList == NULL)
+            return GLOBUS_SUCCESS;
+
+        // SOID_ToString(XFileAttr->SCAttrib[level].VVAttrib[0].VVID) produces a
+        // UUID. Discussing with admins, they'd prefer Volume IDs (ie AA123400)
+        // which has the added benefit of saving us memory during sorting.
+
+        retval = snprintf(NULL,
+                          0,
+                          tape_facts_format,
+                          XFileAttr->SCAttrib[level].VVAttrib[0].PVList->List.List_val[0].Name,
+                          XFileAttr->SCAttrib[level].VVAttrib[0].RelPosition,
+                          XFileAttr->SCAttrib[level].VVAttrib[0].RelPositionOffset);
+       if (retval < 0)
+           return GlobusGFSErrorSystemError("Failed to format tape facts", errno);
+
+        *TapeFacts = malloc(retval + 1);
+        if (*TapeFacts == NULL)
+            return GlobusGFSErrorMemory("tape_facts");
+
+        snprintf(*TapeFacts,
+                 retval+1,
+                 tape_facts_format,
+                 XFileAttr->SCAttrib[level].VVAttrib[0].PVList->List.List_val[0].Name,
+                 XFileAttr->SCAttrib[level].VVAttrib[0].RelPosition,
+                 XFileAttr->SCAttrib[level].VVAttrib[0].RelPositionOffset);
+    }
+    return GLOBUS_SUCCESS;
+}
+
+static globus_result_t
+_get_tape_facts_path(const char * Pathname, char ** TapeFacts)
+{
+    int retval = 0;
+    globus_result_t result = GLOBUS_SUCCESS;
+    hpss_xfileattr_t xattr;
+
+    memset(&xattr, 0, sizeof(hpss_xfileattr_t));
+    *TapeFacts = NULL;
+
+    /*
+     * Stat the object. Without API_GET_XATTRS_NO_BLOCK, this call would hang
+     * on any file moving between levels in its hierarchy (ie staging).
+     */
+    retval = Hpss_FileGetXAttributes((char *)Pathname,
+                                     API_GET_STATS_FOR_ALL_LEVELS | API_GET_XATTRS_NO_BLOCK,
+                                     0,
+                                     &xattr);
+    if (retval)
+        return hpss_error_to_globus_result(retval);
+
+    result = _get_tape_facts(&xattr, TapeFacts);
+    _free_xfileattr(&xattr);
+    return result;
+}
+
+static globus_result_t
+_get_tape_facts_handle(const ns_ObjHandle_t *  ObjHandle,
+                       const char           *  Path,
+                       char                 ** TapeFacts)
+{
+    int retval = 0;
+    globus_result_t result = GLOBUS_SUCCESS;
+    hpss_xfileattr_t xattr;
+
+    memset(&xattr, 0, sizeof(hpss_xfileattr_t));
+    *TapeFacts = NULL;
+
+    retval = Hpss_FileGetXAttributesHandle(ObjHandle,
+                                           Path,
+                                           NULL,
+                                           API_GET_STATS_FOR_ALL_LEVELS | API_GET_XATTRS_NO_BLOCK,
+                                           0,
+                                           &xattr);
+
+    if (retval)
+        return hpss_error_to_globus_result(retval);
+
+    result = _get_tape_facts(&xattr, TapeFacts);
+    _free_xfileattr(&xattr);
+    return result;
+}
+
 globus_result_t
 stat_translate_stat(char *             Pathname,
                     hpss_stat_t *      HpssStat,
@@ -31,8 +158,7 @@ stat_translate_stat(char *             Pathname,
     {
         char symlink_target[HPSS_MAX_PATH_NAME];
         /* Read the target. */
-        int retval =
-            Hpss_Readlink(Pathname, symlink_target, sizeof(symlink_target));
+        int retval = Hpss_Readlink(Pathname, symlink_target, sizeof(symlink_target));
 
         if (retval < 0)
         {
@@ -47,6 +173,16 @@ stat_translate_stat(char *             Pathname,
             stat_destroy(GFSStat);
             return GlobusGFSErrorMemory("SymlinkTarget");
         }
+    } else if (S_ISREG(HpssStat->st_mode))
+    {
+        char * tape_facts = NULL;
+        globus_result_t result = GLOBUS_SUCCESS;
+
+        result = _get_tape_facts_path(Pathname, &tape_facts);
+        if (result != GLOBUS_SUCCESS)
+            return result;
+
+        GFSStat->symlink_target = tape_facts;
     }
 
     /* Copy out the base name. */
@@ -190,6 +326,16 @@ stat_translate_dir_entry(ns_ObjHandle_t *   ParentObjHandle,
             stat_destroy(GFSStat);
             return GlobusGFSErrorMemory("SymlinkTarget");
         }
+    } else if (DirEntry->Attrs.Type == NS_OBJECT_TYPE_FILE)
+    {
+        char * tape_facts = NULL;
+        globus_result_t result = GLOBUS_SUCCESS;
+
+        result = _get_tape_facts_handle(ParentObjHandle, DirEntry->Name, &tape_facts);
+        if (result != GLOBUS_SUCCESS)
+            return result;
+
+        GFSStat->symlink_target = tape_facts;
     }
     return GLOBUS_SUCCESS;
 }
