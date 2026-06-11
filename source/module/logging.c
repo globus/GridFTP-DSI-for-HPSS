@@ -255,8 +255,8 @@ _struct_utimbuf_ptr(struct pool * pool, const struct utimbuf * p)
             "actime=%s, " // time_t
             "modtime=%s"  // time_t
         "}",
-            TIME_T(p->actime),
-            TIME_T(p->modtime));
+        TIME_T(p->actime),
+        TIME_T(p->modtime));
 }
 
 char *
@@ -273,7 +273,7 @@ _unsigned_ptr(struct pool * pool, const unsigned * p)
     return _sprintf(pool, "%u", *p);
 }
 
-// TODO: duplicate code of _pv_list_val
+// TODO: duplicate code of _pv_list_element_t_array
 char *
 _unsigned_array(struct pool * pool, const unsigned * p, size_t c)
 {
@@ -286,7 +286,7 @@ _unsigned_array(struct pool * pool, const unsigned * p, size_t c)
         str = _sprintf(
             pool,
             "%s%s%s",
-            i == 0 ? "" : str, // prefix
+            str,
             i == 0 ? "" : ", ",
             UNSIGNED(p[i]));
     }

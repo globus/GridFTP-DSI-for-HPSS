@@ -68,7 +68,7 @@ Hpss_AuthnMechTypeFromString(
    hpss_authn_mech_t       *  AuthnMech)
 {
     API_ENTER("hpss_AuthnMechTypeFromString",
-              "AuthnMechString=5s AuthnMech=%s",
+              "AuthnMechString=%s AuthnMech=%s",
               CHAR_PTR(AuthnMechString),
               PTR(AuthnMech));
 
@@ -77,7 +77,7 @@ Hpss_AuthnMechTypeFromString(
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_AuthnMechTypeFromString",
-             "return_value=%s last_hpss_errno=%s",
+             "return_value=%s last_hpss_errno=%s AuthnMech=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              HPSS_AUTHN_MECH_T_PTR(AuthnMech));
@@ -383,7 +383,7 @@ Hpss_GetConfiguration(
     hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
 
     API_EXIT("hpss_GetConfiguration",
-             "return_value=%s last_hpss_errno=%s",
+             "return_value=%s last_hpss_errno=%s ConfigOut=%s",
              INT(rv),
              HPSS_ERRNO_STATE_T(errno_state),
              API_CONFIG_T_PTR(ConfigOut));
@@ -661,12 +661,13 @@ Hpss_PIOExecute(
               "Fd=%s "
               "FileOffset=%s "
               "Size=%s "
-              "StripeGroup=<opague> "
+              "StripeGroup=%s "
               "GapInfo=%s "
               "BytesMoved=%s",
               INT(Fd),
               UNSIGNED64(FileOffset),
               UNSIGNED64(Size),
+              PTR(StripeGroup),
               PTR(GapInfo),
               PTR(BytesMoved));
 
@@ -945,7 +946,7 @@ Hpss_Readlink(
     size_t                         BufferSize)
 {
     API_ENTER("hpss_Readlink",
-              "Path=%s BufferSize",
+              "Path=%s BufferSize=%s",
               CHAR_PTR(Path),
               UNSIGNED(BufferSize));
 
@@ -1235,7 +1236,7 @@ Hpss_StageCallBack(
              "last_hpss_errno=%s "
              "ReqID=%s "
 #if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4)
-             "BitfileID",
+             "BitfileID=%s",
 #else
              "BitfileObj=%s",
 #endif
