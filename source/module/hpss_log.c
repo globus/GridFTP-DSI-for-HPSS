@@ -677,7 +677,6 @@ _hpss_userattr_t(struct pool * pool, hpss_userattr_t a)
         CHAR_PTR(a.Value));
 }
 
-// TODO: duplicate code of _pv_list_val
 /*
  * It would be create to consolidate all of the array functions, but C/GCC is
  * not very helpful in this respect. If we consolidate the array function, we
@@ -686,10 +685,10 @@ _hpss_userattr_t(struct pool * pool, hpss_userattr_t a)
  * So we'll punt until we can upgrade compilers or move to C++.
  */
 static char *
-_hpss_userattr_list_t_array(struct pool * pool, const hpss_userattr_t * a, size_t cnt)
+_hpss_userattr_t_array(struct pool * pool, const hpss_userattr_t * p, size_t cnt)
 {
-    if (a == NULL)
-        return PTR(a);
+    if (p == NULL)
+        return PTR(p);
 
     char * str = "[";
     for (int i = 0; i < cnt; i++)
@@ -697,9 +696,9 @@ _hpss_userattr_list_t_array(struct pool * pool, const hpss_userattr_t * a, size_
         str = _sprintf(
             pool,
             "%s%s%s",
-            i == 0 ? "" : str, // prefix
+            str,
             i == 0 ? "" : ", ",
-            HPSS_USERATTR_T(a[i]));
+            HPSS_USERATTR_T(p[i]));
     }
     return _strcat(pool, str, "]");
 }
@@ -717,7 +716,7 @@ _hpss_userattr_list_t_ptr(struct pool * pool, const hpss_userattr_list_t * p)
             "Pair=%s"  // hpss_userattr_t *
         "}",
             INT(p->len),
-            _hpss_userattr_list_t_array(pool, p->Pair, p->len));
+            _hpss_userattr_t_array(pool, p->Pair, p->len));
 }
 
 char *
@@ -811,7 +810,7 @@ _ns_direntry_t(struct pool * pool, ns_DirEntry_t e)
             "Name=%s, "      // char[HPSS_MAX_FILE_NAME]
             "ObjHandle=%s, " // ns_ObjHandle_t
             "ObjOffset=%s, " // u_signed64
-            "Attrs=%s",      // hpss_Attrs_t
+            "Attrs=%s"       // hpss_Attrs_t
         "}",
             CHAR_PTR(e.Name),
             NS_OBJHANDLE_T(e.ObjHandle),
@@ -819,12 +818,11 @@ _ns_direntry_t(struct pool * pool, ns_DirEntry_t e)
             HPSS_ATTRS_T(e.Attrs));
 }
 
-// TODO: duplicate code of _pv_list_val
 char *
-_ns_direntry_t_array(struct pool * pool, const ns_DirEntry_t * a, size_t cnt)
+_ns_direntry_t_array(struct pool * pool, const ns_DirEntry_t * p, size_t cnt)
 {
-    if (a == NULL)
-        return PTR(a);
+    if (p == NULL)
+        return PTR(p);
 
     char * str = "[";
     for (int i = 0; i < cnt; i++)
@@ -832,9 +830,9 @@ _ns_direntry_t_array(struct pool * pool, const ns_DirEntry_t * a, size_t cnt)
         str = _sprintf(
             pool,
             "%s%s%s",
-            i == 0 ? "" : str, // prefix
+            str,
             i == 0 ? "" : ", ",
-            NS_DIRENTRY_T(a[i]));
+            NS_DIRENTRY_T(p[i]));
     }
     return _strcat(pool, str, "]");
 }
@@ -958,17 +956,20 @@ _pv_list_element_t(struct pool * pool, pv_list_element_t e)
 
 // TODO: duplicate code of _unsigned_array
 static char *
-_pv_list_val(struct pool * pool, unsigned len, pv_list_element_t * list)
+_pv_list_element_t_array(struct pool * pool, pv_list_element_t * p, unsigned cnt)
 {
+    if (p == NULL)
+        return PTR(p);
+
     char * str = "[";
-    for (int i = 0; i < len; i++)
+    for (int i = 0; i < cnt; i++)
     {
         str = _sprintf(
             pool,
             "%s%s%s",
-            i == 0 ? "" : str, // prefix
+            str,
             i == 0 ? "" : ", ",
-            PV_LIST_ELEMENT_T(list[i]));
+            PV_LIST_ELEMENT_T(p[i]));
     }
     return _strcat(pool, str, "]");
 }
@@ -988,7 +989,7 @@ _pv_list_t_ptr(struct pool * pool, const pv_list_t * l)
             "}"
         "}",
         UNSIGNED(l->List.List_len),
-        _pv_list_val(pool, l->List.List_len, l->List.List_val));
+        _pv_list_element_t_array(pool, l->List.List_val, l->List.List_len));
 }
 
 #if HPSS_MAJOR_VERSION >= 10

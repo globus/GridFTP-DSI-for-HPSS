@@ -1,5 +1,5 @@
 # Use fedora version formatting, ie. 2.17, 2.17~rc1.
-AC_INIT([globus-gridftp-server-hpss], [2.26~a2], [Globus <support@globus.org>])
+AC_INIT([globus-gridftp-server-hpss], [2.26~a3], [Globus <support@globus.org>])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 # automake 1.11.1 (RHEL 6.8) does not support AM_PROG_AR
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
@@ -74,7 +74,7 @@ then
 	   [hpss],
 	   [_HPSS_LIB_FOUND=1],
 	   [_HPSS_LIB_FOUND=0],
-   )
+    )
 
     fields=($HPSS_CFLAGS $HPSS_LIBS)
     for f in ${fields[[@]]}
