@@ -707,12 +707,13 @@ Hpss_PIOExecute(
               "Fd=%s "
               "FileOffset=%s "
               "Size=%s "
-              "StripeGroup=<opague> "
+              "StripeGroup=%s "
               "GapInfo=%s "
               "BytesMoved=%s",
               INT(Fd),
               UNSIGNED64(FileOffset),
               UNSIGNED64(Size),
+              PTR(StripeGroup),
               PTR(GapInfo),
               PTR(BytesMoved));
 
@@ -748,8 +749,6 @@ Hpss_PIOExportGrp(
               PTR(StripeGroup),
               PTR(Buffer),
               PTR(BufLength));
-
-    memset(Buffer, 0, *BufLength);
 
     Hpss_ClearLastHPSSErrno();
     int rv = hpss_PIOExportGrp(StripeGroup, Buffer, BufLength);
