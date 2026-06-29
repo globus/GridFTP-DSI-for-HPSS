@@ -1,3 +1,4 @@
+.vscode
 compile
 venv
 Makefile.in

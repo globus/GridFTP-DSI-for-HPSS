@@ -421,7 +421,17 @@ cksm_get_uda_checksum(char *  Pathname, char ** ChecksumString)
 
     if (retval != HPSS_E_NOERROR)
     {
-        if (hpss_error_status(retval) == -ENOENT)
+        // Prior to HPSS 11.3, we would check for ENOENT to see if the UDA value exists.
+        // This may have collided with the error code for 'Path' does not exist but, given
+        // the Globus use pattern, it was never an issue.
+        int error_code = ENOENT;
+#if (HPSS_MAJOR_VERSION == 11 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 11
+        // As of 11.3 (possibly 11.1), HPSS_ENOATTR was introduced to indicate that a user
+        // attribute does not exist. I suspect that was to differentiate it from 'Path' does
+        // not exist.
+        error_code = HPSS_ENOATTR;
+#endif
+        if (hpss_error_status(retval) == -error_code)
             return GLOBUS_SUCCESS;
         return hpss_error_to_globus_result(retval);
     }
