@@ -34,52 +34,61 @@ _get_tape_facts(hpss_xfileattr_t *  XFileAttr,
                 char             ** TapeFacts)
 {
     int retval = 0;
+    int level = 0;
 
     *TapeFacts = NULL;
 
-    for (int level = 0; level < HPSS_MAX_STORAGE_LEVELS; level++)
+    for (level = 0; level < HPSS_MAX_STORAGE_LEVELS; level++)
     {
-        if (!(XFileAttr->SCAttrib[level].Flags & BFS_BFATTRS_LEVEL_IS_TAPE))
-            continue;
-
-        // XFileAttr->SCAttrib[level].VVAttrib[BFS_MAX_VV_TO_RETURN_AT_LEVEL]
-        // XFileAttr->SCAttrib[level].NumberOfVVs
-        // XFileAttr->SCAttrib[level].VVAttrib[0].VVID
-        // XFileAttr->SCAttrib[level].VVAttrib[0].RelPosition
-        // XFileAttr->SCAttrib[level].VVAttrib[0].RelPositionOffset
-
-        const char * tape_facts_format = "\\X.tape.id=%s;X.tape.sec=%"PRId32";X.tape.off=%"PRIu64";";
-
-        // The file's COS has a tape level but first VV on the COS has not yet
-        // been assigned PVs. This file is on disk and not yet purged so no need
-        // to report tape attributes.
-        if (XFileAttr->SCAttrib[level].VVAttrib[0].PVList == NULL)
-            return GLOBUS_SUCCESS;
-
-        // SOID_ToString(XFileAttr->SCAttrib[level].VVAttrib[0].VVID) produces a
-        // UUID. Discussing with admins, they'd prefer Volume IDs (ie AA123400)
-        // which has the added benefit of saving us memory during sorting.
-
-        retval = snprintf(NULL,
-                          0,
-                          tape_facts_format,
-                          XFileAttr->SCAttrib[level].VVAttrib[0].PVList->List.List_val[0].Name,
-                          XFileAttr->SCAttrib[level].VVAttrib[0].RelPosition,
-                          XFileAttr->SCAttrib[level].VVAttrib[0].RelPositionOffset);
-       if (retval < 0)
-           return GlobusGFSErrorSystemError("Failed to format tape facts", errno);
-
-        *TapeFacts = malloc(retval + 1);
-        if (*TapeFacts == NULL)
-            return GlobusGFSErrorMemory("tape_facts");
-
-        snprintf(*TapeFacts,
-                 retval+1,
-                 tape_facts_format,
-                 XFileAttr->SCAttrib[level].VVAttrib[0].PVList->List.List_val[0].Name,
-                 XFileAttr->SCAttrib[level].VVAttrib[0].RelPosition,
-                 XFileAttr->SCAttrib[level].VVAttrib[0].RelPositionOffset);
+        // Break on the first tape storage classes
+        if (XFileAttr->SCAttrib[level].Flags & BFS_BFATTRS_LEVEL_IS_TAPE)
+            break;
     }
+
+    // No tape storage classes
+    if (level == HPSS_MAX_STORAGE_LEVELS)
+        return GLOBUS_SUCCESS;
+
+    // The file's COS has a tape level but first VV on the COS has not yet
+    // been assigned PVs. This file is on disk and not yet purged so no need
+    // to report tape attributes.
+    if (XFileAttr->SCAttrib[level].VVAttrib[0].PVList == NULL)
+        return GLOBUS_SUCCESS;
+
+
+    // Let's grab the file's tape facts
+    const char * tape_facts_format = "\\X.tape.id=%s;X.tape.sec=%"PRId32";X.tape.off=%"PRIu64";";
+
+    // SOID_ToString(XFileAttr->SCAttrib[level].VVAttrib[0].VVID) produces a
+    // UUID. Discussing with admins, they'd prefer Volume IDs (ie AA123400)
+    // which has the added benefit of saving us memory during sorting.
+
+    // XFileAttr->SCAttrib[level].VVAttrib[BFS_MAX_VV_TO_RETURN_AT_LEVEL]
+    // XFileAttr->SCAttrib[level].NumberOfVVs
+    // XFileAttr->SCAttrib[level].VVAttrib[0].VVID
+    // XFileAttr->SCAttrib[level].VVAttrib[0].RelPosition
+    // XFileAttr->SCAttrib[level].VVAttrib[0].RelPositionOffset
+
+    retval = snprintf(NULL,
+                      0,
+                      tape_facts_format,
+                      XFileAttr->SCAttrib[level].VVAttrib[0].PVList->List.List_val[0].Name,
+                      XFileAttr->SCAttrib[level].VVAttrib[0].RelPosition,
+                      XFileAttr->SCAttrib[level].VVAttrib[0].RelPositionOffset);
+    if (retval < 0)
+        return GlobusGFSErrorSystemError("Failed to format tape facts", errno);
+
+    *TapeFacts = malloc(retval + 1);
+    if (*TapeFacts == NULL)
+        return GlobusGFSErrorMemory("tape_facts");
+
+    snprintf(*TapeFacts,
+             retval+1,
+             tape_facts_format,
+             XFileAttr->SCAttrib[level].VVAttrib[0].PVList->List.List_val[0].Name,
+             XFileAttr->SCAttrib[level].VVAttrib[0].RelPosition,
+             XFileAttr->SCAttrib[level].VVAttrib[0].RelPositionOffset);
+
     return GLOBUS_SUCCESS;
 }
 
