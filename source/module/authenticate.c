@@ -16,8 +16,8 @@
 #include "logging.h"
 #include "hpss.h"
 
-globus_result_t
-authenticate_get_uid(char *UserName, int *Uid)
+static globus_result_t
+_get_uid(char *UserName, int *Uid)
 {
     struct passwd *passwd = NULL;
     struct passwd  passwd_buf;
@@ -95,7 +95,7 @@ authenticate(char * LoginName, // User w/credentials. defaults to hpssftp
     if (UserName)
     {
         int uid = -1;
-        globus_result_t result = authenticate_get_uid(UserName, &uid);
+        globus_result_t result = _get_uid(UserName, &uid);
         if (result)
             return result;
 

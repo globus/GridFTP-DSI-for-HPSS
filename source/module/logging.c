@@ -83,14 +83,10 @@ build_log_entry(log_type_t type, const char * message_format, va_list ap)
 
     char * entry = NULL;
     rc = asprintf(&entry,
-                  "[HPSS Connector][%s] %s%s%s%s%s%s:: %s\n",
+                  "[HPSS Connector][%s] User=%s TaskID=%s :: %s\n",
                   log_type_to_string(type),
-                  UserToLog   ? "User="     : "",
-                  UserToLog   ? UserToLog   : "",
-                  UserToLog   ? " "         : "",
-                  TaskIDToLog ? "TaskID="   : "",
+                  UserToLog ? UserToLog   : "",
                   TaskIDToLog ? TaskIDToLog : "",
-                  TaskIDToLog ? " "         : "",
                   message);
     free(message);
     if (rc == -1)
@@ -255,8 +251,8 @@ _struct_utimbuf_ptr(struct pool * pool, const struct utimbuf * p)
             "actime=%s, " // time_t
             "modtime=%s"  // time_t
         "}",
-            TIME_T(p->actime),
-            TIME_T(p->modtime));
+        TIME_T(p->actime),
+        TIME_T(p->modtime));
 }
 
 char *

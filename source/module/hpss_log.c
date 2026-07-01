@@ -117,7 +117,7 @@ _bf_vv_attrib_t(struct pool * pool, bf_vv_attrib_t a)
              "RelPosition=%s, "       // signed32
              "RelPositionOffset=%s, " // u_signed64
              "BytesOnVV=%s, "         // u_signed64
-             "PVList=%s, "            // pv_list_t *
+             "PVList=%s"              // pv_list_t *
         "}",
             HPSSOID_T(a.VVID),
             SIGNED(a.RelPosition),
@@ -580,7 +580,7 @@ char *
 _hpss_xfileattr_t_ptr(struct pool * pool, const hpss_xfileattr_t * p)
 {
     if (p == NULL)
-    return PTR(p);
+        return PTR(p);
 
     return _sprintf(
         pool,
