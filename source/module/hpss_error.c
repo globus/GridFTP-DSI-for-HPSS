@@ -97,7 +97,7 @@ hpss_error_to_globus_result(int error)
         break;
     case -EISDIR:
         code = 553;
-        type = "IS_A_DIRECTORTY";
+        type = "IS_A_DIRECTORY";
         break;
     case -ENOTDIR:
         code = 553;

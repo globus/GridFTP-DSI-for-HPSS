@@ -25,11 +25,12 @@ AM_LDFLAGS=$(MODULE_LD_FLAGS) -ldl -rdynamic
 
 test_pio_SOURCES =      \
 	driver.c        \
+	driver.h        \
 	gridftp_mocks.c \
 	hpss_mocks.c    \
 	test_pio.c
 
 test_pio_LDADD = $(FRAMEWORK)/libframework.a
 
-test_utils_SOURCES = driver.c test_utils.c
+test_utils_SOURCES = driver.c driver.h test_utils.c
 test_utils_LDADD = $(FRAMEWORK)/libframework.a

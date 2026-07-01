@@ -5,7 +5,7 @@
 #
 # If you are looking for general production logging, see the 'log_level'
 # setting, set in /etc/gridftp.d/globus-connect-server-gridftp-logging by
-# default. As of version 2.15, the HPSS connector sends it standard logging
+# default. As of version 2.14, the HPSS connector sends its standard logging
 # to the GridFTP server's default log file.
 #
 # See the HPSS connector documentation at docs.globus.org for more information.
