@@ -20,9 +20,10 @@ Enable standard logging of the HPSS connector:
 4. Perform these options and monitor the log file of messages.
 .. In the web app, refresh the directory listing of the endpoint. The log
    file will generate messages with the `[HPSS CONNECTOR][INFO]` tags. These
-   entries will include Username but not TaskID.
+   entries will include the Username and an empty `TaskID=`, because no
+   transfer task exists for a directory listing.
 .. Transfer or delete files on the endpoint through the Web app. The log
-   entries will look similar to the previous test except now TaskID will be set.
+   entries will look similar to the previous test except now `TaskID=` will have a value.
 
 === Verify improvements for configuration errors
 These tests verify that errors from parsing the connector`s configuration file
@@ -43,7 +44,7 @@ The HPSS connector has a configuration issue that must be resolved by the endpoi
 The log file will have the complete error message:
 +
 ----
-[18549] Wed Sep  2 11:23:27 2020 :: [HPSS Connector][ERROR] User=jasonalt :: Can not access the config file: Permission denied
+[18549] Wed Sep  2 11:23:27 2020 :: [HPSS Connector][ERROR] User=jasonalt TaskID= :: Can not access the config file: Permission denied
 ----
 +
 Fix the configuration file`s permissions (chmod 644 <file>).
@@ -53,7 +54,7 @@ Fix the configuration file`s permissions (chmod 644 <file>).
    same error message in (1). The log file will now have:
 +
 ----
-[29398] Wed Sep  2 11:57:34 2020 :: [HPSS Connector][ERROR] User=jasonalt :: Configuration error, no value given for option `foo` on line 9
+[29398] Wed Sep  2 11:57:34 2020 :: [HPSS Connector][ERROR] User=jasonalt TaskID= :: Configuration error, no value given for option `foo` on line 9
 ----
 +
 Remove the option `foo` and save the config file.
@@ -63,7 +64,7 @@ Remove the option `foo` and save the config file.
    same error message in (1). The log file will now show:
 +
 ----
-[29621] Wed Sep  2 12:00:57 2020 :: [HPSS Connector][ERROR] User=jasonalt :: Configuration error, unsupported option `foo`
+[29621] Wed Sep  2 12:00:57 2020 :: [HPSS Connector][ERROR] User=jasonalt TaskID= :: Configuration error, unsupported option `foo`
 ----
 +
 Remove `foo bar` and save the config file.
@@ -73,7 +74,7 @@ Remove `foo bar` and save the config file.
    same error message in (1). The log file will now show:
 +
 ----
-[2579] Wed Sep  2 12:10:56 2020 :: [HPSS Connector][ERROR] User=jasonalt :: User could not log into HPSS because the configured authentication mechanism `foo` is not known to HPSS.
+[2579] Wed Sep  2 12:10:56 2020 :: [HPSS Connector][ERROR] User=jasonalt TaskID= :: User could not log into HPSS because the configured authentication mechanism `foo` is not known to HPSS.
 ----
 +
 Remove `AuthenticationMech foo` and save the config file.
@@ -83,7 +84,7 @@ Remove `AuthenticationMech foo` and save the config file.
    message in (1). The log file will now show:
 +
 ----
-[7443] Wed 02 Sep 2020 12:17:31 PM EDT :: [HPSS Connector][ERROR] User=jasonalt :: Could not log into HPSS as `foo`. Operation not permitted
+[7443] Wed 02 Sep 2020 12:17:31 PM EDT :: [HPSS Connector][ERROR] User=jasonalt TaskID= :: Could not log into HPSS as `foo`. Operation not permitted
 ----
 +
 Remove ` LoginName foo` and save the config file.
@@ -102,7 +103,7 @@ The HPSS connector could not log you into HPSS. The issue must be resolved by th
 And this line will show in the log file:
 +
 ----
-[20112] Wed Sep  2 13:58:01 2020 :: [HPSS Connector][ERROR] User=jasonalt :: Unable to look up the user`s HPSS account with getpwnam()
+[20112] Wed Sep  2 13:58:01 2020 :: [HPSS Connector][ERROR] User=jasonalt TaskID= :: Unable to look up the user`s HPSS account with getpwnam()
 ----
 +
 Remove `$HPSS_DSI_TEST INJECT_UNKNOWN_ACCOUNT` from hpss_test.
@@ -113,7 +114,7 @@ Remove `$HPSS_DSI_TEST INJECT_UNKNOWN_ACCOUNT` from hpss_test.
    And this line will appear in the log file:
 +
 ----
-[22915] Wed Sep  2 14:23:49 2020 :: [HPSS Connector][ERROR] User=jasonalt :: Could not change active HPSS UID to <uid>. Operation not permitted
+[22915] Wed Sep  2 14:23:49 2020 :: [HPSS Connector][ERROR] User=jasonalt TaskID= :: Could not change active HPSS UID to <uid>. Operation not permitted
 ----
 +
 Remove the file /etc/gridftp.d/hpss_test.
