@@ -3,8 +3,8 @@
 
 #include <testing.h>
 
-// Helper that can be used by tests to find DSI entrypoints that the need.
-// This function will call print an error message and call exit(1) if the
+// Helper that can be used by tests to find DSI entrypoints.
+// This function will print an error message and call exit(1) if the
 // symbol fails to resolve. This function will not return NULL.
 void *
 lookup_symbol(const char * symbol_name);

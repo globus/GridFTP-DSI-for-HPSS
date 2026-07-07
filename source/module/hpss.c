@@ -64,8 +64,8 @@ HpssAPI_ConvertTimeToPosixTime(
  
 signed32
 Hpss_AuthnMechTypeFromString(
-   const char              *  AuthnMechString,
-   hpss_authn_mech_t       *  AuthnMech)
+   const char                   *  AuthnMechString,
+   hpss_authn_mech_t            *  AuthnMech)
 {
     API_ENTER("hpss_AuthnMechTypeFromString",
               "AuthnMechString=5s AuthnMech=%s",
@@ -120,8 +120,8 @@ Hpss_Chmod(
 
 char *
 Hpss_ChompXMLHeader(
-    char                        * XML,
-    char                        * Header)
+    char                        *  XML,
+    char                        *  Header)
 {
     API_ENTER("hpss_ChompXMLHeader",
               "XML=%s Header=%s",
@@ -458,9 +458,9 @@ Hpss_GetThreadUcred(
 
 int
 Hpss_LoadDefaultThreadState(
-    uid_t                     UserID,
-    mode_t                    Umask,
-    char                   *  ClientFullName)
+    uid_t                          UserID,
+    mode_t                         Umask,
+    char                        *  ClientFullName)
 {
     API_ENTER("hpss_LoadDefaultThreadState",
               "UserID=%s Umask=%s ClientFullName=%s",
@@ -574,12 +574,12 @@ Hpss_net_getaddrinfo(
 
 int
 Hpss_Open(
-    const char                  * Path,
-    int                           Oflag,
-    mode_t                        Mode,
-    const hpss_cos_hints_t      * HintsIn,
-    const hpss_cos_priorities_t * HintsPri,
-    hpss_cos_hints_t            * HintsOut)
+    const char                  *  Path,
+    int                            Oflag,
+    mode_t                         Mode,
+    const hpss_cos_hints_t      *  HintsIn,
+    const hpss_cos_priorities_t *  HintsPri,
+    hpss_cos_hints_t            *  HintsOut)
 {
     API_ENTER("hpss_Open",
               "Path=%s "
@@ -643,10 +643,10 @@ Hpss_OpendirHandle(
 
 signed32
 Hpss_ParseAuthString(
-    char                   *  AuthenticatorString, // IN
-    hpss_authn_mech_t      *  AuthnMechanism,      // OUT
-    hpss_rpc_auth_type_t   *  AuthenticatorType,   // OUT
-    void                   ** Authenticator)       // OUT
+    char                        *  AuthenticatorString, // IN
+    hpss_authn_mech_t           *  AuthnMechanism,      // OUT
+    hpss_rpc_auth_type_t        *  AuthenticatorType,   // OUT
+    void                        ** Authenticator)       // OUT
 {
     API_ENTER("hpss_ParseAuthString",
               "AuthenticatorString=%s "
@@ -1017,11 +1017,11 @@ Hpss_Readlink(
 
 int
 Hpss_ReadlinkHandle(
-    const ns_ObjHandle_t        * ObjHandle,
-    const char                  * Path,
-    char                        * Contents,
-    size_t                        BufferSize,
-    const sec_cred_t            * Ucred)
+    const ns_ObjHandle_t        *  ObjHandle,
+    const char                  *  Path,
+    char                        *  Contents,
+    size_t                         BufferSize,
+    const sec_cred_t            *  Ucred)
 {
     API_ENTER("hpss_ReadlinkHandle",
               "ObjHandle=%s Path=%s BufferSize=%s Ucred=%s",
@@ -1170,11 +1170,11 @@ Hpss_SetCOSByHints(
 
 int
 Hpss_SetLoginCred(
-    char                   *  PrincipalName, // IN
-    hpss_authn_mech_t         Mechanism,     // IN
-    hpss_rpc_cred_type_t      CredType,      // IN
-    hpss_rpc_auth_type_t      AuthType,      // IN
-    void                   *  Authenticator) // IN
+    char                        *  PrincipalName, // IN
+    hpss_authn_mech_t              Mechanism,     // IN
+    hpss_rpc_cred_type_t           CredType,      // IN
+    hpss_rpc_auth_type_t           AuthType,      // IN
+    void                        *  Authenticator) // IN
 {
     API_ENTER("hpss_SetLoginCred",
               "PrincipalName=%s "
@@ -1190,10 +1190,10 @@ Hpss_SetLoginCred(
 
     Hpss_ClearLastHPSSErrno();
     int rv = hpss_SetLoginCred(PrincipalName,
-                                         Mechanism,
-                                         CredType,
-                                         AuthType,
-                                         Authenticator);
+                               Mechanism,
+                               CredType,
+                               AuthType,
+                               Authenticator);
 
     /* Enable post-login functionality. */
     if (rv == HPSS_E_NOERROR)
@@ -1297,8 +1297,8 @@ Hpss_StageCallBack(
 
 int
 Hpss_Stat(
-    const char                  * Path,
-    hpss_stat_t                 * Buf)
+    const char                  *  Path,
+    hpss_stat_t                 *  Buf)
 {
     API_ENTER("hpss_Stat", "Path=%s", CHAR_PTR(Path));
 
@@ -1463,10 +1463,10 @@ Hpss_UserAttrGetAttrs(
 #else
 int
 Hpss_UserAttrGetAttrs(
-    const char                  * Path,    // IN
-    hpss_userattr_list_t        * Attr,    // IN/OUT
-    int                           XMLFlag, // IN
-    int                           XMLSize) // IN
+    const char                  *  Path,    // IN
+    hpss_userattr_list_t        *  Attr,    // IN/OUT
+    int                            XMLFlag, // IN
+    int                            XMLSize) // IN
 {
     API_ENTER("hpss_UserAttrGetAttrs",
               "Path=%s Attr=%s XMLFlag=%s XMLSize=%s",
@@ -1490,9 +1490,9 @@ Hpss_UserAttrGetAttrs(
 
 int
 Hpss_UserAttrSetAttrs(
-    const char                  * Path,   // IN
-    const hpss_userattr_list_t  * Attr,   // IN
-    const char                  * Schema) // IN
+    const char                  *  Path,   // IN
+    const hpss_userattr_list_t  *  Attr,   // IN
+    const char                  *  Schema) // IN
 {
     API_ENTER("hpss_UserAttrSetAttrs",
               "Path=%s Attr=%s Schema=%s",

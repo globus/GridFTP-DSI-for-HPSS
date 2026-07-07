@@ -17,7 +17,9 @@
 #include "local_strings.h"
 
 char *
-_api_config_t_ptr(struct pool * pool, const api_config_t * p)
+_api_config_t_ptr(
+    struct pool                 *  pool,
+    const api_config_t          *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -42,30 +44,32 @@ _api_config_t_ptr(struct pool * pool, const api_config_t * p)
             "DescName=%s, "             // char[HPSS_MAX_DESC_NAME]
             "DebugPath=%s, "            // char[HPSS_MAX_DESC_NAME]
             "HostName=%s, "             // char[HPSS_MAX_DESC_NAME]
-            "XMLSize=%s,"               // signed32
+            "XMLSize=%s"                // signed32
         "}",
-            UNSIGNED(p->Flags),
-            INT(p->DebugValue),
-            INT(p->TransferType),
-            INT(p->NumRetries),
-            INT(p->BusyDelay),
-            INT(p->TotalDelay),
-            INT(p->LimitedRetries),
-            INT(p->MaxConnections),
-            INT(p->ReuseDataConnections),
-            INT(p->UsePortRange),
-            INT(p->RetryStageInp),
-            INT(p->DMAPWriteUpdates),
-            HPSS_AUTHN_MECH_T(p->AuthnMech),
-            HPSS_RPC_PROT_LEVEL_T(p->RPCProtLevel),
-            CHAR_PTR(p->DescName),
-            CHAR_PTR(p->DebugPath),
-            CHAR_PTR(p->HostName),
-            INT(p->XMLSize));
+        UNSIGNED(p->Flags),
+        INT(p->DebugValue),
+        INT(p->TransferType),
+        INT(p->NumRetries),
+        INT(p->BusyDelay),
+        INT(p->TotalDelay),
+        INT(p->LimitedRetries),
+        INT(p->MaxConnections),
+        INT(p->ReuseDataConnections),
+        INT(p->UsePortRange),
+        INT(p->RetryStageInp),
+        INT(p->DMAPWriteUpdates),
+        HPSS_AUTHN_MECH_T(p->AuthnMech),
+        HPSS_RPC_PROT_LEVEL_T(p->RPCProtLevel),
+        CHAR_PTR(p->DescName),
+        CHAR_PTR(p->DebugPath),
+        CHAR_PTR(p->HostName),
+        INT(p->XMLSize));
 }
 
 char *
-_bf_sc_attrib_t(struct pool * pool, bf_sc_attrib_t a)
+_bf_sc_attrib_t(
+    struct pool                 *  pool,
+    bf_sc_attrib_t                 a)
 {
     return _sprintf(
         pool,
@@ -89,53 +93,58 @@ _bf_sc_attrib_t(struct pool * pool, bf_sc_attrib_t a)
             "StripeLength=%s, "      // u_signed64
             "Flags=%s"               // unsigned32
         "}",
-            BF_VV_ATTRIB_T(a.VVAttrib[0]),
-            BF_VV_ATTRIB_T(a.VVAttrib[1]),
-            BF_VV_ATTRIB_T(a.VVAttrib[2]),
-            BF_VV_ATTRIB_T(a.VVAttrib[3]),
-            BF_VV_ATTRIB_T(a.VVAttrib[4]),
-            BF_VV_ATTRIB_T(a.VVAttrib[5]),
-            BF_VV_ATTRIB_T(a.VVAttrib[6]),
-            BF_VV_ATTRIB_T(a.VVAttrib[7]),
-            BF_VV_ATTRIB_T(a.VVAttrib[8]),
-            BF_VV_ATTRIB_T(a.VVAttrib[9]),
-            UNSIGNED(a.NumberOfVVs),
-            UNSIGNED64(a.BytesAtLevel),
-            UNSIGNED(a.OptimumAccessSize),
-            UNSIGNED(a.StripeWidth),
-            UNSIGNED64(a.StripeLength),
-            HEX(a.Flags));
+        BF_VV_ATTRIB_T(a.VVAttrib[0]),
+        BF_VV_ATTRIB_T(a.VVAttrib[1]),
+        BF_VV_ATTRIB_T(a.VVAttrib[2]),
+        BF_VV_ATTRIB_T(a.VVAttrib[3]),
+        BF_VV_ATTRIB_T(a.VVAttrib[4]),
+        BF_VV_ATTRIB_T(a.VVAttrib[5]),
+        BF_VV_ATTRIB_T(a.VVAttrib[6]),
+        BF_VV_ATTRIB_T(a.VVAttrib[7]),
+        BF_VV_ATTRIB_T(a.VVAttrib[8]),
+        BF_VV_ATTRIB_T(a.VVAttrib[9]),
+        UNSIGNED(a.NumberOfVVs),
+        UNSIGNED64(a.BytesAtLevel),
+        UNSIGNED(a.OptimumAccessSize),
+        UNSIGNED(a.StripeWidth),
+        UNSIGNED64(a.StripeLength),
+        HEX(a.Flags));
 }
 
 char *
-_bf_vv_attrib_t(struct pool * pool, bf_vv_attrib_t a)
+_bf_vv_attrib_t(
+    struct pool                 *  pool,
+    bf_vv_attrib_t                 a)
 {
     return _sprintf(
         pool,
         "{"
-             "VVID=%s, "              // hpssoid_t
-             "RelPosition=%s, "       // signed32
-             "RelPositionOffset=%s, " // u_signed64
-             "BytesOnVV=%s, "         // u_signed64
-             "PVList=%s"              // pv_list_t *
+            "VVID=%s, "              // hpssoid_t
+            "RelPosition=%s, "       // signed32
+            "RelPositionOffset=%s, " // u_signed64
+            "BytesOnVV=%s, "         // u_signed64
+            "PVList=%s"              // pv_list_t *
         "}",
-            HPSSOID_T(a.VVID),
-            SIGNED(a.RelPosition),
-            UNSIGNED64(a.RelPositionOffset),
-            UNSIGNED64(a.BytesOnVV),
-            PV_LIST_T(a.PVList));
+        HPSSOID_T(a.VVID),
+        SIGNED(a.RelPosition),
+        UNSIGNED64(a.RelPositionOffset),
+        UNSIGNED64(a.BytesOnVV),
+        PV_LIST_T(a.PVList));
 }
 
 #if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
 char *
-_bfs_bitfile_obj_handle_t(struct pool * pool, bfs_bitfile_obj_handle_t h)
+_bfs_bitfile_obj_handle_t(
+    struct pool                 *  pool,
+    bfs_bitfile_obj_handle_t       h)
 {
     return _bfs_bitfile_obj_handle_t_ptr(pool, &h);
 }
 
 char *
-_bfs_bitfile_obj_handle_t_ptr(struct pool * pool,
-                               const bfs_bitfile_obj_handle_t * p)
+_bfs_bitfile_obj_handle_t_ptr(
+    struct pool                    * pool,
+    const bfs_bitfile_obj_handle_t * p)
 {
     if (p == NULL)
         return PTR(p);
@@ -154,13 +163,17 @@ _bfs_bitfile_obj_handle_t_ptr(struct pool * pool,
 #endif
 
 char *
-_hpss_attrs_t(struct pool * pool, hpss_Attrs_t a)
+_hpss_attrs_t(
+    struct pool                 *  pool,
+    hpss_Attrs_t                   a)
 {
     return _hpss_attrs_t_ptr(pool, &a);
 }
 
 char *
-_hpss_attrs_t_ptr(struct pool * pool, const hpss_Attrs_t * p)
+_hpss_attrs_t_ptr(
+    struct pool                 *  pool,
+    const hpss_Attrs_t          *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -211,52 +224,54 @@ _hpss_attrs_t_ptr(struct pool * pool, const hpss_Attrs_t * p)
             "UserPerms=%s, "           // uint32_t
             "WriteCount=%s"            // uint32_t
         "}",
-            ACCT_REC_T(p->Account),
+        ACCT_REC_T(p->Account),
 #if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
-            HPSSOID_T(p->BitfileId),
+        HPSSOID_T(p->BitfileId),
 #else
-            BFS_BITFILE_OBJ_HANDLE_T(p->BitfileObj),
+        BFS_BITFILE_OBJ_HANDLE_T(p->BitfileObj),
 #endif
-            CHAR_PTR(p->Comment),
-            HEX(p->CompositePerms),
-            UNSIGNED(p->COSId),
-            UNSIGNED64(p->DataLength),
-            UNSIGNED(p->EntryCount),
-            UNSIGNED(p->ExtendedACLs),
-            UNSIGNED(p->FamilyId),
-            NS_OBJHANDLE_T(p->FilesetHandle),
-            UNSIGNED64(p->FilesetId),
+        CHAR_PTR(p->Comment),
+        HEX(p->CompositePerms),
+        UNSIGNED(p->COSId),
+        UNSIGNED64(p->DataLength),
+        UNSIGNED(p->EntryCount),
+        UNSIGNED(p->ExtendedACLs),
+        UNSIGNED(p->FamilyId),
+        NS_OBJHANDLE_T(p->FilesetHandle),
+        UNSIGNED64(p->FilesetId),
 #if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
-            UNSIGNED64(p->FilesetRootId),
+        UNSIGNED64(p->FilesetRootId),
 #else
-            UNSIGNED64(p->FilesetRootObjectId),
+        UNSIGNED64(p->FilesetRootObjectId),
 #endif
-            UNSIGNED(p->FilesetStateFlags),
-            UNSIGNED(p->FilesetType),
-            UNSIGNED(p->GID),
-            HEX(p->GroupPerms),
-            UNSIGNED(p->LinkCount),
-            HEX(p->ModePerms),
-            UNSIGNED(p->OpenCount),
-            UNSIGNED(p->OptionFlags),
-            HEX(p->OtherPerms),
-            UNSIGNED(p->ReadCount),
-            UNSIGNED(p->RealmId),
-            UNSIGNED64(p->RegisterBitMap),
-            UNSIGNED(p->SubSystemId),
-            TIMESTAMP_SEC_T(p->TimeCreated),
-            TIMESTAMP_SEC_T(p->TimeLastRead),
-            TIMESTAMP_SEC_T(p->TimeLastWritten),
-            TIMESTAMP_SEC_T(p->TimeModified),
-            HPSS_TRASHRECORD_T(p->TrashInfo),
-            UNSIGNED(p->Type),
-            UNSIGNED(p->UID),
-            HEX(p->UserPerms),
-            UNSIGNED(p->WriteCount));
+        UNSIGNED(p->FilesetStateFlags),
+        UNSIGNED(p->FilesetType),
+        UNSIGNED(p->GID),
+        HEX(p->GroupPerms),
+        UNSIGNED(p->LinkCount),
+        HEX(p->ModePerms),
+        UNSIGNED(p->OpenCount),
+        UNSIGNED(p->OptionFlags),
+        HEX(p->OtherPerms),
+        UNSIGNED(p->ReadCount),
+        UNSIGNED(p->RealmId),
+        UNSIGNED64(p->RegisterBitMap),
+        UNSIGNED(p->SubSystemId),
+        TIMESTAMP_SEC_T(p->TimeCreated),
+        TIMESTAMP_SEC_T(p->TimeLastRead),
+        TIMESTAMP_SEC_T(p->TimeLastWritten),
+        TIMESTAMP_SEC_T(p->TimeModified),
+        HPSS_TRASHRECORD_T(p->TrashInfo),
+        UNSIGNED(p->Type),
+        UNSIGNED(p->UID),
+        HEX(p->UserPerms),
+        UNSIGNED(p->WriteCount));
 }
 
 char *
-_hpss_authn_mech_t_ptr(struct pool * pool, const hpss_authn_mech_t * p)
+_hpss_authn_mech_t_ptr(
+    struct pool                 *  pool,
+    const hpss_authn_mech_t     *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -264,7 +279,9 @@ _hpss_authn_mech_t_ptr(struct pool * pool, const hpss_authn_mech_t * p)
 }
 
 char *
-_hpss_cos_hints_t_ptr(struct pool * pool, const hpss_cos_hints_t * p)
+_hpss_cos_hints_t_ptr(
+    struct pool                 *  pool,
+    const hpss_cos_hints_t      *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -288,25 +305,27 @@ _hpss_cos_hints_t_ptr(struct pool * pool, const hpss_cos_hints_t * p)
             "StripeLength=%s, "      // u_signed64
             "FamilyId=%s"            // unsigned32
         "}",
-            UNSIGNED(p->COSId),
-            CHAR_PTR(p->COSName),
-            HEX(p->Flags),
-            UNSIGNED64(p->OptimumAccessSize),
-            UNSIGNED64(p->MinFileSize),
-            UNSIGNED64(p->MaxFileSize),
-            UNSIGNED(p->AccessFrequency),
-            UNSIGNED(p->TransferRate),
-            UNSIGNED(p->AvgLatency),
-            UNSIGNED(p->WriteOps),
-            UNSIGNED(p->ReadOps),
-            UNSIGNED(p->StageCode),
-            UNSIGNED(p->StripeWidth),
-            UNSIGNED64(p->StripeLength),
-            UNSIGNED(p->FamilyId));
+        UNSIGNED(p->COSId),
+        CHAR_PTR(p->COSName),
+        HEX(p->Flags),
+        UNSIGNED64(p->OptimumAccessSize),
+        UNSIGNED64(p->MinFileSize),
+        UNSIGNED64(p->MaxFileSize),
+        UNSIGNED(p->AccessFrequency),
+        UNSIGNED(p->TransferRate),
+        UNSIGNED(p->AvgLatency),
+        UNSIGNED(p->WriteOps),
+        UNSIGNED(p->ReadOps),
+        UNSIGNED(p->StageCode),
+        UNSIGNED(p->StripeWidth),
+        UNSIGNED64(p->StripeLength),
+        UNSIGNED(p->FamilyId));
 }
 
 char *
-_hpss_cos_md_t_ptr(struct pool * pool, const hpss_cos_md_t * p)
+_hpss_cos_md_t_ptr(
+    struct pool                 *  pool,
+    const hpss_cos_md_t         *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -332,29 +351,31 @@ _hpss_cos_md_t_ptr(struct pool * pool, const hpss_cos_md_t * p)
             "FileHashType=%s"        // hpss_hash_type_t
 #endif
         "}",
-            UNSIGNED(p->COSId),
-            UNSIGNED(p->HierId),
-            CHAR_PTR(p->COSName),
-            UNSIGNED(p->OptimumAccessSize),
-            HEX(p->Flags),
-            UNSIGNED64(p->MinFileSize),
-            UNSIGNED64(p->MaxFileSize),
-            UNSIGNED(p->AccessFrequency),
-            UNSIGNED(p->TransferRate),
-            UNSIGNED(p->AvgLatency),
-            UNSIGNED(p->WriteOps),
-            UNSIGNED(p->ReadOps),
-            UNSIGNED(p->StageCode),
+        UNSIGNED(p->COSId),
+        UNSIGNED(p->HierId),
+        CHAR_PTR(p->COSName),
+        UNSIGNED(p->OptimumAccessSize),
+        HEX(p->Flags),
+        UNSIGNED64(p->MinFileSize),
+        UNSIGNED64(p->MaxFileSize),
+        UNSIGNED(p->AccessFrequency),
+        UNSIGNED(p->TransferRate),
+        UNSIGNED(p->AvgLatency),
+        UNSIGNED(p->WriteOps),
+        UNSIGNED(p->ReadOps),
+        UNSIGNED(p->StageCode),
 #if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
-            UNSIGNED(p->AllocMethod));
+        UNSIGNED(p->AllocMethod));
 #else
-            UNSIGNED(p->AllocMethod),
-            HPSS_HASH_TYPE_T(p->FileHashType));
+        UNSIGNED(p->AllocMethod),
+        HPSS_HASH_TYPE_T(p->FileHashType));
 #endif
 }
 
 char *
-_hpss_cos_priorities_t_ptr(struct pool * pool, const hpss_cos_priorities_t * p)
+_hpss_cos_priorities_t_ptr(
+    struct pool                 *  pool,
+    const hpss_cos_priorities_t *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -375,48 +396,60 @@ _hpss_cos_priorities_t_ptr(struct pool * pool, const hpss_cos_priorities_t * p)
             "StageCodePriority=%s, "         // unsigned32
             "StripeWidthPriority=%s, "       // unsigned32
             "StripeLengthPriority=%s, "      // unsigned32
-            "FamilyIdPriority=%s, "          // unsigned32
+            "FamilyIdPriority=%s"            // unsigned32
         "}",
-            UNSIGNED(p->COSIdPriority),
-            UNSIGNED(p->COSNamePriority),
-            UNSIGNED(p->OptimumAccessSizePriority),
-            UNSIGNED(p->MinFileSizePriority),
-            UNSIGNED(p->MaxFileSizePriority),
-            UNSIGNED(p->AccessFrequencyPriority),
-            UNSIGNED(p->TransferRatePriority),
-            UNSIGNED(p->AvgLatencyPriority),
-            UNSIGNED(p->WriteOpsPriority),
-            UNSIGNED(p->ReadOpsPriority),
-            UNSIGNED(p->StageCodePriority),
-            UNSIGNED(p->StripeWidthPriority),
-            UNSIGNED(p->StripeLengthPriority),
-            UNSIGNED(p->FamilyIdPriority));
+        UNSIGNED(p->COSIdPriority),
+        UNSIGNED(p->COSNamePriority),
+        UNSIGNED(p->OptimumAccessSizePriority),
+        UNSIGNED(p->MinFileSizePriority),
+        UNSIGNED(p->MaxFileSizePriority),
+        UNSIGNED(p->AccessFrequencyPriority),
+        UNSIGNED(p->TransferRatePriority),
+        UNSIGNED(p->AvgLatencyPriority),
+        UNSIGNED(p->WriteOpsPriority),
+        UNSIGNED(p->ReadOpsPriority),
+        UNSIGNED(p->StageCodePriority),
+        UNSIGNED(p->StripeWidthPriority),
+        UNSIGNED(p->StripeLengthPriority),
+        UNSIGNED(p->FamilyIdPriority));
 }
 
 char *
-_hpss_errno_state_t(struct pool * pool, hpss_errno_state_t errno_state)
+_hpss_errno_state_t(
+    struct pool                 *  pool, 
+    hpss_errno_state_t             errno_state)
 {
-    return _sprintf(pool,
-                    "{hpss_errno=%s, func=%s, requestId=%s}", 
-                    INT(errno_state.hpss_errno),
-                    CHAR_PTR(errno_state.func),
-                    HPSS_REQID_T(errno_state.requestId));
+    return _sprintf(
+        pool,
+        "{"
+            "hpss_errno=%s, "
+            "func=%s, "
+            "requestId=%s"
+        "}", 
+        INT(errno_state.hpss_errno),
+        CHAR_PTR(errno_state.func),
+        HPSS_REQID_T(errno_state.requestId));
 }
 
 char *
-_hpss_fileattr_t(struct pool * pool, const hpss_fileattr_t * fileattr)
+_hpss_fileattr_t(
+    struct pool                 *  pool,
+    const hpss_fileattr_t       *  fileattr)
 {
-    return _sprintf(pool,
-                    "{"
-                        "ObjectHandle=%s, " // ns_ObjHandle_t
-                        "Attrs=%s"          // hpss_Attrs_t
-                    "}", 
-                    NS_OBJHANDLE_T(fileattr->ObjectHandle),
-                    HPSS_ATTRS_T(fileattr->Attrs));
+    return _sprintf(
+        pool,
+        "{"
+            "ObjectHandle=%s, " // ns_ObjHandle_t
+            "Attrs=%s"          // hpss_Attrs_t
+        "}", 
+        NS_OBJHANDLE_T(fileattr->ObjectHandle),
+        HPSS_ATTRS_T(fileattr->Attrs));
 }
 
 char *
-_hpss_pio_gapinfo_t_ptr(struct pool * pool, const hpss_pio_gapinfo_t * p)
+_hpss_pio_gapinfo_t_ptr(
+    struct pool                 *  pool,
+    const hpss_pio_gapinfo_t    *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -427,12 +460,14 @@ _hpss_pio_gapinfo_t_ptr(struct pool * pool, const hpss_pio_gapinfo_t * p)
             "Offset=%s, " // u_signed64
             "Length=%s"   // u_signed64
         "}",
-            UNSIGNED64(p->Offset),
-            UNSIGNED64(p->Length));
+        UNSIGNED64(p->Offset),
+        UNSIGNED64(p->Length));
 }
 
 char *
-_hpss_pio_prarams_t_ptr(struct pool * pool, const hpss_pio_params_t * p)
+_hpss_pio_prarams_t_ptr(
+    struct pool                 *  pool,
+    const hpss_pio_params_t     *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -440,25 +475,27 @@ _hpss_pio_prarams_t_ptr(struct pool * pool, const hpss_pio_params_t * p)
    return _sprintf(
        pool,
        "{"
-           "Operation=%s, "       // hpss_pio_operation_t
-           "ClntStripeWidth=%s, " // unsigned32
-           "BlockSize=%s, "       // unsigned32
-           "FileStripeWidth=%s, " // unsigned32
-           "IOTimeOutSecs=%s, "   // unsigned32
-           "Transport=%s, "       // hpss_pio_transport_t
-           "Options=%s"           // hpss_pio_options_t
+            "Operation=%s, "       // hpss_pio_operation_t
+            "ClntStripeWidth=%s, " // unsigned32
+            "BlockSize=%s, "       // unsigned32
+            "FileStripeWidth=%s, " // unsigned32
+            "IOTimeOutSecs=%s, "   // unsigned32
+            "Transport=%s, "       // hpss_pio_transport_t
+            "Options=%s"           // hpss_pio_options_t
        "}",
-           HPSS_PIO_OPERATION_T(p->Operation),
-           UNSIGNED(p->ClntStripeWidth),
-           UNSIGNED(p->BlockSize),
-           UNSIGNED(p->FileStripeWidth),
-           UNSIGNED(p->IOTimeOutSecs),
-           HPSS_PIO_TRANSPORT_T(p->Transport),
-           HPSS_PIO_OPTIONS_T(p->Options));
+        HPSS_PIO_OPERATION_T(p->Operation),
+        UNSIGNED(p->ClntStripeWidth),
+        UNSIGNED(p->BlockSize),
+        UNSIGNED(p->FileStripeWidth),
+        UNSIGNED(p->IOTimeOutSecs),
+        HPSS_PIO_TRANSPORT_T(p->Transport),
+        HPSS_PIO_OPTIONS_T(p->Options));
 }
 
 char *
-_hpss_reqid_t_ptr(struct pool * pool, const hpss_reqid_t * p)
+_hpss_reqid_t_ptr(
+    struct pool                 *  pool,
+    const hpss_reqid_t          *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -466,7 +503,9 @@ _hpss_reqid_t_ptr(struct pool * pool, const hpss_reqid_t * p)
 }
 
 char *
-_hpss_rpc_auth_type_t_ptr(struct pool * pool, const hpss_rpc_auth_type_t * p)
+_hpss_rpc_auth_type_t_ptr(
+    struct pool                 *  pool,
+    const hpss_rpc_auth_type_t  *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -474,7 +513,9 @@ _hpss_rpc_auth_type_t_ptr(struct pool * pool, const hpss_rpc_auth_type_t * p)
 }
 
 char *
-_hpss_trashrecord_t(struct pool * pool, hpss_TrashRecord_t t)
+_hpss_trashrecord_t(
+    struct pool                 *  pool,
+    hpss_TrashRecord_t             t)
 {
     return _sprintf(
         pool,
@@ -498,34 +539,38 @@ _hpss_trashrecord_t(struct pool * pool, hpss_TrashRecord_t t)
             "Path=%s, "               // char[HPSS_MAX_TRASH_PATH]
             "Name=%s"                 // char[HPSS_MAX_TRASH_PATH]
         "}",
-            UNSIGNED64(t.ParentId),
+        UNSIGNED64(t.ParentId),
 #if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
-            HPSS_DISTRIBUTIONKEY_T(t.ParentNsHash),
+        HPSS_DISTRIBUTIONKEY_T(t.ParentNsHash),
 #endif
-            NS_OBJHANDLE_T(t.Handle),
-            UNSIGNED(t.UID),
-            UNSIGNED(t.RealmId),
-            TIMESTAMP_SEC_T(t.TimeDeleted),
-            TIMESTAMP_SEC_T(t.TimeCreated),
-            TIMESTAMP_SEC_T(t.TimeLastRead),
-            TIMESTAMP_SEC_T(t.TimeModified),
-            UNSIGNED64(t.LengthAtDeleteTime),
-            HPSSOID_T(t.BitfileId),
+        NS_OBJHANDLE_T(t.Handle),
+        UNSIGNED(t.UID),
+        UNSIGNED(t.RealmId),
+        TIMESTAMP_SEC_T(t.TimeDeleted),
+        TIMESTAMP_SEC_T(t.TimeCreated),
+        TIMESTAMP_SEC_T(t.TimeLastRead),
+        TIMESTAMP_SEC_T(t.TimeModified),
+        UNSIGNED64(t.LengthAtDeleteTime),
+        HPSSOID_T(t.BitfileId),
 #if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
-            HPSS_DISTRIBUTIONKEY_T(t.BitfileHash),
+        HPSS_DISTRIBUTIONKEY_T(t.BitfileHash),
 #endif
-            CHAR_PTR(t.Path),
-            CHAR_PTR(t.Name));
+        CHAR_PTR(t.Path),
+        CHAR_PTR(t.Name));
 }
 
 char *
-_hpss_uuid_t(struct pool * pool, hpss_uuid_t u)
+_hpss_uuid_t(
+    struct pool                 *  pool,
+    hpss_uuid_t                    u)
 {
     return _hpss_uuid_t_ptr(pool, &u);
 }
 
 char *
-_hpss_uuid_t_ptr(struct pool * pool, const hpss_uuid_t * uuid_ptr)
+_hpss_uuid_t_ptr(
+    struct pool                 *  pool,
+    const hpss_uuid_t           *  uuid_ptr)
 {
     char * uuid_str = NULL;
 
@@ -563,21 +608,23 @@ _hpss_uuid_t_ptr(struct pool * pool, const hpss_uuid_t * uuid_ptr)
             "clock_seq_low=%s, "             // uint8_t
             "node=%s"                        // char[6]
         "}",
-            UNSIGNED(uuid_ptr->time_low),
-            UNSIGNED16(uuid_ptr->time_mid),
-            UNSIGNED16(uuid_ptr->time_hi_and_version),
-            UNSIGNED8(uuid_ptr->clock_seq_hi_and_reserved),
-            UNSIGNED8(uuid_ptr->clock_seq_low),
-            HEX8(uuid_ptr->node[0]),
-            HEX8(uuid_ptr->node[1]),
-            HEX8(uuid_ptr->node[2]),
-            HEX8(uuid_ptr->node[3]),
-            HEX8(uuid_ptr->node[4]),
-            HEX8(uuid_ptr->node[5]));
+        UNSIGNED(uuid_ptr->time_low),
+        UNSIGNED16(uuid_ptr->time_mid),
+        UNSIGNED16(uuid_ptr->time_hi_and_version),
+        UNSIGNED8(uuid_ptr->clock_seq_hi_and_reserved),
+        UNSIGNED8(uuid_ptr->clock_seq_low),
+        HEX8(uuid_ptr->node[0]),
+        HEX8(uuid_ptr->node[1]),
+        HEX8(uuid_ptr->node[2]),
+        HEX8(uuid_ptr->node[3]),
+        HEX8(uuid_ptr->node[4]),
+        HEX8(uuid_ptr->node[5]));
 }
 
 char *
-_hpss_xfileattr_t_ptr(struct pool * pool, const hpss_xfileattr_t * p)
+_hpss_xfileattr_t_ptr(
+    struct pool                 *  pool,
+    const hpss_xfileattr_t      *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -595,18 +642,20 @@ _hpss_xfileattr_t_ptr(struct pool * pool, const hpss_xfileattr_t * p)
                 "%s"            // 5 HPSS_MAX_STORAGE_LEVELS
             "}"
         "}",
-            NS_OBJHANDLE_T(p->ObjectHandle),
-            HPSS_ATTRS_T(p->Attrs),
-            BF_SC_ATTRIB_T(p->SCAttrib[0]),
-            BF_SC_ATTRIB_T(p->SCAttrib[1]),
-            BF_SC_ATTRIB_T(p->SCAttrib[2]),
-            BF_SC_ATTRIB_T(p->SCAttrib[3]),
-            BF_SC_ATTRIB_T(p->SCAttrib[4])); // HPSS_MAX_STORAGE_LEVELS
+        NS_OBJHANDLE_T(p->ObjectHandle),
+        HPSS_ATTRS_T(p->Attrs),
+        BF_SC_ATTRIB_T(p->SCAttrib[0]),
+        BF_SC_ATTRIB_T(p->SCAttrib[1]),
+        BF_SC_ATTRIB_T(p->SCAttrib[2]),
+        BF_SC_ATTRIB_T(p->SCAttrib[3]),
+        BF_SC_ATTRIB_T(p->SCAttrib[4])); // HPSS_MAX_STORAGE_LEVELS
 }
 
 #if (HPSS_MAJOR_VERSION >= 8 || HPSS_MINOR_VERSION > 4)
 char *
-_hpss_srvr_id_t_ptr(struct pool * pool, const hpss_srvr_id_t * p)
+_hpss_srvr_id_t_ptr(
+    struct pool                 *  pool,
+    const hpss_srvr_id_t        *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -615,7 +664,9 @@ _hpss_srvr_id_t_ptr(struct pool * pool, const hpss_srvr_id_t * p)
 #endif
 
 char *
-_hpss_stat_t_ptr(struct pool * pool, const hpss_stat_t * p)
+_hpss_stat_t_ptr(
+    struct pool                 *  pool,
+    const hpss_stat_t           *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -643,29 +694,31 @@ _hpss_stat_t_ptr(struct pool * pool, const hpss_stat_t * p)
             "st_size=%s, "       // u_signed64
             "st_mode=%s"         // unsigned32
         "}",
-            UNSIGNED(p->st_dev),
-            UNSIGNED64(p->st_ino),
-            UNSIGNED16(p->st_nlink),
-            UNSIGNED16(p->st_flag),
-            UNSIGNED(p->st_uid),
-            UNSIGNED(p->st_gid),
-            UNSIGNED(p->st_rdev),
-            UNSIGNED64(p->st_ssize),
-            TIMESTAMP_SEC_T(p->hpss_st_atime),
-            TIMESTAMP_SEC_T(p->hpss_st_mtime),
-            TIMESTAMP_SEC_T(p->hpss_st_ctime),
-            UNSIGNED(p->st_blksize),
-            UNSIGNED(p->st_blocks),
-            SIGNED(p->st_vfstype),
-            HEX(p->st_vfs),
-            HEX(p->st_type),
-            UNSIGNED(p->st_gen),
-            UNSIGNED64(p->st_size),
-            HEX(p->st_mode));
+        UNSIGNED(p->st_dev),
+        UNSIGNED64(p->st_ino),
+        UNSIGNED16(p->st_nlink),
+        UNSIGNED16(p->st_flag),
+        UNSIGNED(p->st_uid),
+        UNSIGNED(p->st_gid),
+        UNSIGNED(p->st_rdev),
+        UNSIGNED64(p->st_ssize),
+        TIMESTAMP_SEC_T(p->hpss_st_atime),
+        TIMESTAMP_SEC_T(p->hpss_st_mtime),
+        TIMESTAMP_SEC_T(p->hpss_st_ctime),
+        UNSIGNED(p->st_blksize),
+        UNSIGNED(p->st_blocks),
+        SIGNED(p->st_vfstype),
+        HEX(p->st_vfs),
+        HEX(p->st_type),
+        UNSIGNED(p->st_gen),
+        UNSIGNED64(p->st_size),
+        HEX(p->st_mode));
 }
 
 char *
-_hpss_userattr_t(struct pool * pool, hpss_userattr_t a)
+_hpss_userattr_t(
+    struct pool                 *  pool,
+    hpss_userattr_t                a)
 {
     return _sprintf(
         pool,
@@ -678,14 +731,17 @@ _hpss_userattr_t(struct pool * pool, hpss_userattr_t a)
 }
 
 /*
- * It would be create to consolidate all of the array functions, but C/GCC is
+ * It would be great to consolidate all of the array functions, but C/GCC is
  * not very helpful in this respect. If we consolidate the array function, we
  * get warnings for passing function prototypes that use (void *). GCC has
  * pragmas to deal with this, but not in the version of GCC we currently use.
  * So we'll punt until we can upgrade compilers or move to C++.
  */
 static char *
-_hpss_userattr_t_array(struct pool * pool, const hpss_userattr_t * p, size_t cnt)
+_hpss_userattr_t_array(
+    struct pool                 *  pool,
+    const hpss_userattr_t       *  p,
+    size_t                         cnt)
 {
     if (p == NULL)
         return PTR(p);
@@ -704,7 +760,9 @@ _hpss_userattr_t_array(struct pool * pool, const hpss_userattr_t * p, size_t cnt
 }
 
 char *
-_hpss_userattr_list_t_ptr(struct pool * pool, const hpss_userattr_list_t * p)
+_hpss_userattr_list_t_ptr(
+    struct pool                 *  pool,
+    const hpss_userattr_list_t  *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -715,18 +773,22 @@ _hpss_userattr_list_t_ptr(struct pool * pool, const hpss_userattr_list_t * p)
             "len=%s, " // int
             "Pair=%s"  // hpss_userattr_t *
         "}",
-            INT(p->len),
-            _hpss_userattr_t_array(pool, p->Pair, p->len));
+        INT(p->len),
+        _hpss_userattr_t_array(pool, p->Pair, p->len));
 }
 
 char *
-_hpssoid_t(struct pool * pool, hpssoid_t o)
+_hpssoid_t(
+    struct pool                 *  pool,
+    hpssoid_t                      o)
 {
     return _hpssoid_t_ptr(pool, &o);
 }
 
 char *
-_hpssoid_t_ptr(struct pool * pool, const hpssoid_t * p)
+_hpssoid_t_ptr(
+    struct pool                 *  pool,
+    const hpssoid_t             *  p)
 {
 #if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
     return _sprintf(
@@ -743,16 +805,16 @@ _hpssoid_t_ptr(struct pool * pool, const hpssoid_t * p)
             "SubType=%s, "             // byte
             "Type=%s"                  // byte
         "}",
-            HPSS_UUID_T(p->ObjectID),
-            UNSIGNED(p->ServerDep1),
-            UNSIGNED16(p->ServerDep2),
-            UNSIGNED16(p->ServerDep3),
-            HEX8(p->ServerDep4),
-            HEX8(p->ServerDep5),
-            HEX8(p->SecurityLevel[0]), HEX8(p->SecurityLevel[1]),
-            HEX8(p->Reserved[0]), HEX8(p->Reserved[1]),
-            HEX8(p->SubType),
-            HEX8(p->Type));
+        HPSS_UUID_T(p->ObjectID),
+        UNSIGNED(p->ServerDep1),
+        UNSIGNED16(p->ServerDep2),
+        UNSIGNED16(p->ServerDep3),
+        HEX8(p->ServerDep4),
+        HEX8(p->ServerDep5),
+        HEX8(p->SecurityLevel[0]), HEX8(p->SecurityLevel[1]),
+        HEX8(p->Reserved[0]), HEX8(p->Reserved[1]),
+        HEX8(p->SubType),
+        HEX8(p->Type));
 #else
     return _sprintf(
         pool,
@@ -779,30 +841,32 @@ _hpssoid_t_ptr(struct pool * pool, const hpssoid_t * p)
                 "%s"   // 19 (KSOID)
             "}"
         "}",
-            HEX8(p->Bytes[ 0]),
-            HEX8(p->Bytes[ 1]),
-            HEX8(p->Bytes[ 2]),
-            HEX8(p->Bytes[ 3]),
-            HEX8(p->Bytes[ 4]),
-            HEX8(p->Bytes[ 5]),
-            HEX8(p->Bytes[ 6]),
-            HEX8(p->Bytes[ 7]),
-            HEX8(p->Bytes[ 8]),
-            HEX8(p->Bytes[ 9]),
-            HEX8(p->Bytes[10]),
-            HEX8(p->Bytes[11]),
-            HEX8(p->Bytes[12]),
-            HEX8(p->Bytes[13]),
-            HEX8(p->Bytes[14]),
-            HEX8(p->Bytes[15]),
-            HEX8(p->Bytes[16]),
-            HEX8(p->Bytes[17]),
-            HEX8(p->Bytes[18]));
+        HEX8(p->Bytes[ 0]),
+        HEX8(p->Bytes[ 1]),
+        HEX8(p->Bytes[ 2]),
+        HEX8(p->Bytes[ 3]),
+        HEX8(p->Bytes[ 4]),
+        HEX8(p->Bytes[ 5]),
+        HEX8(p->Bytes[ 6]),
+        HEX8(p->Bytes[ 7]),
+        HEX8(p->Bytes[ 8]),
+        HEX8(p->Bytes[ 9]),
+        HEX8(p->Bytes[10]),
+        HEX8(p->Bytes[11]),
+        HEX8(p->Bytes[12]),
+        HEX8(p->Bytes[13]),
+        HEX8(p->Bytes[14]),
+        HEX8(p->Bytes[15]),
+        HEX8(p->Bytes[16]),
+        HEX8(p->Bytes[17]),
+        HEX8(p->Bytes[18]));
 #endif
 }
 
 char *
-_ns_direntry_t(struct pool * pool, ns_DirEntry_t e)
+_ns_direntry_t(
+    struct pool                 *  pool,
+    ns_DirEntry_t                  e)
 {
     return _sprintf(
         pool,
@@ -812,14 +876,17 @@ _ns_direntry_t(struct pool * pool, ns_DirEntry_t e)
             "ObjOffset=%s, " // u_signed64
             "Attrs=%s"       // hpss_Attrs_t
         "}",
-            CHAR_PTR(e.Name),
-            NS_OBJHANDLE_T(e.ObjHandle),
-            UNSIGNED64(e.ObjOffset),
-            HPSS_ATTRS_T(e.Attrs));
+        CHAR_PTR(e.Name),
+        NS_OBJHANDLE_T(e.ObjHandle),
+        UNSIGNED64(e.ObjOffset),
+        HPSS_ATTRS_T(e.Attrs));
 }
 
 char *
-_ns_direntry_t_array(struct pool * pool, const ns_DirEntry_t * p, size_t cnt)
+_ns_direntry_t_array(
+    struct pool                 *  pool,
+    const ns_DirEntry_t         *  p,
+    size_t                         cnt)
 {
     if (p == NULL)
         return PTR(p);
@@ -838,7 +905,9 @@ _ns_direntry_t_array(struct pool * pool, const ns_DirEntry_t * p, size_t cnt)
 }
 
 char *
-_ns_filesetattrs_t_ptr(struct pool * pool, const ns_FilesetAttrs_t * p)
+_ns_filesetattrs_t_ptr(
+    struct pool                 *  pool,
+    const ns_FilesetAttrs_t     *  p)
 {
     return _sprintf(
         pool,
@@ -863,39 +932,43 @@ _ns_filesetattrs_t_ptr(struct pool * pool, const ns_FilesetAttrs_t * p)
             "JunctionCount=%s, "         // u_signed64
             "SymLinkCount=%s"            // u_signed64
         "}",
-            HEX64(p->RegisterBitMap),
-            HEX64(p->ChangedRegisterBitMap),
-            UNSIGNED(p->ClassOfService),
-            UNSIGNED(p->FamilyId),
-            NS_OBJHANDLE_T(p->FilesetHandle),
-            UNSIGNED64(p->FilesetId),
-            CHAR_PTR(p->FilesetName),
-            UNSIGNED(p->FilesetType),
+        HEX64(p->RegisterBitMap),
+        HEX64(p->ChangedRegisterBitMap),
+        UNSIGNED(p->ClassOfService),
+        UNSIGNED(p->FamilyId),
+        NS_OBJHANDLE_T(p->FilesetHandle),
+        UNSIGNED64(p->FilesetId),
+        CHAR_PTR(p->FilesetName),
+        UNSIGNED(p->FilesetType),
 #if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
-            HPSS_UUID_T(p->GatewayUUID),
+        HPSS_UUID_T(p->GatewayUUID),
 #endif
-            UNSIGNED(p->StateFlags),
-            UNSIGNED(p->SubSystemId),
+        UNSIGNED(p->StateFlags),
+        UNSIGNED(p->SubSystemId),
 #if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
-            BYTES_PTR(p->UserData),
+        BYTES_PTR(p->UserData),
 #else
-            CHAR_PTR(p->UserData),
+        CHAR_PTR(p->UserData),
 #endif
-            UNSIGNED64(p->DirectoryCount),
-            UNSIGNED64(p->FileCount),
-            UNSIGNED64(p->HardLinkCount),
-            UNSIGNED64(p->JunctionCount),
-            UNSIGNED64(p->SymLinkCount));
+        UNSIGNED64(p->DirectoryCount),
+        UNSIGNED64(p->FileCount),
+        UNSIGNED64(p->HardLinkCount),
+        UNSIGNED64(p->JunctionCount),
+        UNSIGNED64(p->SymLinkCount));
 }
 
 char *
-_ns_objhandle_t(struct pool * pool, ns_ObjHandle_t o)
+_ns_objhandle_t(
+    struct pool                 *  pool,
+    ns_ObjHandle_t                 o)
 {
     return _ns_objhandle_t_ptr(pool, &o);
 }
 
 char *
-_ns_objhandle_t_ptr(struct pool * pool, const ns_ObjHandle_t * p)
+_ns_objhandle_t_ptr(
+    struct pool                 *  pool,
+    const ns_ObjHandle_t        *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -911,12 +984,12 @@ _ns_objhandle_t_ptr(struct pool * pool, const ns_ObjHandle_t * p)
             "Generation=%s, "   // unsigned16
             "CoreServerUUID=%s" // hpss_uuid_t
         "}",
-            UNSIGNED64(p->ObjId),
-            UNSIGNED64(p->FileId),
-            HEX8(p->Type),
-            HEX8(p->Flags),
-            UNSIGNED16(p->Generation),
-            HPSS_UUID_T(p->CoreServerUUID));
+        UNSIGNED64(p->ObjId),
+        UNSIGNED64(p->FileId),
+        HEX8(p->Type),
+        HEX8(p->Flags),
+        UNSIGNED16(p->Generation),
+        HPSS_UUID_T(p->CoreServerUUID));
 #else
     return _sprintf(
         pool,
@@ -930,19 +1003,21 @@ _ns_objhandle_t_ptr(struct pool * pool, const ns_ObjHandle_t * p)
             "Generation=%s, " // uint64_t
             "CoreServerId=%s" // hpss_srvr_id_t
         "}",
-            UNSIGNED64(p->ObjId),
-            HPSS_DISTRIBUTIONKEY_T(p->ObjNsHash),
-            UNSIGNED64(p->FileId),
-            HPSS_DISTRIBUTIONKEY_T(p->FileNsHash),
-            HEX8(p->Type),
-            HEX8(p->Flags),
-            UNSIGNED64(p->Generation),
-            HPSS_SRVR_ID_T(p->CoreServerId));
+        UNSIGNED64(p->ObjId),
+        HPSS_DISTRIBUTIONKEY_T(p->ObjNsHash),
+        UNSIGNED64(p->FileId),
+        HPSS_DISTRIBUTIONKEY_T(p->FileNsHash),
+        HEX8(p->Type),
+        HEX8(p->Flags),
+        UNSIGNED64(p->Generation),
+        HPSS_SRVR_ID_T(p->CoreServerId));
 #endif
 }
 
 char *
-_pv_list_element_t(struct pool * pool, pv_list_element_t e)
+_pv_list_element_t(
+    struct pool                 *  pool,
+    pv_list_element_t              e)
 {
     return _sprintf(
         pool,
@@ -956,7 +1031,10 @@ _pv_list_element_t(struct pool * pool, pv_list_element_t e)
 
 // TODO: duplicate code of _unsigned_array
 static char *
-_pv_list_element_t_array(struct pool * pool, pv_list_element_t * p, unsigned cnt)
+_pv_list_element_t_array(
+    struct pool                 *  pool,
+    pv_list_element_t           *  p,
+    unsigned                       cnt)
 {
     if (p == NULL)
         return PTR(p);
@@ -975,7 +1053,9 @@ _pv_list_element_t_array(struct pool * pool, pv_list_element_t * p, unsigned cnt
 }
 
 char *
-_pv_list_t_ptr(struct pool * pool, const pv_list_t * l)
+_pv_list_t_ptr(
+    struct pool                 *  pool,
+    const pv_list_t             *  l)
 {
     if (l == NULL)
         return PTR(l);
@@ -994,7 +1074,9 @@ _pv_list_t_ptr(struct pool * pool, const pv_list_t * l)
 
 #if HPSS_MAJOR_VERSION >= 10
 char *
-_hpss_group_ids_t_ptr(struct pool * pool, const hpss_group_ids_t * p)
+_hpss_group_ids_t_ptr(
+    struct pool                 *  pool,
+    const hpss_group_ids_t      *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -1013,7 +1095,9 @@ _hpss_group_ids_t_ptr(struct pool * pool, const hpss_group_ids_t * p)
 #endif /* HPSS_MAJOR_VERSION >= 10 */
 
 char *
-_sec_cred_t_ptr(struct pool * pool, const sec_cred_t * p)
+_sec_cred_t_ptr(
+    struct pool                 *  pool,
+    const sec_cred_t            *  p)
 {
     if (p == NULL)
         return PTR(p);
@@ -1034,26 +1118,28 @@ _sec_cred_t_ptr(struct pool * pool, const sec_cred_t * p)
             "NumGroups=%s, "  // unsigned32
             "AltGroups=%s, "  // unsigned32[HPSS_NGROUPS_MAX]
         "}",
-            CHAR_PTR(p->Name),
-            CHAR_PTR(p->RealmName),
-            CHAR_PTR(p->Directory),
-            CHAR_PTR(p->UserShell),
-            UNSIGNED(p->RealmId),
-            UNSIGNED(p->Uid),
-            UNSIGNED(p->Gid),
-            HPSS_UUID_T(p->Uuid),
-            ACCT_REC_T(p->DefAccount),
-            ACCT_REC_T(p->CurAccount),
-            UNSIGNED(p->NumGroups),
+        CHAR_PTR(p->Name),
+        CHAR_PTR(p->RealmName),
+        CHAR_PTR(p->Directory),
+        CHAR_PTR(p->UserShell),
+        UNSIGNED(p->RealmId),
+        UNSIGNED(p->Uid),
+        UNSIGNED(p->Gid),
+        HPSS_UUID_T(p->Uuid),
+        ACCT_REC_T(p->DefAccount),
+        ACCT_REC_T(p->CurAccount),
+        UNSIGNED(p->NumGroups),
 #if HPSS_MAJOR_VERSION < 10
-            UNSIGNED_ARRAY(p->AltGroups, p->NumGroups));
+        UNSIGNED_ARRAY(p->AltGroups, p->NumGroups));
 #else /* HPSS_MAJOR_VERSION < 10 */
-            _hpss_group_ids_t_ptr(pool, &p->AltGroups));
+        (pool, &p->AltGroups));
 #endif /* HPSS_MAJOR_VERSION < 10 */
 }
 
 char *
-_timestamp_sec_t_ptr(struct pool * pool, const timestamp_sec_t * p)
+_timestamp_sec_t_ptr(
+    struct pool                 *  pool,
+    const timestamp_sec_t       *  p)
 {
     if (p == NULL)
         return PTR(p);

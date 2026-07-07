@@ -1,6 +1,6 @@
 == Testing for Improved Logging
 This document will help to verify the new functionality in the improved logging
-release. These tests assume an existing, functional Globus Connect Server v4
+release. These tests assume an existing, functional Globus Connect Server v5
 endpoint.
 
 === Verify installation
