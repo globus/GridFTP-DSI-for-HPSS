@@ -24,6 +24,16 @@
 #include "hpss.h"
 #include "cksm.h"
 
+// On initalization of the DSI, this is passed to globus_gridftp_server_finished_session_start()
+// and is returned by gridftp to each of the DSI callbacks. This allows us to pass configuration
+// and state between callbacks.
+struct dsi_user_arg
+{
+    config_t * config;
+};
+typedef struct dsi_user_arg dsi_user_arg_t;
+
+
 static void
 set_logging_task_id(globus_gfs_operation_t Operation)
 {
@@ -38,10 +48,10 @@ void
 dsi_init(globus_gfs_operation_t     Operation,
          globus_gfs_session_info_t *SessionInfo)
 {
-    globus_result_t result = GLOBUS_SUCCESS;
-    config_t *      config = NULL;
-    char *          home   = NULL;
-    sec_cred_t      user_cred;
+    globus_result_t  result   = GLOBUS_SUCCESS;
+    dsi_user_arg_t * user_arg = NULL;
+    char           * home     = NULL;
+    sec_cred_t       user_cred;
 
     logging_init();
     logging_set_user(SessionInfo->username);
@@ -92,16 +102,26 @@ dsi_init(globus_gfs_operation_t     Operation,
         goto cleanup;
 
     /*
+     * Allocate the user arg structure.
+     */
+    user_arg = calloc(1, sizeof(dsi_user_arg_t));
+    if (!user_arg)
+    {
+        result = GlobusGFSErrorMemory("dsi_user_arg_t");
+        goto cleanup;
+    }
+
+    /*
      * Read in the config.
      */
-    result = config_init(Operation, &config);
+    result = config_init(Operation, &user_arg->config);
     if (result)
         goto cleanup;
 
     /* Now authenticate. */
-    result = authenticate(config->LoginName,
-                          config->AuthenticationMech,
-                          config->Authenticator,
+    result = authenticate(user_arg->config->LoginName,
+                          user_arg->config->AuthenticationMech,
+                          user_arg->config->Authenticator,
                           SessionInfo->username);
     if (result != GLOBUS_SUCCESS)
         goto cleanup;
@@ -138,21 +158,35 @@ cleanup:
      */
     globus_gridftp_server_finished_session_start(Operation,
                                                  result,
-                                                 result ? NULL : config,
+                                                 result ? NULL : user_arg,
                                                  NULL, // username
                                                  result ? NULL : home);
 
     if (result)
-        config_destroy(config);
-    if (result && home)
-        free(home);
+    {
+        if (user_arg)
+        {
+            if (user_arg->config)
+                config_destroy(user_arg->config);
+            free(user_arg);
+        }
+        if (home)
+            free(home);
+
+    }
 }
 
 void
-dsi_destroy(void *Arg)
+dsi_destroy(void *UserArg)
 {
-    if (Arg)
-        config_destroy(Arg);
+    dsi_user_arg_t * user_arg = UserArg;
+
+    if (user_arg)
+    {
+        if (user_arg->config)
+            config_destroy(user_arg->config);
+        free(user_arg);
+    }
 }
 
 void
@@ -172,13 +206,13 @@ dsi_recv(globus_gfs_operation_t      Operation,
          globus_gfs_transfer_info_t *TransferInfo,
          void *                      UserArg)
 {
-    config_t * config = UserArg;
+    dsi_user_arg_t * user_arg = UserArg;
 
     set_logging_task_id(Operation);
 
     // Defering the INFO() call until inside of stor() since it has the
     // critical information.
-    stor(Operation, TransferInfo, config->UDAChecksumSupport);
+    stor(Operation, TransferInfo, user_arg->config->UDAChecksumSupport);
 }
 
 void
@@ -187,7 +221,7 @@ dsi_command(globus_gfs_operation_t     Operation,
             void *                     UserArg)
 {
     globus_result_t result;
-    config_t * config = UserArg;
+    dsi_user_arg_t * user_arg = UserArg;
 
     set_logging_task_id(Operation);
 
@@ -246,7 +280,7 @@ dsi_command(globus_gfs_operation_t     Operation,
         break;
     case GLOBUS_GFS_CMD_CKSM:
         INFO("Get checksum of %s", CommandInfo->pathname);
-        cksm(Operation, CommandInfo, config->UDAChecksumSupport, Callback);
+        cksm(Operation, CommandInfo, user_arg->config->UDAChecksumSupport, Callback);
         break;
     case GLOBUS_GFS_HPSS_CMD_SITE_STAGE:
         INFO("Staging %s", CommandInfo->pathname);
@@ -304,7 +338,7 @@ _stat_dir_callback(globus_gfs_stat_t * GFSStatArray,
 void
 dsi_stat(globus_gfs_operation_t   Operation,
          globus_gfs_stat_info_t * StatInfo,
-         void *                   Arg)
+         void *                   UserArg)
 {
     globus_result_t   result = GLOBUS_SUCCESS;
 
