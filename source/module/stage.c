@@ -558,3 +558,96 @@ cleanup:
     if (task_id)
         free(task_id);
 }
+
+#if (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
+//
+// New stage interface
+//
+
+/*
+ * Batch stage structure. Keeps state between successive staging calls.
+ */
+struct batch_stage {
+    int index;
+    hpss_stage_batch_t batch;
+};
+
+// SITE STGBEGIN
+// 350 SITE STGBEGIN successful. Follow with SITE STGFILE.
+// XXX 451 Tape subsystem busy. Please retry SITE STGBEGIN later.
+// 503 Command out of sequence. A staging session is already active.
+// XXX 550 Failed to begin staging session.
+
+// BatchStage should be pointer-to-NULL on first call
+void
+stgbegin(
+    globus_gfs_operation_t         Operation,    // IN
+    globus_gfs_command_info_t   *  CommandInfo,  // IN
+    batch_stage_t               ** BatchStage,   // IN/OUT
+    commands_callback              Callback)     // IN
+{
+    if (*BatchStage != NULL)
+    {
+        Callback(
+            Operation,
+            GLOBUS_SUCCESS,
+            "503 Command out of sequence. A staging session is already active.\r\n");
+        return;
+    }
+
+    *BatchStage = calloc(1, sizeof(**BatchStage));
+    if (*BatchStage == NULL)
+    {
+        Callback(Operation, GlobusGFSErrorMemory("batch_stage_t"), NULL);
+        return;
+    }
+
+    int retval = HpssAPI_StageBatchInit(&(*BatchStage)->batch, BATCH_STAGE_MAX_FILES);
+    if (retval)
+    {
+        Callback(Operation, hpss_error_to_globus_result(retval), NULL);
+        free(*BatchStage);
+        *BatchStage = NULL;
+        return;
+    }
+
+    Callback(
+        Operation,
+        GLOBUS_SUCCESS,
+        "350 SITE STGBEGIN successful. Follow with SITE STGFILE.\r\n");
+}
+
+
+// SITE STGEND
+// 200 No pending files to submit to tape system. Stage session ended.
+// 250 Remaining files submitted to tape system. Request ID: <request_id>.
+// 451 Failed to flush remaining files. Please retry SITE STGEND.
+// 503 Command out of sequence. No active staging session to end.
+// 550 Failed to end staging session.
+void
+stgend(
+    globus_gfs_operation_t         Operation,    // IN
+    globus_gfs_command_info_t   *  CommandInfo,  // IN
+    batch_stage_t               ** BatchStage,   // IN/OUT
+    commands_callback              Callback)     // IN
+{
+    if (*BatchStage == NULL)
+    {
+        Callback(
+            Operation,
+            GLOBUS_SUCCESS,
+            "503 Command out of sequence. No active staging session to end.\r\n");
+        return;
+    }
+
+    Callback(
+        Operation,
+        GLOBUS_SUCCESS,
+        "200 No pending files to submit to tape system. Stage session ended.\r\n");
+
+    HpssAPI_StageBatchFree(&(*BatchStage)->batch);
+    free(*BatchStage);
+    *BatchStage = NULL;
+}
+
+#endif  //(HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9

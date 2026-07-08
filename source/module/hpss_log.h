@@ -202,4 +202,24 @@ _sec_cred_t_ptr(struct pool * pool, const sec_cred_t * p);
 char *
 _timestamp_sec_t_ptr(struct pool * pool, const timestamp_sec_t * p);
 
+#if (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
+
+#define HPSS_OBJECT_HANDLE_T(h) _hpss_object_handle_t(pool, h)
+char *
+_hpss_object_handle_t(struct pool * pool, const hpss_object_handle_t h);
+
+#define BFS_GK_CTL_T(g) _bfs_gk_ctl_t(pool, g)
+char *
+_bfs_gk_ctl_t(struct pool * pool, const bfs_gk_ctl_t g);
+
+#define HPSS_STAGE_T(s) _hpss_stage_t(pool, s)
+char *
+_hpss_stage_t(struct pool * pool, hpss_stage_t s);
+
+#define HPSS_STAGE_BATCH_T_PTR(p) _hpss_stage_batch_t_ptr(pool, p)
+char *
+_hpss_stage_batch_t_ptr(struct pool * pool, const hpss_stage_batch_t * p);
+
+#endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
+
 #endif /* _HPSS_LOG_H_ */

@@ -343,4 +343,15 @@ Hpss_Utime(
     const char                  *  Path,   // IN
     const struct utimbuf        *  Times); // IN
 
+#if (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
+int
+HpssAPI_StageBatchInit(
+    hpss_stage_batch_t          * Batch,
+    int                           Len);
+
+void
+HpssAPI_StageBatchFree(
+   hpss_stage_batch_t           * Batch);
+#endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
+
 #endif /* _HPSS_H_ */

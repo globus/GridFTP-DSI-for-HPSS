@@ -1146,3 +1146,114 @@ _timestamp_sec_t_ptr(
     return TIMESTAMP_SEC_T(*p);
 }
 
+#if (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
+
+char *
+_hpss_object_handle_t(
+    struct pool                 *  pool,
+    const hpss_object_handle_t     h)
+{
+    return _sprintf(
+        pool,
+        "{"
+            "ObjectPtr=%s, "      // signed32
+            "ObjectID=%s, "       // hpss_uuid_t
+            "ObjectType=%s, "     // signed32
+            "ConnectionType=%s, " // signed32
+            "ClientPtr=%s"        // signed32
+        "}",
+        SIGNED(h.ObjectPtr),
+        HPSS_UUID_T(h.ObjectID),
+        SIGNED(h.ObjectType),
+        SIGNED(h.ConnectionType),
+        SIGNED(h.ClientPtr)
+    );
+}
+
+char *
+_bfs_gk_ctl_t(
+    struct pool                 *  pool,
+    const bfs_gk_ctl_t             g)
+{
+    return _sprintf(
+        pool,
+        "{"
+            "GKControlNo=%s, " // hpss_uuid_t
+            "GKWaitTime=%s"    // unsigned32
+        "}",
+        HPSS_UUID_T(g.GKControlNo),
+        UNSIGNED(g.GKWaitTime)
+    );
+}
+
+char *
+_hpss_stage_t(
+    struct pool                 *  pool,
+    hpss_stage_t                   s)
+{
+    return _sprintf(
+        pool,
+        "{"
+            "Filedes=%s, "           // int
+            "ObjHandle=%s, "         // hpss_object_handle_t
+            "BFObj=%s, "             // bfs_bitfile_obj_handle_t
+            "Offset=%s, "            // uint64_t
+            "Length=%s, "            // uint64_t
+            "FromStorageLevel=%s, "  // uint64_t
+            "ToStorageLevel=%s, "    // uint32_t
+            "Flags=%s, "             // uint32_t
+            "RetryGKControlNoP=%s, " // hpss_uuid_t *
+            "GKControl=%s"           // bfs_gk_ctl_t
+        "}",
+        SIGNED(s.Filedes),
+        HPSS_OBJECT_HANDLE_T(s.ObjHandle),
+        BFS_BITFILE_OBJ_HANDLE_T(s.BFObj),
+        UNSIGNED64(s.Offset),
+        UNSIGNED64(s.Length),
+        UNSIGNED64(s.FromStorageLevel),
+        UNSIGNED(s.ToStorageLevel),
+        UNSIGNED(s.Flags),
+        HPSS_UUID_T_PTR(s.RetryGKControlNoP),
+        BFS_GK_CTL_T(s.GKControl)
+    );
+}
+
+static char *
+_hpss_stage_t_array(
+    struct pool                 *  pool,
+    hpss_stage_t                *  list,
+    unsigned                       len)
+{
+    char * str = "[";
+    for (int i = 0; i < len; i++)
+    {
+        str = _sprintf(
+            pool,
+            "%s%s%s",
+            str,
+            i == 0 ? "" : ", ",
+            HPSS_STAGE_T(list[i]));
+    }
+    return _strcat(pool, str, "]");
+}
+
+char *
+_hpss_stage_batch_t_ptr(
+    struct pool                 *  pool,
+    const hpss_stage_batch_t    *  p)
+{
+    if (p == NULL)
+        return PTR(p);
+
+    return _sprintf(
+        pool,
+        "{"
+            "List={"
+                "List_len=%s, " // u_int
+                "List_val=%s"   // hpss_stage_t
+            "}"
+        "}",
+        UNSIGNED(p->List.List_len),
+        _hpss_stage_t_array(pool, p->List.List_val, p->List.List_len));
+}
+#endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9

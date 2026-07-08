@@ -24,19 +24,52 @@
 globus_result_t
 commands_init(globus_gfs_operation_t Operation)
 {
-    globus_result_t result =
-        globus_gridftp_server_add_command(Operation,
-                                          "SITE STAGE",
-                                          GLOBUS_GFS_HPSS_CMD_SITE_STAGE,
-                                          4,
-                                          4,
-                                          "SITE STAGE <sp> timeout <sp> path",
-                                          GLOBUS_TRUE,
-                                          GFS_ACL_ACTION_READ);
+    globus_result_t result;
+
+    result = globus_gridftp_server_add_command(Operation,
+                                               "SITE STAGE",
+                                               GLOBUS_GFS_HPSS_CMD_SITE_STAGE,
+                                               4,
+                                               4,
+                                               "SITE STAGE <sp> timeout <sp> path",
+                                               GLOBUS_TRUE,
+                                               GFS_ACL_ACTION_READ);
 
     if (result != GLOBUS_SUCCESS)
         return GlobusGFSErrorWrapFailed(
             "Failed to add custom 'SITE STAGE' command", result);
+
+#if (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
+    //
+    // New stage interface
+    //
+
+    // SITE STGBEGIN
+    result = globus_gridftp_server_add_command(Operation,
+                                               "SITE STGBEGIN",
+                                               GLOBUS_GFS_HPSS_CMD_SITE_STGBEGIN,
+                                               2,
+                                               2,
+                                               "SITE STGBEGIN",
+                                               GLOBUS_FALSE, // has_pathname
+                                               GFS_ACL_ACTION_READ);
+    if (result != GLOBUS_SUCCESS)
+        return GlobusGFSErrorWrapFailed(
+            "Failed to add custom 'SITE STGBEGIN' command", result);
+
+    // SITE STGEND
+    result = globus_gridftp_server_add_command(Operation,
+                                               "SITE STGEND",
+                                               GLOBUS_GFS_HPSS_CMD_SITE_STGEND,
+                                               2,
+                                               2,
+                                               "SITE STGEND",
+                                               GLOBUS_FALSE, // has_pathname
+                                               GFS_ACL_ACTION_READ);
+    if (result != GLOBUS_SUCCESS)
+        return GlobusGFSErrorWrapFailed(
+            "Failed to add custom 'SITE STGEND' command", result);
+#endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
 
     return GLOBUS_SUCCESS;
 }

@@ -6,9 +6,18 @@
  */
 #include <_globus_gridftp_server.h>
 
+/*
+ * Local includes
+ */
+#include "hpss.h"
+
 enum
 {
     GLOBUS_GFS_HPSS_CMD_SITE_STAGE = GLOBUS_GFS_MIN_CUSTOM_CMD,
+#if (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
+    GLOBUS_GFS_HPSS_CMD_SITE_STGBEGIN,
+    GLOBUS_GFS_HPSS_CMD_SITE_STGEND,
+#endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
 };
 
 globus_result_t

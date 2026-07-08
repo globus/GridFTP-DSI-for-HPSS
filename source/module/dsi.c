@@ -30,6 +30,7 @@
 struct dsi_user_arg
 {
     config_t * config;
+    batch_stage_t * batch_stage;
 };
 typedef struct dsi_user_arg dsi_user_arg_t;
 
@@ -92,14 +93,15 @@ dsi_init(globus_gfs_operation_t     Operation,
     }
     free(version_string);
 
+#if (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
     /*
      * Enable the 'STAGE' FEAT so Transfer knows we support improved staging.
      */
-
     const char * feat_stage_value = "sort:x.tape.id,x.tape.sec,x.tape.off;";
     result = globus_gridftp_server_set_staging_support(Operation, feat_stage_value);
     if (result != GLOBUS_SUCCESS)
         goto cleanup;
+#endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
 
     /*
      * Allocate the user arg structure.
@@ -292,6 +294,27 @@ dsi_command(globus_gfs_operation_t     Operation,
         result = commands_truncate(CommandInfo);
         globus_gridftp_server_finished_command(Operation, result, NULL);
         break;
+
+#if (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
+// This will keep GCS from complaining about the switch statement
+// dsi.c:271:5: warning: case value ‘4100’ not in enumerated type ‘globus_gfs_command_type_t’ {aka ‘enum globus_gfs_command_type_e’} [-Wswitch]
+//      case GLOBUS_GFS_HPSS_CMD_SITE_STGCHK:
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch"
+
+    case GLOBUS_GFS_HPSS_CMD_SITE_STGBEGIN:
+        INFO("Begin bulk stage");
+        stgbegin(Operation, CommandInfo, &user_arg->batch_stage, Callback);
+        break;
+
+    case GLOBUS_GFS_HPSS_CMD_SITE_STGEND:
+        INFO("End bulk stage");
+        stgend(Operation, CommandInfo, &user_arg->batch_stage, Callback);
+        break;
+
+#pragma GCC diagnostic pop
+#endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
+
     default:
         globus_gridftp_server_finished_command(
             Operation,

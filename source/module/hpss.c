@@ -1542,3 +1542,46 @@ Hpss_Utime(
              HPSS_ERRNO_STATE_T(errno_state));
     return HPSS_ERROR(rv, errno_state);
 }
+
+#if (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
+int
+HpssAPI_StageBatchInit(
+    hpss_stage_batch_t          *  Batch,
+    int                            Len)
+{
+    API_ENTER("API_StageBatchInit",
+              "Batch=%s Len=%s",
+              PTR(Batch),
+              INT(Len));
+
+    Hpss_ClearLastHPSSErrno();
+    int rv = API_StageBatchInit(Batch, Len);
+    hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
+
+    API_EXIT("API_StageBatchInit",
+             "return_value=%s last_hpss_errno=%s Batch=%s",
+             INT(rv),
+             HPSS_ERRNO_STATE_T(errno_state),
+             rv ? PTR(Batch) : HPSS_STAGE_BATCH_T_PTR(Batch));
+    return HPSS_ERROR(rv, errno_state);
+}
+
+void
+HpssAPI_StageBatchFree(
+   hpss_stage_batch_t           *  Batch)
+{
+    API_ENTER("API_StageBatchFree",
+              "Batch=%s",
+              HPSS_STAGE_BATCH_T_PTR(Batch));
+
+    Hpss_ClearLastHPSSErrno();
+    API_StageBatchFree(Batch);
+    hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
+
+    API_EXIT("API_StageBatchFree",
+             "return_value=void last_hpss_errno=%s Batch=%s",
+             HPSS_ERRNO_STATE_T(errno_state),
+             PTR(Batch));
+    return;
+}
+#endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9

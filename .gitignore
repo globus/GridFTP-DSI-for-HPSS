@@ -29,6 +29,7 @@ missing
 source/loader/version.h
 source/module/Makefile.rules
 source/utils/stage
+source/utils/batch_stage
 test-driver
 test/utils/symlink
 test/framework/libframework.a
