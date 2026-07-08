@@ -72,7 +72,10 @@ _errno_string(int err, char * buf, size_t buflen)
         return;
     }
 
-    strerror_r(abs(err), buf, buflen);
+    // This used to use strerror_r() to fill in missing HPSS errno strings.
+    // Now we prefer to use the actual error code value.
+    if (strlen(buf) == 0)
+        snprintf(buf, buflen, "%d", -abs(err));
 }
 
 globus_result_t

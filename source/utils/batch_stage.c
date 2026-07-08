@@ -40,23 +40,25 @@ static const char * HELP_MSG =
     "$ stage -a krb5 -p user1 -t /home/user1/keytab -v 'ERROR|WARN' /my/file\n"
     "";
 
+void
+globus_gridftp_server_get_task_id(
+    globus_gfs_operation_t         op,
+    char                        ** task_id)
+{
+    *task_id = strdup("deadbeef-dead-beef-dead-beefdeadbeef");
+}
+
 static void
 _commands_callback(
     globus_gfs_operation_t         op,
     globus_result_t                result,
     char                        *  command_response)
 {
-    //globus_object_t * obj = globus_error_peek(result);
-    // 451
-    //printf("XXX %d XXX\n", globus_gfs_error_get_ftp_response_code(obj));
-    // INTERNAL_ERROR
-    //printf("XXX %s XXX\n", globus_gfs_error_get_ftp_response_error_code(obj));
     if (result != GLOBUS_SUCCESS)
     {
         globus_object_t * obj = globus_error_peek(result);
         printf("Reply Code:%d\n", globus_gfs_error_get_ftp_response_code(obj));
-        printf("%s\n", globus_gfs_error_get_ftp_response_error_code(obj));
-
+        printf("%s", globus_error_print_chain(obj));
     } else
     {
         printf("%s", command_response);
@@ -186,6 +188,12 @@ main(int argc, char * argv[])
     batch_stage_t               *  batch_stage = NULL;
     printf("SITE STGBEGIN\n");
     stgbegin(NULL, NULL, &batch_stage, _commands_callback);
+
+    printf("SITE STGFILE %s\n", path);
+    globus_gfs_command_info_t command_info;
+    command_info.pathname = (char *)path;
+    stgfile(NULL, &command_info, batch_stage, _commands_callback);
+
     printf("SITE STGEND\n");
     stgend(NULL, NULL, &batch_stage, _commands_callback);
 

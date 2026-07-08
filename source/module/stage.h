@@ -48,6 +48,7 @@ stage_ex(
  * Maximum number of files to stage in a single batch.
  */
 #define BATCH_STAGE_MAX_FILES 100
+
 /*
  * Batch stage structure. Keeps state between successive staging calls.
  */
@@ -60,6 +61,13 @@ stgbegin(
     globus_gfs_command_info_t   *  CommandInfo,  // IN
     batch_stage_t               ** BatchStage,   // IN/OUT
     commands_callback              Callback);    // IN
+
+void
+stgfile(
+    globus_gfs_operation_t         Operation,   // IN
+    globus_gfs_command_info_t   *  CommandInfo, // IN
+    batch_stage_t               *  BatchStage,  // IN/OUT
+    commands_callback              Callback);   // IN
 
 void
 stgend(

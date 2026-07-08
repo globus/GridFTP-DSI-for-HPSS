@@ -220,6 +220,18 @@ _hpss_stage_t(struct pool * pool, hpss_stage_t s);
 char *
 _hpss_stage_batch_t_ptr(struct pool * pool, const hpss_stage_batch_t * p);
 
+#define HPSS_STAGE_BITFILE_LIST_T_PTR(p) _hpss_stage_bitfile_list_t_ptr(pool, p)
+char *
+_hpss_stage_bitfile_list_t_ptr(struct pool * pool, const hpss_stage_bitfile_list_t * p);
+
+#define HPSS_STAGE_BATCH_STATUS_T_PTR(p) _hpss_stage_batch_status_t_ptr(pool, p)
+char *
+_hpss_stage_batch_status_t_ptr(struct pool * pool, const hpss_stage_batch_status_t * p);
+
+#define HPSS_STAGE_STATUS_T(s) _hpss_stage_status_t(pool, s)
+char *
+_hpss_stage_status_t(struct pool * pool, const hpss_stage_status_t s);
+
 #endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
 
 #endif /* _HPSS_LOG_H_ */

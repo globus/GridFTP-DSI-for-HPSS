@@ -139,7 +139,10 @@ _bytes_to_request_id(const unsigned char Bytes[UUID_BYTE_COUNT], hpss_reqid_t * 
 }
 
 static void
-_generate_request_id(const char * TaskID, bitfile_id_t * BitfileID, hpss_reqid_t * RequestID)
+_generate_request_id(
+    const char                  *  TaskID,
+    bitfile_id_t                *  BitfileID,
+    hpss_reqid_t                *  RequestID)
 {
     // If we do not have a Task ID, log a warning and return the default.
     if (!is_valid_uuid(TaskID))
@@ -218,15 +221,11 @@ min(size_t x, size_t y)
 }
 
 static globus_result_t
-submit_stage_request(const char *Pathname, hpss_reqid_t RequestID)
+_build_callback_addr(
+    hpss_reqid_t                   CallbackID,
+    bfs_callback_addr_t         *  CallbackAddr) // OUT
 {
-    hpss_fileattr_t fattrs;
-    int retval = Hpss_FileGetAttributes((char *)Pathname, &fattrs);
-    if (retval)
-        return hpss_error_to_globus_result(retval);
-
-    bfs_callback_addr_t callback_addr;
-    memset(&callback_addr, 0, sizeof(callback_addr));
+    memset(CallbackAddr, 0, sizeof(*CallbackAddr));
 
     const char *callback_addr_str = getenv("ASYNC_CALLBACK_ADDR");
     if (callback_addr_str)
@@ -250,13 +249,13 @@ submit_stage_request(const char *Pathname, hpss_reqid_t RequestID)
         }
 
         char errbuf[HPSS_NET_MAXBUF];
-        retval = Hpss_net_getaddrinfo(node,
-                                      serv,
-                                      0,
-                                      HPSS_IPPROTO_TCP,
-                                      &callback_addr.sockaddr,
-                                      errbuf,
-                                      sizeof(errbuf));
+        int retval = Hpss_net_getaddrinfo(node,
+                                          serv,
+                                          0,
+                                          HPSS_IPPROTO_TCP,
+                                          &CallbackAddr->sockaddr,
+                                          errbuf,
+                                          sizeof(errbuf));
 
         if (retval)
         {
@@ -269,7 +268,24 @@ submit_stage_request(const char *Pathname, hpss_reqid_t RequestID)
         }
     }
 
-    callback_addr.id = RequestID;
+    CallbackAddr->id = CallbackID;
+    return GLOBUS_SUCCESS;
+}
+
+
+static globus_result_t
+submit_stage_request(const char *Pathname, hpss_reqid_t RequestID)
+{
+    hpss_fileattr_t fattrs;
+    int retval = Hpss_FileGetAttributes((char *)Pathname, &fattrs);
+    if (retval)
+        return hpss_error_to_globus_result(retval);
+
+    bfs_callback_addr_t callback_addr;
+
+    globus_result_t result = _build_callback_addr(RequestID, &callback_addr);
+    if (result)
+        return result;
 
     DEBUG("Requesting stage for %s", Pathname);
 
@@ -568,8 +584,8 @@ cleanup:
  * Batch stage structure. Keeps state between successive staging calls.
  */
 struct batch_stage {
-    int index;
-    hpss_stage_batch_t batch;
+    bfs_bitfile_obj_handle_t bfobjs[BATCH_STAGE_MAX_FILES];
+    int count;
 };
 
 // SITE STGBEGIN
@@ -602,21 +618,191 @@ stgbegin(
         return;
     }
 
-    int retval = HpssAPI_StageBatchInit(&(*BatchStage)->batch, BATCH_STAGE_MAX_FILES);
-    if (retval)
-    {
-        Callback(Operation, hpss_error_to_globus_result(retval), NULL);
-        free(*BatchStage);
-        *BatchStage = NULL;
-        return;
-    }
-
     Callback(
         Operation,
         GLOBUS_SUCCESS,
         "350 SITE STGBEGIN successful. Follow with SITE STGFILE.\r\n");
 }
 
+static globus_result_t
+_submit_batch_stage(
+    globus_gfs_operation_t         Operation, // IN
+    bfs_bitfile_obj_handle_t    *  BfObjs,    // IN
+    int                            Count,     // IN
+    hpss_reqid_t                *  RequestID) // OUT
+{
+    int                            retval = 0;
+    char                        *  task_id = NULL;
+    hpss_reqid_t                   callback_id;
+    hpss_stage_batch_t             stage_batch;
+    unsigned char                  task_id_bytes[UUID_BYTE_COUNT];
+    globus_result_t                result;
+    bfs_callback_addr_t            callback_addr;
+    hpss_stage_bitfile_list_t      bfids;
+    hpss_stage_batch_status_t      status;
+
+    retval = HpssAPI_StageBatchInit(&stage_batch, Count);
+    if (retval)
+    {
+        //Callback(Operation, hpss_error_to_globus_result(retval), NULL);
+        return hpss_error_to_globus_result(retval);
+    }
+
+    for (int i = 0; i < Count; i++)
+    {
+        retval = HpssAPI_StageBatchInsertBFObj(&stage_batch,
+                                               i,
+                                               &BfObjs[i],
+                                               0, // FromStorageLevel
+                                               0, // ToStorageLevel
+                                               0, // Offset
+                                               0, // Length
+                                               BFS_STAGE_ALL);
+        if (retval)
+        {
+            //Callback(Operation,
+            //         hpss_error_to_globus_result(retval),
+            //         NULL);
+            HpssAPI_StageBatchFree(&stage_batch);
+            return hpss_error_to_globus_result(retval);
+        }
+    }
+
+    /*
+     * Calculate the callback ID.
+     */
+    globus_gridftp_server_get_task_id(Operation, &task_id);
+    assert(task_id);
+    // Convert Task ID to a bytes array
+    uuid_str_to_bytes(task_id, task_id_bytes);
+    // Convert our bytes array into a callback ID)
+    bytes_to_hpss_uuid(task_id_bytes, &callback_id);
+    free(task_id);
+
+    /*
+     * Build the callback addr.
+     */
+    result = _build_callback_addr(callback_id, &callback_addr);
+    if (result)
+    {
+        //Callback(Operation, result, NULL);
+        HpssAPI_StageBatchFree(&stage_batch);
+        return result;
+    }
+
+    /*
+     * Submit the batch stage request.
+     */
+    // Batch->List.List_len must equal the number of files to stage (no unsed
+    // indices in the array) or hpss_StageBatchCallBack() will return -95.
+    retval = Hpss_StageBatchCallBack(&stage_batch,   // IN
+                                     &callback_addr, // IN
+                                     RequestID,      // OUT
+                                     &bfids,         // OUT
+                                     &status);       // OUT
+
+    if (retval)
+    {
+        //Callback(Operation,
+        //         hpss_error_to_globus_result(retval),
+        //         NULL);
+        HpssAPI_StageBatchFree(&stage_batch);
+        return hpss_error_to_globus_result(retval);
+    }
+
+    HpssAPI_StageBatchFree(&stage_batch);
+    return GLOBUS_SUCCESS;
+}
+
+// SITE STGFILE <file>
+// 200 File queued. Staging is pending and ready to submit.
+// 250 Batch submitted to tape system. Request ID: <request_id>.
+// 452 Internal error queuing file. Please retry this file.
+// 503 Command out of sequence. Call SITE STGBEGIN first.
+// 550 File does not exist or access is denied.
+void
+stgfile(
+    globus_gfs_operation_t         Operation,   // IN
+    globus_gfs_command_info_t   *  CommandInfo, // IN
+    batch_stage_t               *  BatchStage,  // IN/OUT
+    commands_callback              Callback)    // IN
+{
+    if (BatchStage == NULL)
+    {
+        Callback(
+            Operation,
+            GLOBUS_SUCCESS,
+            "503 Command out of sequence. Call SITE STGBEGIN first.\r\n");
+        return;
+    }
+
+    hpss_fileattr_t fattrs;
+    int retval = Hpss_FileGetAttributes((char *)CommandInfo->pathname, &fattrs);
+    if (retval)
+    {
+        Callback(
+            Operation,
+            hpss_error_to_globus_result(retval),
+            NULL);
+        return;
+    }
+
+    if (fattrs.Attrs.Type != NS_OBJECT_TYPE_FILE &&
+        fattrs.Attrs.Type != NS_OBJECT_TYPE_HARD_LINK)
+    {
+        Callback(
+            Operation,
+            GLOBUS_SUCCESS,
+            "550 Path does not refer to a regular file or hard link.\r\n");
+        return;
+    }
+
+    memcpy(&BatchStage->bfobjs[BatchStage->count++],
+           &fattrs.Attrs.BitfileObj,
+           sizeof(fattrs.Attrs.BitfileObj));
+
+    if (BatchStage->count < BATCH_STAGE_MAX_FILES)
+    {
+        Callback(
+            Operation,
+            GLOBUS_SUCCESS,
+            "200 File queued. Stage is pending and ready to submit.\r\n");
+        return;
+    }
+
+    hpss_reqid_t request_id;
+    globus_result_t result = _submit_batch_stage(Operation,
+                                                 BatchStage->bfobjs,
+                                                 BatchStage->count,
+                                                 &request_id);
+
+    if (result)
+    {
+        // Allow the caller to retry this command
+        BatchStage->count--;
+        Callback(Operation, result, NULL);
+        return;
+    }
+
+    // Reset for next use
+    BatchStage->count = 0;
+
+    char * request_id_str = hpss_RequestIDtoString(&request_id);
+    size_t cnt = snprintf(NULL,
+                          0,
+                          "250 Batch submitted to tape system. Request ID: %s.\r\n",
+                          request_id_str);
+    char * response = calloc(cnt+1, 1);
+    snprintf(response,
+             cnt+1,
+             "250 Batch submitted to tape system. Request ID: %s.\r\n",
+             request_id_str);
+
+    Callback(Operation, GLOBUS_SUCCESS, response);
+    free(request_id_str);
+    free(response);
+    return;
+}
 
 // SITE STGEND
 // 200 No pending files to submit to tape system. Stage session ended.
@@ -640,12 +826,46 @@ stgend(
         return;
     }
 
-    Callback(
-        Operation,
-        GLOBUS_SUCCESS,
-        "200 No pending files to submit to tape system. Stage session ended.\r\n");
+    if ((*BatchStage)->count == 0)
+    {
+        Callback(
+            Operation,
+            GLOBUS_SUCCESS,
+            "200 No pending files to submit to tape system. Stage session ended.\r\n");
 
-    HpssAPI_StageBatchFree(&(*BatchStage)->batch);
+        free(*BatchStage);
+        *BatchStage = NULL;
+        return;
+    }
+
+    hpss_reqid_t request_id;
+    globus_result_t result = _submit_batch_stage(Operation,
+                                                 (*BatchStage)->bfobjs,
+                                                 (*BatchStage)->count,
+                                                 &request_id);
+
+    if (result)
+    {
+        // Retryable?
+        Callback(Operation, result, NULL);
+        return;
+    }
+
+    char * request_id_str = hpss_RequestIDtoString(&request_id);
+    size_t cnt = snprintf(NULL,
+                          0,
+                          "250 Remaining files submitted to tape system. Request ID: %s.\r\n",
+                          request_id_str);
+    char * response = calloc(cnt+1, 1);
+    snprintf(response,
+             cnt+1,
+             "250 Remaining files submitted to tape system. Request ID: %s.\r\n",
+             request_id_str);
+
+    Callback(Operation, GLOBUS_SUCCESS, response);
+    free(request_id_str);
+    free(response);
+
     free(*BatchStage);
     *BatchStage = NULL;
 }

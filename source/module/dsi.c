@@ -306,7 +306,10 @@ dsi_command(globus_gfs_operation_t     Operation,
         INFO("Begin bulk stage");
         stgbegin(Operation, CommandInfo, &user_arg->batch_stage, Callback);
         break;
-
+    case GLOBUS_GFS_HPSS_CMD_SITE_STGFILE:
+        INFO("Bulk stage file %s", CommandInfo->pathname);
+        stgfile(Operation, CommandInfo, user_arg->batch_stage, Callback);
+        break;
     case GLOBUS_GFS_HPSS_CMD_SITE_STGEND:
         INFO("End bulk stage");
         stgend(Operation, CommandInfo, &user_arg->batch_stage, Callback);

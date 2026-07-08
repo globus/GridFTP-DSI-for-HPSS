@@ -1520,8 +1520,8 @@ Hpss_UserAttrSetAttrs(
 
 int
 Hpss_Utime(
-    const char                  *  Path,
-    const struct utimbuf        *  Times)
+    const char                  *  Path,  // IN
+    const struct utimbuf        *  Times) // IN
 {
     API_ENTER("hpss_Utime",
               "Path=%s Times=%s",
@@ -1546,8 +1546,8 @@ Hpss_Utime(
 #if (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
 int
 HpssAPI_StageBatchInit(
-    hpss_stage_batch_t          *  Batch,
-    int                            Len)
+    hpss_stage_batch_t          *  Batch, // IN
+    int                            Len)   // IN
 {
     API_ENTER("API_StageBatchInit",
               "Batch=%s Len=%s",
@@ -1568,7 +1568,7 @@ HpssAPI_StageBatchInit(
 
 void
 HpssAPI_StageBatchFree(
-   hpss_stage_batch_t           *  Batch)
+   hpss_stage_batch_t           *  Batch) // IN
 {
     API_ENTER("API_StageBatchFree",
               "Batch=%s",
@@ -1584,4 +1584,99 @@ HpssAPI_StageBatchFree(
              PTR(Batch));
     return;
 }
+
+int
+HpssAPI_StageBatchInsertBFObj(
+    hpss_stage_batch_t             * Batch,            // IN/OUT
+    int                              Idx,              // IN
+    const bfs_bitfile_obj_handle_t * BfObj,            // IN
+    int                              FromStorageLevel, // IN
+    int                              ToStorageLevel,   // IN
+    u_signed64                       Offset,           // IN
+    u_signed64                       Length,           // IN
+    uint32_t                         Flags)            // IN
+{
+    API_ENTER("API_StageBatchInsertBFObj",
+              "Batch=%s Idx=%s BfObj=%s FromStorageLevel=%s ToStorageLevel=%s Offset=%s Length=%s Flags=%s",
+              HPSS_STAGE_BATCH_T_PTR(Batch),
+              INT(Idx),
+              BFS_BITFILE_OBJ_HANDLE_T_PTR(BfObj),
+              INT(FromStorageLevel),
+              INT(ToStorageLevel),
+              UNSIGNED64(Offset),
+              UNSIGNED64(Length),
+              UNSIGNED(Flags));
+
+    Hpss_ClearLastHPSSErrno();
+    int rv = API_StageBatchInsertBFObj(Batch,
+                                       Idx,
+                                       BfObj,
+                                       FromStorageLevel,
+                                       ToStorageLevel,
+                                       Offset,
+                                       Length,
+                                       Flags);
+    hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
+
+    API_EXIT("API_StageBatchInsertBFObj",
+             "return_value=%s last_hpss_errno=%s Batch=%s",
+             INT(rv),
+             HPSS_ERRNO_STATE_T(errno_state),
+             rv ? PTR(Batch) : HPSS_STAGE_BATCH_T_PTR(Batch));
+    return HPSS_ERROR(rv, errno_state);
+}
+
+int
+Hpss_StageBatchCallBack(
+    hpss_stage_batch_t          *  Batch,       // IN
+    bfs_callback_addr_t         *  CallBackPtr, // IN
+    hpss_reqid_t                *  ReqID,       // OUT
+    hpss_stage_bitfile_list_t   *  BFIDs,       // OUT
+    hpss_stage_batch_status_t   *  Status)      // OUT
+{
+    API_ENTER("hpss_StageBatchCallBack",
+              "Batch=%s CallBackPtr=%s ReqID=%s BFIDs=%s Status=%s",
+              HPSS_STAGE_BATCH_T_PTR(Batch),
+              PTR(CallBackPtr),
+              PTR(ReqID),
+              PTR(BFIDs),
+              PTR(Status));
+
+    Hpss_ClearLastHPSSErrno();
+    // HPSS 9.3: This returned -95 when Batch->List.List_len > # of files to stage
+    int rv = hpss_StageBatchCallBack(Batch,       // IN
+                                     CallBackPtr, // IN
+                                     ReqID,       // OUT
+                                     BFIDs,       // OUT
+                                     Status);     // OUT
+    hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
+
+    API_EXIT("hpss_StageBatchCallBack",
+             "return_value=%s last_hpss_errno=%s ReqID=%s BFIDs=%s Status=%s",
+             INT(rv),
+             HPSS_ERRNO_STATE_T(errno_state),
+             rv ? PTR(ReqID) : HPSS_REQID_T_PTR(ReqID),
+             rv ? PTR(BFIDs) : HPSS_STAGE_BITFILE_LIST_T_PTR(BFIDs),
+             rv ? PTR(Status) : HPSS_STAGE_BATCH_STATUS_T_PTR(Status));
+    return HPSS_ERROR(rv, errno_state);
+}
+
+void
+HpssAPI_StageStatusFree(
+    hpss_stage_batch_status_t   * Status) /* IN - Batch */
+{
+    API_ENTER("API_StageStatusFree",
+              "Status=%s",
+              HPSS_STAGE_BATCH_STATUS_T_PTR(Status));
+
+    Hpss_ClearLastHPSSErrno();
+    API_StageStatusFree(Status);
+    hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
+
+    API_EXIT("API_StageStatusFree",
+             "return_value=void last_hpss_errno=%s",
+             HPSS_ERRNO_STATE_T(errno_state));
+    return;
+}
+
 #endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9

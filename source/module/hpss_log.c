@@ -1256,4 +1256,99 @@ _hpss_stage_batch_t_ptr(
         UNSIGNED(p->List.List_len),
         _hpss_stage_t_array(pool, p->List.List_val, p->List.List_len));
 }
+
+static char *
+_bfs_bitfile_obj_handle_t_array(
+    struct pool                 *  pool,
+    bfs_bitfile_obj_handle_t    *  list,
+    unsigned                       len)
+{
+    char * str = "[";
+    for (int i = 0; i < len; i++)
+    {
+        str = _sprintf(
+            pool,
+            "%s%s%s",
+            str,
+            i == 0 ? "" : ", ",
+            BFS_BITFILE_OBJ_HANDLE_T(list[i]));
+    }
+    return _strcat(pool, str, "]");
+}
+
+char *
+_hpss_stage_bitfile_list_t_ptr(
+    struct pool                     * pool,
+    const hpss_stage_bitfile_list_t * p)
+{
+    if (p == NULL)
+        return PTR(p);
+
+    return _sprintf(
+        pool,
+        "{"
+            "BFList={"
+                "BFList_len=%s, " // u_int
+                "BFList_val=%s"   // bfs_bitfile_obj_handle_t[]
+            "}"
+        "}",
+        UNSIGNED(p->BFList.BFList_len),
+        _bfs_bitfile_obj_handle_t_array(pool, p->BFList.BFList_val, p->BFList.BFList_len));
+}
+
+char *
+_hpss_stage_status_t(
+    struct pool                 *  pool,
+    const hpss_stage_status_t      s)
+{
+    return _sprintf(
+        pool,
+        "{"
+            "StageStatus=%s, " // int32_t
+            "RequestId=%s, "   // hpss_reqid_t
+            "Position=%s"      // int32_t
+        "}",
+        SIGNED(s.StageStatus),
+        HPSS_REQID_T(s.RequestId),
+        SIGNED(s.Position));
+}
+
+static char *
+_hpss_stage_status_t_array(
+    struct pool                 *  pool,
+    hpss_stage_status_t         *  list,
+    unsigned                       len)
+{
+    char * str = "[";
+    for (int i = 0; i < len; i++)
+    {
+        str = _sprintf(
+            pool,
+            "%s%s%s",
+            str,
+            i == 0 ? "" : ", ",
+            HPSS_STAGE_STATUS_T(list[i]));
+    }
+    return _strcat(pool, str, "]");
+}
+
+char *
+_hpss_stage_batch_status_t_ptr(
+    struct pool                     * pool,
+    const hpss_stage_batch_status_t * p)
+{
+    if (p == NULL)
+        return PTR(p);
+
+    return _sprintf(
+        pool,
+        "{"
+            "StatusList={"
+                "StatusList_len=%s, " // u_int
+                "StatusList_val=%s"   // hpss_stage_status_t[]
+            "}"
+        "}",
+        UNSIGNED(p->StatusList.StatusList_len),
+        _hpss_stage_status_t_array(pool, p->StatusList.StatusList_val, p->StatusList.StatusList_len));
+}
 #endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9

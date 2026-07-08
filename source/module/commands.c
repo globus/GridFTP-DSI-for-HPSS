@@ -57,6 +57,19 @@ commands_init(globus_gfs_operation_t Operation)
         return GlobusGFSErrorWrapFailed(
             "Failed to add custom 'SITE STGBEGIN' command", result);
 
+    // SITE STGFILE
+    result = globus_gridftp_server_add_command(Operation,
+                                               "SITE STGFILE",
+                                               GLOBUS_GFS_HPSS_CMD_SITE_STGFILE,
+                                               3,
+                                               3,
+                                               "SITE STGFILE <sp> path",
+                                               GLOBUS_TRUE, // has_pathname
+                                               GFS_ACL_ACTION_READ);
+    if (result != GLOBUS_SUCCESS)
+        return GlobusGFSErrorWrapFailed(
+            "Failed to add custom 'SITE STGFILE' command", result);
+
     // SITE STGEND
     result = globus_gridftp_server_add_command(Operation,
                                                "SITE STGEND",

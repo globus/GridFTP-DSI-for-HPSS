@@ -346,12 +346,36 @@ Hpss_Utime(
 #if (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
 int
 HpssAPI_StageBatchInit(
-    hpss_stage_batch_t          * Batch,
-    int                           Len);
+    hpss_stage_batch_t          * Batch, // IN
+    int                           Len);  // IN
 
 void
 HpssAPI_StageBatchFree(
-   hpss_stage_batch_t           * Batch);
+   hpss_stage_batch_t           * Batch); // IN
+
+int
+HpssAPI_StageBatchInsertBFObj(
+    hpss_stage_batch_t             * Batch,            // IN/OUT
+    int                              Idx,              // IN
+    const bfs_bitfile_obj_handle_t * BfObj,            // IN
+    int                              FromStorageLevel, // IN
+    int                              ToStorageLevel,   // IN
+    u_signed64                       Offset,           // IN
+    u_signed64                       Length,           // IN
+    uint32_t                         Flags);           // IN
+
+int
+Hpss_StageBatchCallBack(
+    hpss_stage_batch_t          *  Batch,       // IN
+    bfs_callback_addr_t         *  CallBackPtr, // IN
+    hpss_reqid_t                *  ReqID,       // OUT
+    hpss_stage_bitfile_list_t   *  BFIDs,       // OUT
+    hpss_stage_batch_status_t   *  Status);     // OUT
+
+void
+HpssAPI_StageStatusFree(
+    hpss_stage_batch_status_t   *  Status); // IN
+
 #endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
 
 #endif /* _HPSS_H_ */
