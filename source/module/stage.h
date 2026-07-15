@@ -76,6 +76,12 @@ stgend(
     batch_stage_t               ** BatchStage,   // IN/OUT
     commands_callback              Callback);    // IN
 
+void
+stgchk(
+    globus_gfs_operation_t         Operation,    // IN
+    globus_gfs_command_info_t   *  CommandInfo,  // IN
+    commands_callback              Callback);    // IN
+
 #endif  //(HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
 
 #endif /* HPSS_DSI_STAGE_H */

@@ -1679,4 +1679,33 @@ HpssAPI_StageStatusFree(
     return;
 }
 
+int
+Hpss_GetBatchAsynchStatus(
+   hpss_reqid_t                    CallBackId,  // IN
+   hpss_stage_bitfile_list_t    *  BFIDs,       // IN
+   hpss_stage_status_type_t        Type,        // IN
+   hpss_stage_batch_status_t    *  Status)      // OUT
+{
+    API_ENTER("hpss_GetBatchAsynchStatus",
+              "CallBackId=%s BFIDs=%s Type=%s Status=%s",
+              HPSS_REQID_T(CallBackId),
+              HPSS_STAGE_BITFILE_LIST_T_PTR(BFIDs),
+              HPSS_STAGE_STATUS_TYPE_T(Type),
+              PTR(Status));
+
+    Hpss_ClearLastHPSSErrno();
+    int rv = hpss_GetBatchAsynchStatus(CallBackId,  // IN
+                                       BFIDs,       // IN
+                                       Type,        // IN
+                                       Status);     // OUT
+    hpss_errno_state_t errno_state = Hpss_GetLastHPSSErrno();
+
+    API_EXIT("hpss_GetBatchAsynchStatus",
+             "return_value=%s last_hpss_errno=%s Status=%s",
+             INT(rv),
+             HPSS_ERRNO_STATE_T(errno_state),
+             rv ? PTR(Status) : HPSS_STAGE_BATCH_STATUS_T_PTR(Status));
+    return HPSS_ERROR(rv, errno_state);
+}
+
 #endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9

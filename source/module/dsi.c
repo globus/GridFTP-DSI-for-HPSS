@@ -314,6 +314,10 @@ dsi_command(globus_gfs_operation_t     Operation,
         INFO("End bulk stage");
         stgend(Operation, CommandInfo, &user_arg->batch_stage, Callback);
         break;
+    case GLOBUS_GFS_HPSS_CMD_SITE_STGCHK:
+        INFO("Check stage status of %s", CommandInfo->pathname);
+        stgchk(Operation, CommandInfo, Callback);
+        break;
 
 #pragma GCC diagnostic pop
 #endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <assert.h>
 
 /*
  * Project includes
@@ -48,6 +49,113 @@ globus_gridftp_server_get_task_id(
     *task_id = strdup("deadbeef-dead-beef-dead-beefdeadbeef");
 }
 
+/*
+ * Build an FTP response in short format:
+ *   200 Ok.
+ *
+ * Caller will need to free() the return value.
+ * ASSERT: code must be a 3 digit base10 value
+ * ASSUMPTION: string does not contain '\n'
+ */
+static char *
+_build_ftp_short_response(
+    int                            code,
+    const char *                   string)
+{
+    assert(code >= 100 && code < 1000);
+    assert(strchr(string, '\n') == NULL);
+
+    // len("XYZ \0") = 5
+    char * response = calloc(strlen(string)+5, 1);
+    sprintf(response, "%d %s", code, string);
+    return response;
+}
+
+/*
+ * Build an FTP response in long format:
+ *   500-GlobusError: v=1 c=GENERAL_ERROR
+ *   500-HPSS-Reason: HPSS_ENOATTR
+ *   500-HPSS-Function: Hpss_UserAttrGetAttrs
+ *   500-HPSS-Last-Error: HPSS_ENOATTR
+ *   500-HPSS-Last-Function: API_core_UserAttrGetAttr
+ *   500 End.
+ *
+ * Caller will need to free() the return value.
+ * ASSERT: code must be a 3 digit base10 value
+ * ASSUMPTION: string does not terminate with '\n\0'
+ * ASSUMPTION: string contains at least one '\n'
+ */
+static char *
+_build_ftp_long_response(
+    int                            code,
+    const char *                   string)
+{
+    assert(code >= 100 && code < 1000);
+    assert(string[strlen(string)-1] != '\n');
+    assert(strchr(string, '\n') != NULL);
+
+    // Count the number of lines
+    int num_of_lines = 1;
+    const char * cptr = string;
+    while ((cptr = strchr(cptr, '\n')) != NULL)
+    {
+        num_of_lines++;
+        cptr++;
+    }
+
+    int len = strlen(string); // length of input string
+    len += 4 * num_of_lines; // len("XYZ-")
+    len += 10; // len("XYZ End.\r\n")
+    len += 1; // Null terminator
+
+    char * response = calloc(len, 1);
+
+    cptr = string;
+    const char * newline;
+    while ((newline = strchr(cptr, '\n')) != NULL)
+    {
+        sprintf(response+strlen(response), "%d-", code);
+        strncat(response, cptr, newline-cptr+1);
+        cptr = newline + 1;
+    }
+
+    sprintf(response+strlen(response), "%d-%s\n%d End.\r\n", code, cptr, code);
+    return response;
+}
+
+/*
+ * Build an FTP response in either short format:
+ *   200 Ok.\r\n
+ * or long format:
+ *   500-GlobusError: v=1 c=GENERAL_ERROR\n
+ *   500-HPSS-Reason: HPSS_ENOATTR\n
+ *   500-HPSS-Function: Hpss_UserAttrGetAttrs\n
+ *   500-HPSS-Last-Error: HPSS_ENOATTR\n
+ *   500-HPSS-Last-Function: API_core_UserAttrGetAttr\n
+ *   500 End.\r\n
+ *
+ * Caller will need to free() the return value.
+ * ASSERT: code must be a 3 digit base10 value
+ * ASSUMPTION: string does not terminate with '\n\0'
+ */
+static char *
+_build_ftp_response(
+    int                            code,
+    const char *                   string)
+{
+    assert(code >= 100 && code < 1000);
+
+    if (strchr(string, '\n'))
+        return _build_ftp_long_response(code, string);
+    return _build_ftp_short_response(code, string);
+}
+
+// typedef struct globus_l_gfs_data_operation_s *  globus_gfs_operation_t;
+struct globus_l_gfs_data_operation_s {
+    int code;
+    char * response;
+};
+
 static void
 _commands_callback(
     globus_gfs_operation_t         op,
@@ -57,11 +165,20 @@ _commands_callback(
     if (result != GLOBUS_SUCCESS)
     {
         globus_object_t * obj = globus_error_peek(result);
-        printf("Reply Code:%d\n", globus_gfs_error_get_ftp_response_code(obj));
-        printf("%s", globus_error_print_chain(obj));
+        char * error_chain = globus_error_print_chain(obj);
+        // globus_error_print_chain() appends a trailing '\n'
+        error_chain[strlen(error_chain)-1] = '\0';
+        op->code = globus_gfs_error_get_ftp_response_code(obj);
+        op->response = _build_ftp_response(op->code, error_chain);
+        free(error_chain);
+    } else if (command_response)
+    {
+        op->code = atoi(command_response);
+        op->response = strdup(command_response);
     } else
     {
-        printf("%s", command_response);
+        op->code = 200;
+        op->response = strdup("Success");
     }
 }
 
@@ -185,17 +302,44 @@ main(int argc, char * argv[])
         exit(1);
     }
 
-    batch_stage_t               *  batch_stage = NULL;
-    printf("SITE STGBEGIN\n");
-    stgbegin(NULL, NULL, &batch_stage, _commands_callback);
-
-    printf("SITE STGFILE %s\n", path);
+    struct globus_l_gfs_data_operation_s op;
     globus_gfs_command_info_t command_info;
     command_info.pathname = (char *)path;
-    stgfile(NULL, &command_info, batch_stage, _commands_callback);
+
+    batch_stage_t               *  batch_stage = NULL;
+    printf("SITE STGBEGIN\n");
+    stgbegin(&op, NULL, &batch_stage, _commands_callback);
+    printf("%s\n", op.response);
+    free(op.response);
+    if (op.code != 350)
+        return 1;
+
+    printf("SITE STGFILE %s\n", path);
+    stgfile(&op, &command_info, batch_stage, _commands_callback);
+    printf("%s\n", op.response);
+    free(op.response);
+    if (op.code != 200)
+        return 1;
 
     printf("SITE STGEND\n");
-    stgend(NULL, NULL, &batch_stage, _commands_callback);
+    stgend(&op, NULL, &batch_stage, _commands_callback);
+    printf("%s\n", op.response);
+    free(op.response);
+    if (op.code != 250)
+        return 1;
+
+    while(1)
+    {
+        printf("SITE STGCHK %s\n", path);
+        stgchk(&op, &command_info, _commands_callback);
+        printf("%s\n", op.response);
+        free(op.response);
+        if (op.code == 211) // Stage completed
+            return 0;
+        if (op.code != 213) // Stage in progress
+            return 1;
+        sleep(1);
+    }
 
     return 0;
 }

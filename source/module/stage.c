@@ -660,9 +660,6 @@ _submit_batch_stage(
                                                BFS_STAGE_ALL);
         if (retval)
         {
-            //Callback(Operation,
-            //         hpss_error_to_globus_result(retval),
-            //         NULL);
             HpssAPI_StageBatchFree(&stage_batch);
             return hpss_error_to_globus_result(retval);
         }
@@ -703,14 +700,15 @@ _submit_batch_stage(
 
     if (retval)
     {
-        //Callback(Operation,
-        //         hpss_error_to_globus_result(retval),
-        //         NULL);
         HpssAPI_StageBatchFree(&stage_batch);
         return hpss_error_to_globus_result(retval);
     }
 
     HpssAPI_StageBatchFree(&stage_batch);
+    if (bfids.BFList.BFList_val)
+        free(bfids.BFList.BFList_val);
+    // Expected: StageStatus=-1406 (HPSS_ENOTALLMOVED)
+    HpssAPI_StageStatusFree(&status);
     return GLOBUS_SUCCESS;
 }
 
@@ -868,6 +866,101 @@ stgend(
 
     free(*BatchStage);
     *BatchStage = NULL;
+}
+
+// Original:
+// 250: file is resident on disk
+// 450: file is not on disk but tape mount request still exists
+// 550: an error has occurred, retry SITE STGCHK
+// 551: file is not on disk and tape mount does not exist. Reissue ‘SITE STGFILE’ sequence
+//      for all non-transferred files on this same request id.
+
+// Updated:
+// 211: file is resident on disk
+// 213: file is not on disk but tape mount request still exists
+// 451: an error has occurred, retry SITE STGCHK
+// 550: file is not on disk and tape mount does not exist. Reissue 'SITE STGFILE' sequence
+//      for all non-transferred files on this same request id.
+void
+stgchk(
+    globus_gfs_operation_t         Operation,    // IN
+    globus_gfs_command_info_t   *  CommandInfo,  // IN
+    commands_callback              Callback)     // IN
+{
+    char                        *  task_id = NULL;
+    unsigned char                  task_id_bytes[UUID_BYTE_COUNT];
+    hpss_reqid_t                   callback_id;
+    residency_t                    residency;
+    globus_result_t                result;
+    hpss_stage_batch_status_t      stage_batch_status;
+    hpss_stage_bitfile_list_t      bfids;
+
+    result = check_file_residency(CommandInfo->pathname, &residency);
+    if (result)
+    {
+        Callback(Operation, result, NULL);
+        return;
+    }
+
+    if (residency == RESIDENCY_RESIDENT)
+    {
+        Callback(Operation, GLOBUS_SUCCESS, "211 File is resident on disk\r\n");
+        return;
+    }
+
+    /*
+     * Otherwise, check the status of the stage request
+     */
+
+    // Calculate the callback ID.
+    globus_gridftp_server_get_task_id(Operation, &task_id);
+    assert(task_id);
+    // Convert Task ID to a bytes array
+    uuid_str_to_bytes(task_id, task_id_bytes);
+    // Convert our bytes array into a callback ID)
+    bytes_to_hpss_uuid(task_id_bytes, &callback_id);
+    free(task_id);
+
+    hpss_fileattr_t fattrs;
+    int retval = Hpss_FileGetAttributes((char *)CommandInfo->pathname, &fattrs);
+    if (retval)
+    {
+        Callback(Operation, hpss_error_to_globus_result(retval), NULL);
+        return;
+    }
+
+    bfids.BFList.BFList_len = 1;
+    bfids.BFList.BFList_val = &fattrs.Attrs.BitfileObj;
+
+    retval = Hpss_GetBatchAsynchStatus(callback_id,              // IN
+                                       &bfids,                   // IN
+                                       HPSS_STAGE_STATUS_BFS_SS, // IN
+                                       &stage_batch_status);     // OUT
+    if (retval)
+    {
+        Callback(Operation, hpss_error_to_globus_result(retval), NULL);
+        return;
+    }
+
+    // Stage does not exist: StageStatus=0, RequestId=00000000-0000-0000-0000-000000000000, Position=-1
+    // Stage in progress: StageStatus=2, RequestId=8f23a1c6-9ee7-184c-8f78-6edfb1235f3c, Position=-2147483648
+    //     RequestID value changes on each request to get status
+    if (stage_batch_status.StatusList.StatusList_val[0].StageStatus == 0)
+    {
+        Callback(Operation,
+                 GLOBUS_SUCCESS,
+                 "550 File is not on disk and tape mount does not exist. "
+                 "Reissue 'SITE STGFILE' sequence for all non-transferred "
+                 "files on this same request id.\r\n");
+    } else
+    {
+        Callback(Operation,
+                 GLOBUS_SUCCESS,
+                 "213 File is not on disk but tape mount request still exists\r\n");
+    }
+
+    HpssAPI_StageStatusFree(&stage_batch_status);
+
 }
 
 #endif  //(HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9

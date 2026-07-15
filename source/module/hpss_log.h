@@ -232,6 +232,7 @@ _hpss_stage_batch_status_t_ptr(struct pool * pool, const hpss_stage_batch_status
 char *
 _hpss_stage_status_t(struct pool * pool, const hpss_stage_status_t s);
 
+#define HPSS_STAGE_STATUS_TYPE_T(t) INT(t)
 #endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
 
 #endif /* _HPSS_LOG_H_ */

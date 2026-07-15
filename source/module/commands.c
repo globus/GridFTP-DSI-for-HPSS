@@ -82,6 +82,20 @@ commands_init(globus_gfs_operation_t Operation)
     if (result != GLOBUS_SUCCESS)
         return GlobusGFSErrorWrapFailed(
             "Failed to add custom 'SITE STGEND' command", result);
+
+    // SITE STGCHK
+    result = globus_gridftp_server_add_command(Operation,
+                                               "SITE STGCHK",
+                                               GLOBUS_GFS_HPSS_CMD_SITE_STGCHK,
+                                               4,
+                                               4,
+                                               "SITE STGCHK <sp> request_id <sp> path",
+                                               GLOBUS_TRUE, // has_pathname
+                                               GFS_ACL_ACTION_READ);
+    if (result != GLOBUS_SUCCESS)
+        return GlobusGFSErrorWrapFailed(
+            "Failed to add custom 'SITE STGCHK' command", result);
+
 #endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
 
     return GLOBUS_SUCCESS;

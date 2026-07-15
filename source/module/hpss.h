@@ -376,6 +376,13 @@ void
 HpssAPI_StageStatusFree(
     hpss_stage_batch_status_t   *  Status); // IN
 
+int
+Hpss_GetBatchAsynchStatus(
+   hpss_reqid_t                    CallBackId,  // IN
+   hpss_stage_bitfile_list_t    *  BFIDs,       // IN
+   hpss_stage_status_type_t        Type,        // IN
+   hpss_stage_batch_status_t    *  Status);     // OUT
+
 #endif // (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
 
 #endif /* _HPSS_H_ */
