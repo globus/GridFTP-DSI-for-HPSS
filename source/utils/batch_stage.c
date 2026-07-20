@@ -49,6 +49,26 @@ globus_gridftp_server_get_task_id(
     *task_id = strdup("deadbeef-dead-beef-dead-beefdeadbeef");
 }
 
+char * StgchkArgv[] = {"SITE", "STGCHK", "deadbeef-dead-beef-dead-beefdeadbeef", NULL};
+
+globus_result_t
+globus_gridftp_server_query_op_info(
+    globus_gfs_operation_t         Operation,
+    globus_gfs_op_info_t           OpInfo,
+    globus_gfs_op_info_param_t     Param,
+    ...)
+{
+    va_list args;
+    va_start(args, Param);
+    char ***argv = va_arg(args, char ***);
+    int *argc = va_arg(args, int *);
+    va_end(args);
+
+    *argv = StgchkArgv;
+    *argc = 3;
+    return GLOBUS_SUCCESS;
+}
+
 /*
  * Build an FTP response in short format:
  *   200 Ok.

@@ -746,7 +746,6 @@ hpss_reqid_to_string(
         return GlobusGFSErrorMemory("UUIDString");
 
     uuid_bytes_to_str(bytes, *UUIDString);
-    printf("Actual: %s\n", *UUIDString);
     return GLOBUS_SUCCESS;
 }
 
@@ -930,6 +929,41 @@ stgend(
     *BatchStage = NULL;
 }
 
+static globus_result_t
+_get_request_id_arg(
+    globus_gfs_operation_t         Operation,
+    globus_gfs_command_info_t   *  CommandInfo,
+    hpss_reqid_t                *  RequestID)
+{
+    globus_result_t result;
+    char **         argv   = NULL;
+    int             argc   = 0;
+
+    /* Get the command arguments. */
+    result = globus_gridftp_server_query_op_info(Operation,
+                                                 CommandInfo->op_info,
+                                                 GLOBUS_GFS_OP_INFO_CMD_ARGS,
+                                                 &argv,
+                                                 &argc);
+
+    if (result)
+        return GlobusGFSErrorWrapFailed("Unable to get command args", result);
+
+    if (!is_valid_uuid(argv[2]))
+    {
+        ERROR("Invalid request_id value for STGCHK.");
+        return GlobusGFSErrorGeneric("Invalid request_id value for STGCHK");
+    }
+
+    // Convert Task ID to a bytes array
+    unsigned char request_id_bytes[UUID_BYTE_COUNT];
+    uuid_str_to_bytes(argv[2], request_id_bytes);
+    // Convert our bytes array into a request ID.
+    bytes_to_hpss_uuid(request_id_bytes, RequestID);
+
+    return GLOBUS_SUCCESS;
+}
+
 // Original:
 // 250: file is resident on disk
 // 450: file is not on disk but tape mount request still exists
@@ -972,8 +1006,10 @@ stgchk(
      * Otherwise, check the status of the stage request
      */
 
-    // Calculate the callback ID.
-    result = _generate_callback_id(Operation, &callback_id);
+    /*
+     * The caller should have included the request ID (aka callback ID).
+     */
+    result = _get_request_id_arg(Operation, CommandInfo, &callback_id);
     if (result != GLOBUS_SUCCESS)
     {
         Callback(Operation, result, NULL);
