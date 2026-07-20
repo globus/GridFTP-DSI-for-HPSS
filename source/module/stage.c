@@ -625,6 +625,30 @@ stgbegin(
 }
 
 static globus_result_t
+_generate_callback_id(
+    globus_gfs_operation_t         Operation,  // IN
+    hpss_reqid_t                *  CallbackID) // OUT
+{
+    char                        *  task_id = NULL;
+    unsigned char                  task_id_bytes[UUID_BYTE_COUNT];
+
+    globus_gridftp_server_get_task_id(Operation, &task_id);
+    if (!is_valid_uuid(task_id))
+    {
+        ERROR("No valid task ID available for stage request.");
+        return GlobusGFSErrorGeneric("No valid task ID available for stage request.");
+    }
+
+    // Convert Task ID to a bytes array
+    uuid_str_to_bytes(task_id, task_id_bytes);
+    // Convert our bytes array into a callback ID)
+    bytes_to_hpss_uuid(task_id_bytes, CallbackID);
+
+    free(task_id);
+    return GLOBUS_SUCCESS;
+}
+
+static globus_result_t
 _submit_batch_stage(
     globus_gfs_operation_t         Operation, // IN
     bfs_bitfile_obj_handle_t    *  BfObjs,    // IN
@@ -632,10 +656,8 @@ _submit_batch_stage(
     hpss_reqid_t                *  RequestID) // OUT
 {
     int                            retval = 0;
-    char                        *  task_id = NULL;
     hpss_reqid_t                   callback_id;
     hpss_stage_batch_t             stage_batch;
-    unsigned char                  task_id_bytes[UUID_BYTE_COUNT];
     globus_result_t                result;
     bfs_callback_addr_t            callback_addr;
     hpss_stage_bitfile_list_t      bfids;
@@ -643,10 +665,7 @@ _submit_batch_stage(
 
     retval = HpssAPI_StageBatchInit(&stage_batch, Count);
     if (retval)
-    {
-        //Callback(Operation, hpss_error_to_globus_result(retval), NULL);
         return hpss_error_to_globus_result(retval);
-    }
 
     for (int i = 0; i < Count; i++)
     {
@@ -668,13 +687,12 @@ _submit_batch_stage(
     /*
      * Calculate the callback ID.
      */
-    globus_gridftp_server_get_task_id(Operation, &task_id);
-    assert(task_id);
-    // Convert Task ID to a bytes array
-    uuid_str_to_bytes(task_id, task_id_bytes);
-    // Convert our bytes array into a callback ID)
-    bytes_to_hpss_uuid(task_id_bytes, &callback_id);
-    free(task_id);
+    result = _generate_callback_id(Operation, &callback_id);
+    if (result != GLOBUS_SUCCESS)
+    {
+        HpssAPI_StageBatchFree(&stage_batch);
+        return result;
+    }
 
     /*
      * Build the callback addr.
@@ -682,7 +700,6 @@ _submit_batch_stage(
     result = _build_callback_addr(callback_id, &callback_addr);
     if (result)
     {
-        //Callback(Operation, result, NULL);
         HpssAPI_StageBatchFree(&stage_batch);
         return result;
     }
@@ -932,8 +949,6 @@ stgchk(
     globus_gfs_command_info_t   *  CommandInfo,  // IN
     commands_callback              Callback)     // IN
 {
-    char                        *  task_id = NULL;
-    unsigned char                  task_id_bytes[UUID_BYTE_COUNT];
     hpss_reqid_t                   callback_id;
     residency_t                    residency;
     globus_result_t                result;
@@ -958,13 +973,12 @@ stgchk(
      */
 
     // Calculate the callback ID.
-    globus_gridftp_server_get_task_id(Operation, &task_id);
-    assert(task_id);
-    // Convert Task ID to a bytes array
-    uuid_str_to_bytes(task_id, task_id_bytes);
-    // Convert our bytes array into a callback ID)
-    bytes_to_hpss_uuid(task_id_bytes, &callback_id);
-    free(task_id);
+    result = _generate_callback_id(Operation, &callback_id);
+    if (result != GLOBUS_SUCCESS)
+    {
+        Callback(Operation, result, NULL);
+        return;
+    }
 
     hpss_fileattr_t fattrs;
     int retval = Hpss_FileGetAttributes((char *)CommandInfo->pathname, &fattrs);
