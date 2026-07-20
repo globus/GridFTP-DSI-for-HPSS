@@ -712,6 +712,28 @@ _submit_batch_stage(
     return GLOBUS_SUCCESS;
 }
 
+/*
+ * Converts a hpss_reqid_t * (aka a hpss_uuid_t) to a UUID in string format:
+ *   ex. hpss_request_id * => "ddfeb23c-53ee-435b-8318-a2c4fb2519d2"
+ */
+static globus_result_t
+hpss_reqid_to_string(
+    const hpss_reqid_t          *  RequestID,
+    char                        ** UUIDString)
+{
+    unsigned char bytes[UUID_BYTE_COUNT];
+    hpss_uuid_to_bytes(RequestID, bytes);
+
+    *UUIDString = calloc(UUID_STR_COUNT, 1);
+    if (*UUIDString == NULL)
+        return GlobusGFSErrorMemory("UUIDString");
+
+    uuid_bytes_to_str(bytes, *UUIDString);
+    printf("Actual: %s\n", *UUIDString);
+    return GLOBUS_SUCCESS;
+}
+
+
 // SITE STGFILE <file>
 // 200 File queued. Staging is pending and ready to submit.
 // 250 Batch submitted to tape system. Request ID: <request_id>.
@@ -786,11 +808,23 @@ stgfile(
     BatchStage->count = 0;
 
     char * request_id_str = hpss_RequestIDtoString(&request_id);
+    result = hpss_reqid_to_string(&request_id, &request_id_str);
+    if (result)
+    {
+        Callback(Operation, result, NULL);
+        return;
+    }
+
     size_t cnt = snprintf(NULL,
                           0,
                           "250 Batch submitted to tape system. Request ID: %s.\r\n",
                           request_id_str);
     char * response = calloc(cnt+1, 1);
+    if (response == NULL)
+    {
+        Callback(Operation, GlobusGFSErrorMemory("response"), NULL);
+        return;
+    }
     snprintf(response,
              cnt+1,
              "250 Batch submitted to tape system. Request ID: %s.\r\n",
@@ -850,11 +884,22 @@ stgend(
     }
 
     char * request_id_str = hpss_RequestIDtoString(&request_id);
+    result = hpss_reqid_to_string(&request_id, &request_id_str);
+    if (result)
+    {
+        Callback(Operation, result, NULL);
+        return;
+    }
     size_t cnt = snprintf(NULL,
                           0,
                           "250 Remaining files submitted to tape system. Request ID: %s.\r\n",
                           request_id_str);
     char * response = calloc(cnt+1, 1);
+    if (response == NULL)
+    {
+        Callback(Operation, GlobusGFSErrorMemory("response"), NULL);
+        return;
+    }
     snprintf(response,
              cnt+1,
              "250 Remaining files submitted to tape system. Request ID: %s.\r\n",

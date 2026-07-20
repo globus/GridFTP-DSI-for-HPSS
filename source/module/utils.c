@@ -173,3 +173,19 @@ bytes_to_unsigned(const unsigned char Bytes[UUID_BYTE_COUNT], unsigned * Unsigne
         *Unsigned ^= Bytes[i] << bits_to_shift;
     }
 }
+
+void
+uuid_bytes_to_str(const unsigned char Bytes[UUID_BYTE_COUNT], char UUID[UUID_STR_COUNT])
+{
+    assert(Bytes != NULL);
+    assert(UUID != NULL);
+
+    sprintf(UUID,
+        "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+        Bytes[0], Bytes[1], Bytes[2], Bytes[3],
+        Bytes[4], Bytes[5],
+        Bytes[6], Bytes[7],
+        Bytes[8], Bytes[9],
+        Bytes[10], Bytes[11], Bytes[12], Bytes[13], Bytes[14], Bytes[15]
+    );
+}
