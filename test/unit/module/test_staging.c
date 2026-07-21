@@ -17,7 +17,7 @@
 #include "driver.h"
 
 struct test_suite_arg {
-    int XXX;
+    int UNUSED; // This is a placeholder for future use.
 };
 typedef struct test_suite_arg test_suite_arg_t;
 
@@ -91,8 +91,6 @@ command_callback(
     args->command_response = command_response;
 }
 
-//fprintf(stderr, "%s\n", globus_error_print_chain(globus_error_peek(result)));
-
 void
 test_stgbegin_350_success(void * Arg)
 {
@@ -114,7 +112,6 @@ test_stgbegin_350_success(void * Arg)
 void
 test_stgbegin_500_batch_init_failed(void * Arg)
 {
-    //test_suite_arg_t * arg = Arg;
     command_callback_args_t args;
 
     EXPECT_RETURN("API_StageBatchInit", WHEN_ONCE, INT, HPSS_EIO);
@@ -145,7 +142,6 @@ test_stgbegin_500_batch_init_failed(void * Arg)
 void
 test_stgbegin_503_out_of_order(void * Arg)
 {
-    //test_suite_arg_t * arg = Arg;
     command_callback_args_t args;
 
     batch_stage_t * batch_stage = (batch_stage_t *) 0x1;
@@ -163,7 +159,6 @@ test_stgbegin_503_out_of_order(void * Arg)
 void
 test_stgend_200_no_pending_files_to_stage(void * Arg)
 {
-    //test_suite_arg_t * arg = Arg;
     command_callback_args_t args;
 
     // Successful STGBEGIN
@@ -185,7 +180,6 @@ test_stgend_200_no_pending_files_to_stage(void * Arg)
 void
 test_stgend_503_out_of_order(void * Arg)
 {
-    //test_suite_arg_t * arg = Arg;
     command_callback_args_t args;
 
     batch_stage_t * batch_stage = NULL;

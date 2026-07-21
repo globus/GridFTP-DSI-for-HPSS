@@ -11,31 +11,66 @@
  */
 #include "hpss.h"
 
-bool
-is_valid_uuid(const char * uuid_str);
+/*
+ * In HPSS 7.5, the bitfile ID changed from an hpssoid_t stored at x.Attrs.BitfileId
+ * to a bfs_bitfile_obj_handle_t stored at Attrs.BitfileObj.BfId. These macros help
+ * to simplify older code branches that are still in use and also reminds us of where
+ * the bitfile ID lives.
+ */
 
-#define UUID_BYTE_COUNT 16
-
-// Returns an array of UUID_BYTE_COUNT bytes. Not NULL-terminated.
-void
-uuid_str_to_bytes(const char * UUID, unsigned char Bytes[UUID_BYTE_COUNT]);
-
-// Returns an array of UUID_BYTE_COUNT bytes. Not NULL-terminated.
-void
-hpss_uuid_to_bytes(const hpss_uuid_t * UUID, unsigned char Bytes[UUID_BYTE_COUNT]);
-
-void
-bytes_to_hpss_uuid(const unsigned char Bytes[UUID_BYTE_COUNT], hpss_uuid_t * UUID);
-
-void
-bytes_to_unsigned(const unsigned char Bytes[UUID_BYTE_COUNT], unsigned * Unsigned);
-
-#define UUID_STR_COUNT 37 // 36 characters + 1 null terminator
+#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
+  #define bitfile_id_t bfs_bitfile_obj_handle_t
+  #define ATTR_TO_BFID(x) (x.Attrs.BitfileObj.BfId)
+#else
+  #define bitfile_id_t hpssoid_t
+  #define ATTR_TO_BFID(x) (x.Attrs.BitfileId)
+#endif
 
 /*
- * Translate Bytes to a UUID in string format, ex. "ddfeb23c-53ee-435b-8318-a2c4fb2519d2"
+ * Returns True if UUIDString is a non-null value with the format:
+ *    "[hex]{8}-[hex]{4}-[hex]{4}-[hex]{4}-[hex]{12}\0"
+ * The string can use upper or lower case characters.
  */
-void
-uuid_bytes_to_str(const unsigned char Bytes[UUID_BYTE_COUNT], char UUID[UUID_STR_COUNT]);
+bool
+is_valid_uuid(const char * UUIDString);
+
+/*
+ * Generate CallbackID from TaskID and BitfileID.
+ *   TaskID - Required
+ *   BitfileID - Optional
+ *
+ * If BitfileID is NULL, CallbackID is set to TaskID. If BitfileID is not NULL,
+ * CallbackID is TaskID^BitfileID (TaskID is first converted byte-by-byte to its
+ * int values).
+ */
+globus_result_t
+generate_callback_id(
+    const char                  *  TaskID,
+    bitfile_id_t                *  BitfileID,
+    hpss_reqid_t                *  CallbackID);
+
+#if HPSS_MAJOR_VERSION >= 8
+/*
+ * Converts a hpss_reqid_t * (aka a hpss_uuid_t) to a UUID in string format:
+ *   ex. hpss_request_id * => "ddfeb23c-53ee-435b-8318-a2c4fb2519d2"
+ *
+ * Added with batch staging in 9.3.
+ */
+globus_result_t
+hpss_reqid_to_string(
+    const hpss_reqid_t          *  RequestID,
+    char                        ** UUIDString);
+
+/*
+ * Converts a UUID string to hpss_reqid_t *.
+ *   ex. "ddfeb23c-53ee-435b-8318-a2c4fb2519d2" => hpss_request_id
+ *
+ * Added with batch staging in 9.3.
+ */
+globus_result_t
+string_to_hpss_reqid(
+    const char                  *  UUIDString,
+    hpss_reqid_t                *  RequestID);
+#endif // HPSS_MAJOR_VERSION >= 8
 
 #endif /* HPSS_DSI_UTILS_H */

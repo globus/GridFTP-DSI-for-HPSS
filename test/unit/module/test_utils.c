@@ -5,11 +5,24 @@
 #include <utils.h>
 
 static bool (*_is_valid_uuid)(const char * uuid_str);
-static void (*_uuid_str_to_bytes)(const char * UUID, unsigned char Bytes[UUID_BYTE_COUNT]);
-static void (*_hpss_uuid_to_bytes)(const hpss_uuid_t * UUID, unsigned char bytes[UUID_BYTE_COUNT]);
-static void (*_bytes_to_hpss_uuid)(const unsigned char Bytes[UUID_BYTE_COUNT], hpss_uuid_t * UUID);
-static void (*_bytes_to_unsigned)(const unsigned char Bytes[UUID_BYTE_COUNT], unsigned * Unsigned);
 
+static globus_result_t
+(*_generate_callback_id)(
+    const char                  *  TaskID,
+    bitfile_id_t                *  BitfileID,
+    hpss_reqid_t                *  CallbackID);
+
+#if HPSS_MAJOR_VERSION >= 8
+static globus_result_t
+(*_hpss_reqid_to_string)(
+    const hpss_reqid_t          *  RequestID,
+    char                        ** UUIDString);
+
+static globus_result_t
+(*_string_to_hpss_reqid)(
+    const char                  *  UUIDString,
+    hpss_reqid_t                *  RequestID);
+#endif // HPSS_MAJOR_VERSION >= 8
 
 void
 test_is_valid_uuid(void * Arg)
@@ -28,125 +41,198 @@ test_is_valid_uuid(void * Arg)
 }
 
 void
-test_uuid_str_to_bytes(void * Arg)
+test_generate_callback_id(void * Arg)
 {
-    unsigned char uuid_bytes[UUID_BYTE_COUNT];
-    _uuid_str_to_bytes("d0d50984-1fbb-40f1-a014-a2996944aa19", uuid_bytes);
+    globus_result_t result;
+    bitfile_id_t bitfile_id;
+    hpss_reqid_t callback_id;
+    const char * task_id = "7c1506fd-f7f1-45fd-9fb6-df0401e2c77f";
 
-    ASSERT(uuid_bytes[0] == 0xd0);
-    ASSERT(uuid_bytes[1] == 0xd5);
-    ASSERT(uuid_bytes[2] == 0x09);
-    ASSERT(uuid_bytes[3] == 0x84);
+    //
+    // If TaskID is NULL, does not return GLOBUS_SUCCESS
+    //
+    result = _generate_callback_id(NULL, &bitfile_id, &callback_id);
+    ASSERT(result != GLOBUS_SUCCESS);
 
-    ASSERT(uuid_bytes[4] == 0x1f);
-    ASSERT(uuid_bytes[5] == 0xbb);
+    //
+    // If BitfileID is NULL, CallbackID only consists of the TaskID
+    //
+    result = _generate_callback_id(task_id, NULL, &callback_id);
+    ASSERT(result == GLOBUS_SUCCESS);
 
-    ASSERT(uuid_bytes[6] == 0x40);
-    ASSERT(uuid_bytes[7] == 0xf1);
-
-    ASSERT(uuid_bytes[8] == 0xa0);
-    ASSERT(uuid_bytes[9] == 0x14);
-
-    ASSERT(uuid_bytes[10] == 0xa2);
-    ASSERT(uuid_bytes[11] == 0x99);
-    ASSERT(uuid_bytes[12] == 0x69);
-    ASSERT(uuid_bytes[13] == 0x44);
-    ASSERT(uuid_bytes[14] == 0xaa);
-    ASSERT(uuid_bytes[15] == 0x19);
-}
-
-
-void
-test_hpss_uuid_to_bytes(void * Arg)
-{
-    hpss_uuid_t hpss_uuid = {0xdeadbeef, 0x0123, 0x4567, 0x89, 0xab, {0xcd, 0xef, 0xde, 0xad, 0xbe, 0xef}};
-
-    unsigned char bytes[UUID_BYTE_COUNT];
-    _hpss_uuid_to_bytes(&hpss_uuid, bytes);
-
-    ASSERT(bytes[0] == 0xde);
-    ASSERT(bytes[1] == 0xad);
-    ASSERT(bytes[2] == 0xbe);
-    ASSERT(bytes[3] == 0xef);
-
-    ASSERT(bytes[4] == 0x01);
-    ASSERT(bytes[5] == 0x23);
-
-    ASSERT(bytes[6] == 0x45);
-    ASSERT(bytes[7] == 0x67);
-
-    ASSERT(bytes[8] == 0x89);
-    ASSERT(bytes[9] == 0xab);
-
-    ASSERT(bytes[10] == 0xcd);
-    ASSERT(bytes[11] == 0xef);
-    ASSERT(bytes[12] == 0xde);
-    ASSERT(bytes[13] == 0xad);
-    ASSERT(bytes[14] == 0xbe);
-    ASSERT(bytes[15] == 0xef);
-}
-
-
-void
-test_bytes_to_hpss_uuid(void * Arg)
-{
-    unsigned char bytes[UUID_BYTE_COUNT] = {
-        0xf1, 0xe2, 0xd3, 0xc4, 0xb5, 0xa6, 0x97, 0x88,
-        0x79, 0x6a, 0x5b, 0x4c, 0x3d, 0x2e, 0x1f, 0xff,
-    };
-
-    hpss_uuid_t uuid;
-    _bytes_to_hpss_uuid(bytes, &uuid);
-
-    ASSERT(uuid.time_low == 0xf1e2d3c4);
-    ASSERT(uuid.time_mid == 0xb5a6);
-    ASSERT(uuid.time_hi_and_version == 0x9788);
-    ASSERT(uuid.clock_seq_hi_and_reserved == 0x79);
-    ASSERT(uuid.clock_seq_low == 0x6a);
-    ASSERT(uuid.node[0] == 0x5b);
-    ASSERT(uuid.node[1] == 0x4c);
-    ASSERT(uuid.node[2] == 0x3d);
-    ASSERT(uuid.node[3] == 0x2e);
-    ASSERT(uuid.node[4] == 0x1f);
-    ASSERT(uuid.node[5] == (char)0xff);
-}
-
-
-void
-test_bytes_to_unsigned(void * Arg)
-{
-    unsigned char bytes[UUID_BYTE_COUNT] = {
-        0x67, 0xc6, 0x69, 0x73, 0x51, 0xff, 0x4a, 0xec,
-        0x29, 0xcd, 0xba, 0xab, 0xf2, 0xfb, 0xe3, 0x46
-    };
-
-    unsigned returned_value;
-    _bytes_to_unsigned(bytes, &returned_value);
-
+#if HPSS_MAJOR_VERSION == 7
+    // In HPSS 7.x, hpss_reqid_t was an unsigned
     unsigned expected_value =
-        (((bytes[0] ^ bytes[4] ^ bytes[8]  ^ bytes[12]) << 24) & 0xFF000000) |
-        (((bytes[1] ^ bytes[5] ^ bytes[9]  ^ bytes[13]) << 16) & 0x00FF0000) |
-        (((bytes[2] ^ bytes[6] ^ bytes[10] ^ bytes[14]) <<  8) & 0x0000FF00) |
-        (((bytes[3] ^ bytes[7] ^ bytes[11] ^ bytes[15]) <<  0) & 0x000000FF);
+        (((0x7c ^ 0xf7 ^ 0x9f ^ 0x01) << 24) & 0xFF000000) |
+        (((0x15 ^ 0xf1 ^ 0xb6 ^ 0xe2) << 16) & 0x00FF0000) |
+        (((0x06 ^ 0x45 ^ 0xdf ^ 0xc7) <<  8) & 0x0000FF00) |
+        (((0xfd ^ 0xfd ^ 0x04 ^ 0x7f) <<  0) & 0x000000FF);
+    ASSERT(callback_id == expected_value);
+#else // HPSS_MAJOR_VERSION >= 8
+    // In HPSS 8.x+, hpss_reqid_t was an hpss_uuid_t
+    ASSERT(callback_id.time_low == 0x7c1506fd);
+    ASSERT(callback_id.time_mid == 0xf7f1);
+    ASSERT(callback_id.time_hi_and_version == 0x45fd);
+    ASSERT(callback_id.clock_seq_hi_and_reserved == 0x9f);
+    ASSERT(callback_id.clock_seq_low == 0xb6);
+    ASSERT(callback_id.node[0] == (char)0xdf);
+    ASSERT(callback_id.node[1] == (char)0x04);
+    ASSERT(callback_id.node[2] == (char)0x01);
+    ASSERT(callback_id.node[3] == (char)0xe2);
+    ASSERT(callback_id.node[4] == (char)0xc7);
+    ASSERT(callback_id.node[5] == (char)0x7f);
+#endif // HPSS_MAJOR_VERSION >= 8
 
-    ASSERT(returned_value == expected_value);
+    //
+    // If BitfileID is not NULL, CallbackID consists of TaskID ^ BitfileID
+    //
+    // Bitfile ID is "92185e1e-48c8-424a-924e-dda3b3047353";
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    // BitfileID is a hpssoid_t for <= HPSS 7.4. We use the ObjectID field (hpss_uuid_t)
+    // for this calculation.
+    bitfile_id.ObjectID
+    bitfile_id.ObjectID.time_low == 0x92185e1e);
+    bitfile_id.ObjectID.time_mid == 0x48c8);
+    bitfile_id.ObjectID.time_hi_and_version == 0x424a);
+    bitfile_id.ObjectID.clock_seq_hi_and_reserved == 0x92);
+    bitfile_id.ObjectID.clock_seq_low == 0x4e);
+    bitfile_id.ObjectID.node[0] == (char)0xdd);
+    bitfile_id.ObjectID.node[1] == (char)0xa3);
+    bitfile_id.ObjectID.node[2] == (char)0xb3);
+    bitfile_id.ObjectID.node[3] == (char)0x04);
+    bitfile_id.ObjectID.node[4] == (char)0x73);
+    bitfile_id.ObjectID.node[5] == (char)0x53);
+#else // HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    // BitfileID is a bfs_bitfile_obj_handle_t for >= HPSS 7.5. We use  the BfId.Bytes
+    // field for this calculation.
+    bitfile_id.BfId.Bytes[0] = 0x92;
+    bitfile_id.BfId.Bytes[1] = 0x18;
+    bitfile_id.BfId.Bytes[2] = 0x5e;
+    bitfile_id.BfId.Bytes[3] = 0x1e;
+    bitfile_id.BfId.Bytes[4] = 0x48;
+    bitfile_id.BfId.Bytes[5] = 0xc8;
+    bitfile_id.BfId.Bytes[6] = 0x42;
+    bitfile_id.BfId.Bytes[7] = 0x4a;
+    bitfile_id.BfId.Bytes[8] = 0x92;
+    bitfile_id.BfId.Bytes[9] = 0x4e;
+    bitfile_id.BfId.Bytes[10] = 0xdd;
+    bitfile_id.BfId.Bytes[11] = 0xa3;
+    bitfile_id.BfId.Bytes[12] = 0xb3;
+    bitfile_id.BfId.Bytes[13] = 0x04;
+    bitfile_id.BfId.Bytes[14] = 0x73;
+    bitfile_id.BfId.Bytes[15] = 0x53;
+#endif // HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+
+    result = _generate_callback_id(task_id, &bitfile_id, &callback_id);
+    ASSERT(result == GLOBUS_SUCCESS);
+
+#if HPSS_MAJOR_VERSION == 7
+    // In HPSS 7.x, hpss_reqid_t was an unsigned
+    expected_value =
+        (((0x7c ^ 0x92 ^ 0xf7 ^ 0x48 ^ 0x9f ^ 0x92 ^ 0x01 ^ 0xb3 ) << 24) & 0xFF000000) |
+        (((0x15 ^ 0x18 ^ 0xf1 ^ 0xc8 ^ 0xb6 ^ 0x4e ^ 0xe2 ^ 0x04 ) << 16) & 0x00FF0000) |
+        (((0x06 ^ 0x5e ^ 0x45 ^ 0x42 ^ 0xdf ^ 0xdd ^ 0xc7 ^ 0x73 ) <<  8) & 0x0000FF00) |
+        (((0xfd ^ 0x1e ^ 0xfd ^ 0x4a ^ 0x04 ^ 0xa3 ^ 0x7f ^ 0x53 ) <<  0) & 0x000000FF);
+    ASSERT(callback_id == expected_value);
+#else // HPSS_MAJOR_VERSION >= 8
+    // In HPSS 8.x+, hpss_reqid_t was an hpss_uuid_t
+    // Bitfile ID is "92185e1e-48c8-424a-924e-dda3b3047353";
+    ASSERT(callback_id.time_low == (0x7c1506fd ^ 0x92185e1e));
+    ASSERT(callback_id.time_mid == (0xf7f1 ^ 0x48c8));
+    ASSERT(callback_id.time_hi_and_version == (0x45fd ^ 0x424a));
+    ASSERT(callback_id.clock_seq_hi_and_reserved == (0x9f ^ 0x92));
+    ASSERT(callback_id.clock_seq_low == (0xb6 ^ 0x4e));
+    ASSERT(callback_id.node[0] == (char)(0xdf ^ 0xdd));
+    ASSERT(callback_id.node[1] == (char)(0x04 ^ 0xa3));
+    ASSERT(callback_id.node[2] == (char)(0x01 ^ 0xb3));
+    ASSERT(callback_id.node[3] == (char)(0xe2 ^ 0x04));
+    ASSERT(callback_id.node[4] == (char)(0xc7 ^ 0x73));
+    ASSERT(callback_id.node[5] == (char)(0x7f ^ 0x53));
+#endif // HPSS_MAJOR_VERSION >= 8
 }
 
+#if HPSS_MAJOR_VERSION >= 8
+// Prior to HPSS v8, hpss_reqid_t was an unsigned. As of HPSS v8, it is a hpss_uuid_t.
+// We only support these functions in HPSS v8+.
+void
+test_hpss_reqid_to_string(void * Arg)
+{
+    char * uuid_str = NULL;
+    const char * expected_uuid_str = "02e69056-440a-4cc6-8fe5-11a80aa260fb";
+    hpss_reqid_t request_id;
+
+    request_id.time_low = 0x02e69056;
+    request_id.time_mid = 0x440a;
+    request_id.time_hi_and_version = 0x4cc6;
+    request_id.clock_seq_hi_and_reserved = 0x8f;
+    request_id.clock_seq_low = 0xe5;
+    request_id.node[0] = (char)0x11;
+    request_id.node[1] = (char)0xa8;
+    request_id.node[2] = (char)0x0a;
+    request_id.node[3] = (char)0xa2;
+    request_id.node[4] = (char)0x60;
+    request_id.node[5] = (char)0xfb;
+
+    // Successful conversion (always?)
+    globus_result_t result = _hpss_reqid_to_string(&request_id, &uuid_str);
+    ASSERT(result == GLOBUS_SUCCESS);
+    ASSERT(uuid_str != NULL);
+    if (uuid_str != NULL)
+    {
+        ASSERT(strcmp(uuid_str, expected_uuid_str) == 0);
+        free(uuid_str);
+    }
+}
+
+void
+test_string_to_hpss_reqid(void * Arg)
+{
+    const char * uuid_str = "16f3a9ed-0e8b-4cab-b3c9-95bf02e026a2";
+    hpss_reqid_t request_id;
+
+    // Successful conversion when UUIDString represents a valid UUID
+    globus_result_t result = _string_to_hpss_reqid(uuid_str, &request_id);
+    ASSERT(result == GLOBUS_SUCCESS);
+
+    ASSERT(request_id.time_low == 0x16f3a9ed);
+    ASSERT(request_id.time_mid == 0x0e8b);
+    ASSERT(request_id.time_hi_and_version == 0x4cab);
+    ASSERT(request_id.clock_seq_hi_and_reserved == 0xb3);
+    ASSERT(request_id.clock_seq_low == 0xc9);
+    ASSERT(request_id.node[0] == (char)0x95);
+    ASSERT(request_id.node[1] == (char)0xbf);
+    ASSERT(request_id.node[2] == (char)0x02);
+    ASSERT(request_id.node[3] == (char)0xe0);
+    ASSERT(request_id.node[4] == (char)0x26);
+    ASSERT(request_id.node[5] == (char)0xa2);
+
+    // Failed conversion when UUIDString is NULL
+    result = _string_to_hpss_reqid(NULL, &request_id);
+    ASSERT(result != GLOBUS_SUCCESS);
+
+    // Failed conversion when UUIDString does not represent a valid UUID
+    result = _string_to_hpss_reqid("Hello World", &request_id);
+    ASSERT(result != GLOBUS_SUCCESS);
+}
+#endif // HPSS_MAJOR_VERSION >= 8
 
 test_status_t
 test_setup(void * Arg)
 {
     if (!_is_valid_uuid)
         _is_valid_uuid = lookup_symbol("is_valid_uuid");
-    if (!_uuid_str_to_bytes)
-        _uuid_str_to_bytes = lookup_symbol("uuid_str_to_bytes");
-    if (!_hpss_uuid_to_bytes)
-        _hpss_uuid_to_bytes = lookup_symbol("hpss_uuid_to_bytes");
-    if (!_bytes_to_hpss_uuid)
-        _bytes_to_hpss_uuid = lookup_symbol("bytes_to_hpss_uuid");
-    if (!_bytes_to_unsigned)
-        _bytes_to_unsigned = lookup_symbol("bytes_to_unsigned");
+    if (!_generate_callback_id)
+        _generate_callback_id = lookup_symbol("generate_callback_id");
+
+#if HPSS_MAJOR_VERSION >= 8
+    if (!_hpss_reqid_to_string)
+        _hpss_reqid_to_string = lookup_symbol("hpss_reqid_to_string");
+
+    if (!_string_to_hpss_reqid)
+        _string_to_hpss_reqid = lookup_symbol("string_to_hpss_reqid");
+
     return TEST_SUCCESS;
+#endif // HPSS_MAJOR_VERSION >= 8
 }
 
 
@@ -155,10 +241,12 @@ struct test_suite TEST_SUITE = {
     .teardown = NULL,
     .test_cases = (struct test_case[]) {
         {"test_is_valid_uuid",      test_is_valid_uuid},
-        {"test_uuid_str_to_bytes",  test_uuid_str_to_bytes},
-        {"test_hpss_uuid_to_bytes", test_hpss_uuid_to_bytes},
-        {"test_bytes_to_hpss_uuid", test_bytes_to_hpss_uuid},
-        {"test_bytes_to_unsigned",  test_bytes_to_unsigned},
+        {"test_generate_callback_id", test_generate_callback_id},
+
+#if HPSS_MAJOR_VERSION >= 8
+        {"test_hpss_reqid_to_string", test_hpss_reqid_to_string},
+        {"test_string_to_hpss_reqid", test_string_to_hpss_reqid},
+#endif // HPSS_MAJOR_VERSION >= 8
         {NULL,  NULL},
     }
 };

@@ -97,15 +97,6 @@
  * having Transfer keep some state between requests.
  */
 
-#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
-#define bitfile_id_t bfs_bitfile_obj_handle_t
-#define ATTR_TO_BFID(x) (x.Attrs.BitfileObj.BfId)
-#else
-#define bitfile_id_t hpssoid_t
-#define ATTR_TO_BFID(x) (x.Attrs.BitfileId)
-#endif
-
-
 /*
  * Fallback to a constant request ID for stage requests when a task ID is not
  * avilable so that we can query the stage request status between processes.
@@ -115,28 +106,6 @@ static hpss_reqid_t DEFAULT_REQUEST_ID = {0xdeadbeef, 0xdead, 0xbeef, 0xde, 0xad
 #else
 static hpss_reqid_t DEFAULT_REQUEST_ID = 0xDEADBEEF;
 #endif
-
-static void
-_bitfile_id_to_bytes(bitfile_id_t * BitfileID, unsigned char Bytes[UUID_BYTE_COUNT])
-{
-#if (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION > 4) || HPSS_MAJOR_VERSION >= 8
-    memcpy(Bytes, BitfileID->BfId.Bytes, UUID_BYTE_COUNT);
-#else
-    hpss_uuid_to_bytes(&BitfileID->ObjectID, Bytes);
-#endif
-}
-
-static void
-_bytes_to_request_id(const unsigned char Bytes[UUID_BYTE_COUNT], hpss_reqid_t * RequestID)
-{
-#if HPSS_MAJOR_VERSION >= 8
-    // Convert to a UUID
-    bytes_to_hpss_uuid(Bytes, RequestID);
-#else
-    // Convert to unsigned
-    bytes_to_unsigned(Bytes, RequestID);
-#endif
-}
 
 static void
 _generate_request_id(
@@ -152,23 +121,13 @@ _generate_request_id(
         return;
     }
 
-    // Convert Task ID to a bytes array
-    unsigned char task_id_bytes[UUID_BYTE_COUNT];
-    uuid_str_to_bytes(TaskID, task_id_bytes);
-
-    // Convert BitfileID to a byte array
-    unsigned char bitfile_id_bytes[UUID_BYTE_COUNT];
-    _bitfile_id_to_bytes(BitfileID, bitfile_id_bytes);
-
-    // Combine the two byte arrays
-    unsigned char request_id_bytes[UUID_BYTE_COUNT];
-    for (int i = 0; i < UUID_BYTE_COUNT; i++)
+    globus_result_t result = generate_callback_id(TaskID, BitfileID, RequestID);
+    if (result != GLOBUS_SUCCESS)
     {
-        request_id_bytes[i] = task_id_bytes[i] ^ bitfile_id_bytes[i];
+        WARN("Using the default request id.");
+        memcpy(RequestID, &DEFAULT_REQUEST_ID, sizeof(*RequestID));
+        return;
     }
-
-    // Convert our bytes array into a request ID.
-    _bytes_to_request_id(request_id_bytes, RequestID);
 
     // This debug is here to allow us to verify the computation
     DEBUG("Using request ID %s for Task ID %s and %s %s",
@@ -629,8 +588,7 @@ _generate_callback_id(
     globus_gfs_operation_t         Operation,  // IN
     hpss_reqid_t                *  CallbackID) // OUT
 {
-    char                        *  task_id = NULL;
-    unsigned char                  task_id_bytes[UUID_BYTE_COUNT];
+    char * task_id = NULL;
 
     globus_gridftp_server_get_task_id(Operation, &task_id);
     if (!is_valid_uuid(task_id))
@@ -639,10 +597,9 @@ _generate_callback_id(
         return GlobusGFSErrorGeneric("No valid task ID available for stage request.");
     }
 
-    // Convert Task ID to a bytes array
-    uuid_str_to_bytes(task_id, task_id_bytes);
-    // Convert our bytes array into a callback ID)
-    bytes_to_hpss_uuid(task_id_bytes, CallbackID);
+    globus_result_t result = generate_callback_id(task_id, NULL, CallbackID);
+    if (result != GLOBUS_SUCCESS)
+        return result;
 
     free(task_id);
     return GLOBUS_SUCCESS;
@@ -729,27 +686,6 @@ _submit_batch_stage(
     return GLOBUS_SUCCESS;
 }
 
-/*
- * Converts a hpss_reqid_t * (aka a hpss_uuid_t) to a UUID in string format:
- *   ex. hpss_request_id * => "ddfeb23c-53ee-435b-8318-a2c4fb2519d2"
- */
-static globus_result_t
-hpss_reqid_to_string(
-    const hpss_reqid_t          *  RequestID,
-    char                        ** UUIDString)
-{
-    unsigned char bytes[UUID_BYTE_COUNT];
-    hpss_uuid_to_bytes(RequestID, bytes);
-
-    *UUIDString = calloc(UUID_STR_COUNT, 1);
-    if (*UUIDString == NULL)
-        return GlobusGFSErrorMemory("UUIDString");
-
-    uuid_bytes_to_str(bytes, *UUIDString);
-    return GLOBUS_SUCCESS;
-}
-
-
 // SITE STGFILE <file>
 // 200 File queued. Staging is pending and ready to submit.
 // 250 Batch submitted to tape system. Request ID: <request_id>.
@@ -823,7 +759,7 @@ stgfile(
     // Reset for next use
     BatchStage->count = 0;
 
-    char * request_id_str = hpss_RequestIDtoString(&request_id);
+    char * request_id_str = NULL;
     result = hpss_reqid_to_string(&request_id, &request_id_str);
     if (result)
     {
@@ -899,7 +835,7 @@ stgend(
         return;
     }
 
-    char * request_id_str = hpss_RequestIDtoString(&request_id);
+    char * request_id_str = NULL;
     result = hpss_reqid_to_string(&request_id, &request_id_str);
     if (result)
     {
@@ -955,13 +891,7 @@ _get_request_id_arg(
         return GlobusGFSErrorGeneric("Invalid request_id value for STGCHK");
     }
 
-    // Convert Task ID to a bytes array
-    unsigned char request_id_bytes[UUID_BYTE_COUNT];
-    uuid_str_to_bytes(argv[2], request_id_bytes);
-    // Convert our bytes array into a request ID.
-    bytes_to_hpss_uuid(request_id_bytes, RequestID);
-
-    return GLOBUS_SUCCESS;
+    return string_to_hpss_reqid(argv[2], RequestID);
 }
 
 // Original:
