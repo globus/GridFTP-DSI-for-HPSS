@@ -64,6 +64,10 @@ PKG_CHECK_MODULES([JANSSON], [jansson])
 HPSS_MAJOR=`grep -E "#define HPSS_MAJOR_VERSION" ${HPSS_ROOT}/include/hpss_version.h | sed "s/HPSS_MAJOR_VERSION *0/HPSS_MAJOR_VERSION /"  | awk '{print $3}'`
 HPSS_MINOR=`grep -E "#define HPSS_MINOR_VERSION" ${HPSS_ROOT}/include/hpss_version.h | sed "s/VERSION *0/VERSION /"  | awk '{print $3}'`
 
+if [[[ $HPSS_MAJOR -lt 7 || ($HPSS_MAJOR -eq 7 && $HPSS_MINOR -lt 3) ]]];
+then
+    AC_MSG_ERROR([HPSS ${HPSS_MAJOR}.${HPSS_MINOR} is not supported. This project requires HPSS >= 7.3.])
+fi
 
 # HPSS < 7.5 did not have a pkg_config
 if [[[ $HPSS_MAJOR -gt 7 || $HPSS_MINOR -ge 5 ]]];

@@ -577,15 +577,15 @@ _hpss_uuid_t_ptr(
     if (uuid_ptr == NULL)
         return PTR(uuid_ptr);
 
-#if HPSS_MAJOR_VERSION ==  7 && HPSS_MINOR_VERSION == 4
-    // HPSS 7.4
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+    // HPSS 7.3 and 7.4
     signed32 status = 0;
     uuid_to_string(uuid_ptr, &uuid_str, &status);
-#elif HPSS_MAJOR_VERSION < 11
-    // HPSS 8.3
+#elif (HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION >= 5) || (HPSS_MAJOR_VERSION >= 8 && HPSS_MAJOR_VERSION <= 10)
+    // HPSS 7.5+, <= 10.x
     int status = 0;
     status = hpss_uuid_to_string(uuid_ptr, &uuid_str);
-#else
+#elif HPSS_MAJOR_VERSION >= 11
     // HPSS 11, no uuid->string function but a request_id is a hpss_uuid
     uuid_str = hpss_RequestIDtoString(uuid_ptr);
     int status = (uuid_str != NULL);
@@ -940,7 +940,7 @@ _ns_filesetattrs_t_ptr(
         UNSIGNED64(p->FilesetId),
         CHAR_PTR(p->FilesetName),
         UNSIGNED(p->FilesetType),
-#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
+#if HPSS_MAJOR_VERSION == 7
         HPSS_UUID_T(p->GatewayUUID),
 #endif
         UNSIGNED(p->StateFlags),

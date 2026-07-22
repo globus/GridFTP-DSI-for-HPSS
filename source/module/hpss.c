@@ -293,7 +293,7 @@ Hpss_FilesetGetAttributes(
     const char                  *  Name,            // IN
     const uint64_t              *  FilesetId,       // IN
     const ns_ObjHandle_t        *  FilesetHandle,   // IN
-#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION == 4
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
     const hpss_uuid_t           *  CoreServerUUID,  // IN
 #else
     const hpss_srvr_id_t        *  CoreServerID,    // IN
@@ -305,7 +305,7 @@ Hpss_FilesetGetAttributes(
               "Name=%s "            // const char *
               "FilesetId=%s "       // uint64_t *
               "FilesetHandle=%s "   // const ns_ObjHandle_t *
-#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION == 4
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
               "CoreServerUUID=%s "  // const hpss_uuid_t *
 #else
               "CoreServerID=%s "    // const hpss_srvr_id_t *
@@ -315,7 +315,7 @@ Hpss_FilesetGetAttributes(
               CHAR_PTR(Name),
               UNSIGNED64_PTR(FilesetId),
               NS_OBJHANDLE_T_PTR(FilesetHandle),
-#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION == 4
+#if HPSS_MAJOR_VERSION == 7 && HPSS_MINOR_VERSION <= 4
               HPSS_UUID_T_PTR(CoreServerUUID),
 #else
               HPSS_SRVR_ID_T_PTR(CoreServerID),
