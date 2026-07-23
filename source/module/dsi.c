@@ -30,7 +30,9 @@
 struct dsi_user_arg
 {
     config_t * config;
+#if (HPSS_MAJOR_VERSION == 9 && HPSS_MINOR_VERSION >= 3) || HPSS_MAJOR_VERSION > 9
     batch_stage_t * batch_stage;
+#endif
 };
 typedef struct dsi_user_arg dsi_user_arg_t;
 
