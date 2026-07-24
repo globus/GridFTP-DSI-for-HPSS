@@ -11,7 +11,7 @@ srcpkg: dist
 
 develop:
 	@[ -f configure ] || autoreconf -i
-	@[ -f Makefile  ] || CFLAGS="-Wall -ggdb3" ./configure
+	@[ -f Makefile  ] || CFLAGS="-Wall -ggdb3 -O2 -Werror=format-security" ./configure
 
 release: dist
 	@make package
