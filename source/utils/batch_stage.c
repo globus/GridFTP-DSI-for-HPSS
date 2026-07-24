@@ -247,7 +247,7 @@ main(int argc, char * argv[])
 
         case '?':
         default:
-            fprintf(stderr, HELP_MSG);
+            fprintf(stderr, "%s", HELP_MSG);
             exit (1);
         }
     }
@@ -255,34 +255,34 @@ main(int argc, char * argv[])
     if (login_name == NULL)
     {
         fprintf(stderr, "Missing: -p <principal>\n");
-        fprintf(stderr, HELP_MSG);
+        fprintf(stderr, "%s", HELP_MSG);
         exit (1);
     }
 
     if (auth_mech == NULL)
     {
         fprintf(stderr, "Missing: -a [unix|krb5]\n");
-        fprintf(stderr, HELP_MSG);
+        fprintf(stderr, "%s", HELP_MSG);
         exit (1);
     }
 
     if (authenticator == NULL)
     {
         fprintf(stderr, "Missing: -t <authenticator>\n");
-        fprintf(stderr, HELP_MSG);
+        fprintf(stderr, "%s", HELP_MSG);
         exit (1);
     }
 
     if (argc == optind)
     {
         fprintf(stderr, "Missing: path\n");
-        fprintf(stderr, HELP_MSG);
+        fprintf(stderr, "%s", HELP_MSG);
         exit (1);
     }
 
     if ((argc - optind) != 1)
     {
-        fprintf(stderr, HELP_MSG);
+        fprintf(stderr, "%s", HELP_MSG);
         exit (1);
     }
 
