@@ -66,13 +66,10 @@ void
 _errno_string(int err, char * buf, size_t buflen)
 {
     const char * error_msg = hpss_ErrnoName(-abs(err));
-    if (strcmp(error_msg, "unknown error code") != 0)
-    {
+    if (error_msg != NULL && strcmp(error_msg, "unknown error code") != 0)
         strncpy(buf, error_msg, buflen);
-        return;
-    }
-
-    strerror_r(abs(err), buf, buflen);
+    else
+        snprintf(buf, buflen, "%d", -abs(err));
 }
 
 globus_result_t
