@@ -66,15 +66,9 @@ void
 _errno_string(int err, char * buf, size_t buflen)
 {
     const char * error_msg = hpss_ErrnoName(-abs(err));
-    if (strcmp(error_msg, "unknown error code") != 0)
-    {
+    if (error_msg != NULL && strcmp(error_msg, "unknown error code") != 0)
         strncpy(buf, error_msg, buflen);
-        return;
-    }
-
-    // This used to use strerror_r() to fill in missing HPSS errno strings.
-    // Now we prefer to use the actual error code value.
-    if (strlen(buf) == 0)
+    else
         snprintf(buf, buflen, "%d", -abs(err));
 }
 
