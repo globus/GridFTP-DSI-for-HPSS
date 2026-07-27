@@ -16,6 +16,9 @@ develop:
 	@[ -f configure ] || autoreconf -i
 	@[ -f Makefile  ] || CFLAGS="$(_DEV_CFLAGS)" ./configure $(_WITH_HPSS)
 
+tarball: develop
+	@make tarball
+
 release: dist
 	@make package
 

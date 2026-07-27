@@ -23,4 +23,13 @@ rpm:: dist rpmmacros rpmbuild_dirs
 	@rpmbuild -bb --nodeps ./rpmbuild/SPECS/globus-gridftp-server-hpss.spec
 	@cp rpmbuild/RPMS/x86_64/* .
 
+tarball:
+	rm -rf $(abs_top_builddir)/staging
+	$(MAKE) install DESTDIR=$(abs_top_builddir)/staging prefix=/usr \
+		libdir=$$([ -f /etc/debian_version ] && echo /usr/lib/x86_64-linux-gnu || echo /usr/lib64)
+	find $(abs_top_builddir)/staging -name 'lib*.la' -delete
+	. /etc/os-release && \
+	tar czf $(PACKAGE)-$(VERSION).$$ID$$VERSION_ID.tar.gz -C $(abs_top_builddir)/staging .
+	rm -rf $(abs_top_builddir)/staging
+
 EXTRA_DIST=data
