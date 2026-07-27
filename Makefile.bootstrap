@@ -9,9 +9,12 @@ dist:
 
 srcpkg: dist
 
+_WITH_HPSS = $(if $(HPSS_ROOT),--with-hpss=$(HPSS_ROOT))
+_DEV_CFLAGS = -Wall -ggdb3 -O2 -Werror=format-security
+
 develop:
 	@[ -f configure ] || autoreconf -i
-	@[ -f Makefile  ] || CFLAGS="-Wall -ggdb3 -O2 -Werror=format-security" ./configure
+	@[ -f Makefile  ] || CFLAGS="$(_DEV_CFLAGS)" ./configure $(_WITH_HPSS)
 
 release: dist
 	@make package
