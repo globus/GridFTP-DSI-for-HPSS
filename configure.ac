@@ -128,6 +128,15 @@ AC_CHECK_HEADERS([hpss_String.h \
                  [AC_MSG_ERROR(hpss-lib-devel is not installed)])
 CPPFLAGS="${SAVE_CPPFLAGS}"
 
+SAVE_CPPFLAGS="${CPPFLAGS}"
+CPPFLAGS="${TIRPC_CFLAGS} ${HPSS_CPPFLAGS}"
+AC_CHECK_HEADER([hpss_api_test.h],
+    [AC_DEFINE([HPSS_API_TEST], [1],
+               [Defined when building against a test environment instead of a production HPSS environment])],
+    [])
+AM_CONDITIONAL([HPSS_API_TEST], [test "x$ac_cv_header_hpss_api_test_h" = xyes])
+CPPFLAGS="${SAVE_CPPFLAGS}"
+
 SAVE_LDFLAGS="${LDFLAGS}"
 LDFLAGS="${HPSS_LDFLAGS}"
 AC_CHECK_LIB(hpss,

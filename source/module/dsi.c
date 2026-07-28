@@ -24,6 +24,29 @@
 #include "hpss.h"
 #include "cksm.h"
 
+#ifdef HPSS_API_TEST
+#include "hpss_api_test.h"
+
+static int g_api_test_task_id_set;
+
+/*
+ * Bootstrap the test modules with the Transfer Task ID, when available.
+ */
+static void
+_api_test_init(globus_gfs_operation_t Operation)
+{
+    if (g_api_test_task_id_set)
+        return;
+    char *task_id = NULL;
+    globus_gridftp_server_get_task_id(Operation, &task_id);
+    if (task_id == NULL)
+        return;
+    hpss_api_test_set_task_id(task_id);
+    free(task_id);
+    g_api_test_task_id_set = 1;
+}
+#endif /* HPSS_API_TEST */
+
 // On initalization of the DSI, this is passed to globus_gridftp_server_finished_session_start()
 // and is returned by gridftp to each of the DSI callbacks. This allows us to pass configuration
 // and state between callbacks.
@@ -226,6 +249,10 @@ dsi_command(globus_gfs_operation_t     Operation,
 {
     globus_result_t result;
     dsi_user_arg_t * user_arg = UserArg;
+
+#ifdef HPSS_API_TEST
+    _api_test_init(Operation);
+#endif
 
     set_logging_task_id(Operation);
 
