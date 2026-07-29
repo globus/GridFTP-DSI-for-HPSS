@@ -1,3 +1,4 @@
+ACLOCAL_AMFLAGS = -I m4
 SUBDIRS=source test
 
 if NONCANONICAL_HPSS

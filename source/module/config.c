@@ -139,7 +139,7 @@ config_process_env()
         api_config.DebugValue = atoi(env_value);
 
     if ((env_value = getenv("HPSS_API_DEBUG_PATH")))
-        strncpy(api_config.DebugPath, env_value, sizeof(api_config.DebugPath));
+        snprintf(api_config.DebugPath, sizeof(api_config.DebugPath), "%s", env_value);
 
     /* Now set the current HPSS client configuration. */
     api_config.Flags = API_USE_CONFIG;

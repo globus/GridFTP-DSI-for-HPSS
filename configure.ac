@@ -3,7 +3,7 @@ AC_INIT([globus-gridftp-server-hpss], [2.26~a5], [Globus <support@globus.org>])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 # automake 1.11.1 (RHEL 6.8) does not support AM_PROG_AR
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
-AC_PROG_LIBTOOL
+LT_INIT
 AC_CONFIG_MACRO_DIR([m4])
 AC_PROG_CC
 # -std=gnu99 is not supported on RHEL 6.8

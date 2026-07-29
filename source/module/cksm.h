@@ -5,6 +5,7 @@
  * System includes
  */
 #include <openssl/md5.h>
+#include <openssl/evp.h>
 #include <stdbool.h>
 
 /*
@@ -37,7 +38,7 @@ typedef struct
     bool                       UseUDAChecksums;
     char *                     Pathname;
     commands_callback          Callback;
-    MD5_CTX                    MD5Context;
+    EVP_MD_CTX *               MD5Context;
     globus_result_t            Result;
     int                        FileFD;
     globus_size_t              BlockSize;

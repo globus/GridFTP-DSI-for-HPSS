@@ -146,10 +146,10 @@ cksm_pio_callout(char *    Buffer,
 
     assert(*Length <= cksm_info->BlockSize);
 
-    rc = MD5_Update(&cksm_info->MD5Context, Buffer, *Length);
+    rc = EVP_DigestUpdate(cksm_info->MD5Context, Buffer, *Length);
     if (rc != 1)
     {
-        cksm_info->Result = GlobusGFSErrorGeneric("MD5_Update() failed");
+        cksm_info->Result = GlobusGFSErrorGeneric("EVP_DigestUpdate() failed");
         return 1;
     }
 
@@ -181,6 +181,7 @@ cksm_transfer_complete_callback(globus_result_t Result, void *UserArg)
     cksm_info_t *   cksm_info = UserArg;
     int             rc        = 0;
     unsigned char   md5_digest[MD5_DIGEST_LENGTH];
+    unsigned int    md5_len   = 0;
     char            cksm_string[2 * MD5_DIGEST_LENGTH + 1];
     int             i;
 
@@ -194,9 +195,9 @@ cksm_transfer_complete_callback(globus_result_t Result, void *UserArg)
 
     if (!result)
     {
-        rc = MD5_Final(md5_digest, &cksm_info->MD5Context);
+        rc = EVP_DigestFinal_ex(cksm_info->MD5Context, md5_digest, &md5_len);
         if (rc != 1)
-            result = GlobusGFSErrorGeneric("MD5_Final() failed");
+            result = GlobusGFSErrorGeneric("EVP_DigestFinal_ex() failed");
     }
 
     if (!result)
@@ -219,6 +220,7 @@ cksm_transfer_complete_callback(globus_result_t Result, void *UserArg)
             cksm_set_uda_checksum(cksm_info->Pathname, cksm_string);
     }
 
+    EVP_MD_CTX_free(cksm_info->MD5Context);
     free(cksm_info->Pathname);
     free(cksm_info);
 }
@@ -278,10 +280,16 @@ cksm(globus_gfs_operation_t     Operation,
         cksm_info->RangeLength =
             hpss_stat_buf.st_size - CommandInfo->cksm_offset;
 
-    rc = MD5_Init(&cksm_info->MD5Context);
-    if (rc != 1)
+    cksm_info->MD5Context = EVP_MD_CTX_new();
+    if (!cksm_info->MD5Context)
     {
         result = GlobusGFSErrorGeneric("Failed to create MD5 context");
+        goto cleanup;
+    }
+    rc = EVP_DigestInit_ex(cksm_info->MD5Context, EVP_md5(), NULL);
+    if (rc != 1)
+    {
+        result = GlobusGFSErrorGeneric("Failed to initialize MD5 context");
         goto cleanup;
     }
 
@@ -318,6 +326,7 @@ cleanup:
     {
         if (cksm_info)
         {
+            EVP_MD_CTX_free(cksm_info->MD5Context);
             if (cksm_info->FileFD != -1)
                 Hpss_Close(cksm_info->FileFD);
             if (cksm_info->Pathname)
