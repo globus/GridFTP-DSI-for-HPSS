@@ -3,13 +3,22 @@ AC_INIT([globus-gridftp-server-hpss], [2.25], [Globus <support@globus.org>])
 # foreign: don't require GNU standard files (ChangeLog, AUTHORS, NEWS, etc.)
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
-# automake 1.11.1 (RHEL 6.8) does not support AM_PROG_AR
-m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
+AM_PROG_AR                  # locate the archiver; required when libtool builds static libs
 AC_CONFIG_MACRO_DIR([m4])   # tell aclocal to search m4/ for third-party macros (e.g. libtool)
 LT_INIT                     # initialize libtool for portable shared/static library builds
 AC_PROG_CC                  # locate and test the C compiler; sets CC, CFLAGS, GCC
-# -std=gnu99 is not supported on RHEL 6.8
-CC="${CC} -std=gnu99"
+
+#
+# Code for the newest C standard supported by our oldest supported distro (EL8)
+#
+AC_MSG_CHECKING([whether ${CC} accepts -std=gnu17])
+ac_save_CC="${CC}"
+CC="${CC} -std=gnu17"
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],[])],
+    [AC_MSG_RESULT([yes])],
+    [AC_MSG_RESULT([no])
+     CC="${ac_save_CC}"
+     AC_MSG_ERROR([${CC} does not support -std=gnu17; GCC 8 or newer is required.])])
 
 #
 # Configure Options
