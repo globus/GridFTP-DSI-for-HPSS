@@ -169,26 +169,28 @@ void
 log_api_enter(const char * func, const char * format, ...)
 {
     char * message = NULL;
-    asprintf(&message, "%s() Enter: %s", func, format);
+    int rc = asprintf(&message, "%s() Enter: %s", func, format);
 
     va_list ap;
     va_start(ap, format);
-    _log_message(LOG_TYPE_TRACE, message, ap);
+    _log_message(LOG_TYPE_TRACE, rc == -1 ? format : message, ap);
     va_end(ap);
-    free(message);
+    if (rc != -1)
+        free(message);
 }
 
 void
 log_api_exit(const char * func, const char * format, ...)
 {
     char * message = NULL;
-    asprintf(&message, "%s() Exit: %s", func, format);
+    int rc = asprintf(&message, "%s() Exit: %s", func, format);
 
     va_list ap;
     va_start(ap, format);
-    _log_message(LOG_TYPE_TRACE, message, ap);
+    _log_message(LOG_TYPE_TRACE, rc == -1 ? format : message, ap);
     va_end(ap);
-    free(message);
+    if (rc != -1)
+        free(message);
 }
 
 char *

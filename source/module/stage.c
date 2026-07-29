@@ -243,7 +243,7 @@ submit_stage_request(const char *Pathname, hpss_reqid_t RequestID)
             strncpy(node,
                     callback_addr_str,
                     min(sizeof(node) - 1, colon - callback_addr_str));
-            strncpy(serv, colon + 1, sizeof(serv));
+            snprintf(serv, sizeof(serv), "%s", colon + 1);
         } else
         {
             strncpy(node, callback_addr_str, sizeof(node) - 1);
