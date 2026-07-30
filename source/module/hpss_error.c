@@ -89,7 +89,7 @@ hpss_error_to_globus_result(int error)
     switch (he.returned_value)
     {
     case -ENOENT:
-        code = 404;
+        code = 550;
         type = "PATH_NOT_FOUND";
         break;
     case -EISDIR:
