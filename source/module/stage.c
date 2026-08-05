@@ -563,12 +563,6 @@ struct batch_stage {
     int count;
 };
 
-// SITE STGBEGIN
-// 350 SITE STGBEGIN successful. Follow with SITE STGFILE.
-// XXX 451 Tape subsystem busy. Please retry SITE STGBEGIN later.
-// 503 Command out of sequence. A staging session is already active.
-// XXX 550 Failed to begin staging session.
-
 // BatchStage should be pointer-to-NULL on first call
 void
 stgbegin(
@@ -702,12 +696,6 @@ _submit_batch_stage(
     return GLOBUS_SUCCESS;
 }
 
-// SITE STGFILE <file>
-// 200 File queued. Staging is pending and ready to submit.
-// 250 Batch submitted to tape system. Request ID: <request_id>.
-// 452 Internal error queuing file. Please retry this file.
-// 503 Command out of sequence. Call SITE STGBEGIN first.
-// 550 File does not exist or access is denied.
 void
 stgfile(
     globus_gfs_operation_t         Operation,   // IN
@@ -766,8 +754,6 @@ stgfile(
 
     if (result)
     {
-        // Allow the caller to retry this command
-        BatchStage->count--;
         Callback(Operation, result, NULL);
         return;
     }
@@ -804,12 +790,6 @@ stgfile(
     return;
 }
 
-// SITE STGEND
-// 200 No pending files to submit to tape system. Stage session ended.
-// 250 Remaining files submitted to tape system. Request ID: <request_id>.
-// 451 Failed to flush remaining files. Please retry SITE STGEND.
-// 503 Command out of sequence. No active staging session to end.
-// 550 Failed to end staging session.
 void
 stgend(
     globus_gfs_operation_t         Operation,    // IN
@@ -846,7 +826,6 @@ stgend(
 
     if (result)
     {
-        // Retryable?
         Callback(Operation, result, NULL);
         return;
     }
@@ -910,19 +889,6 @@ _get_request_id_arg(
     return string_to_hpss_reqid(argv[2], RequestID);
 }
 
-// Original:
-// 250: file is resident on disk
-// 450: file is not on disk but tape mount request still exists
-// 550: an error has occurred, retry SITE STGCHK
-// 551: file is not on disk and tape mount does not exist. Reissue ‘SITE STGFILE’ sequence
-//      for all non-transferred files on this same request id.
-
-// Updated:
-// 211: file is resident on disk
-// 213: file is not on disk but tape mount request still exists
-// 451: an error has occurred, retry SITE STGCHK
-// 550: file is not on disk and tape mount does not exist. Reissue 'SITE STGFILE' sequence
-//      for all non-transferred files on this same request id.
 void
 stgchk(
     globus_gfs_operation_t         Operation,    // IN
