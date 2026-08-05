@@ -75,12 +75,12 @@ test_generate_callback_id(void * Arg)
     ASSERT(callback_id.time_hi_and_version == 0x45fd);
     ASSERT(callback_id.clock_seq_hi_and_reserved == 0x9f);
     ASSERT(callback_id.clock_seq_low == 0xb6);
-    ASSERT(callback_id.node[0] == (char)0xdf);
-    ASSERT(callback_id.node[1] == (char)0x04);
-    ASSERT(callback_id.node[2] == (char)0x01);
-    ASSERT(callback_id.node[3] == (char)0xe2);
-    ASSERT(callback_id.node[4] == (char)0xc7);
-    ASSERT(callback_id.node[5] == (char)0x7f);
+    ASSERT(callback_id.node[0] == (unsigned char)0xdf);
+    ASSERT(callback_id.node[1] == (unsigned char)0x04);
+    ASSERT(callback_id.node[2] == (unsigned char)0x01);
+    ASSERT(callback_id.node[3] == (unsigned char)0xe2);
+    ASSERT(callback_id.node[4] == (unsigned char)0xc7);
+    ASSERT(callback_id.node[5] == (unsigned char)0x7f);
 #endif // HPSS_MAJOR_VERSION >= 8
 
     //
@@ -142,12 +142,12 @@ test_generate_callback_id(void * Arg)
     ASSERT(callback_id.time_hi_and_version == (0x45fd ^ 0x424a));
     ASSERT(callback_id.clock_seq_hi_and_reserved == (0x9f ^ 0x92));
     ASSERT(callback_id.clock_seq_low == (0xb6 ^ 0x4e));
-    ASSERT(callback_id.node[0] == (char)(0xdf ^ 0xdd));
-    ASSERT(callback_id.node[1] == (char)(0x04 ^ 0xa3));
-    ASSERT(callback_id.node[2] == (char)(0x01 ^ 0xb3));
-    ASSERT(callback_id.node[3] == (char)(0xe2 ^ 0x04));
-    ASSERT(callback_id.node[4] == (char)(0xc7 ^ 0x73));
-    ASSERT(callback_id.node[5] == (char)(0x7f ^ 0x53));
+    ASSERT(callback_id.node[0] == (unsigned char)(0xdf ^ 0xdd));
+    ASSERT(callback_id.node[1] == (unsigned char)(0x04 ^ 0xa3));
+    ASSERT(callback_id.node[2] == (unsigned char)(0x01 ^ 0xb3));
+    ASSERT(callback_id.node[3] == (unsigned char)(0xe2 ^ 0x04));
+    ASSERT(callback_id.node[4] == (unsigned char)(0xc7 ^ 0x73));
+    ASSERT(callback_id.node[5] == (unsigned char)(0x7f ^ 0x53));
 #endif // HPSS_MAJOR_VERSION >= 8
 }
 
@@ -166,12 +166,12 @@ test_hpss_reqid_to_string(void * Arg)
     request_id.time_hi_and_version = 0x4cc6;
     request_id.clock_seq_hi_and_reserved = 0x8f;
     request_id.clock_seq_low = 0xe5;
-    request_id.node[0] = (char)0x11;
-    request_id.node[1] = (char)0xa8;
-    request_id.node[2] = (char)0x0a;
-    request_id.node[3] = (char)0xa2;
-    request_id.node[4] = (char)0x60;
-    request_id.node[5] = (char)0xfb;
+    request_id.node[0] = (unsigned char)0x11;
+    request_id.node[1] = (unsigned char)0xa8;
+    request_id.node[2] = (unsigned char)0x0a;
+    request_id.node[3] = (unsigned char)0xa2;
+    request_id.node[4] = (unsigned char)0x60;
+    request_id.node[5] = (unsigned char)0xfb;
 
     // Successful conversion (always?)
     globus_result_t result = _hpss_reqid_to_string(&request_id, &uuid_str);
@@ -199,12 +199,12 @@ test_string_to_hpss_reqid(void * Arg)
     ASSERT(request_id.time_hi_and_version == 0x4cab);
     ASSERT(request_id.clock_seq_hi_and_reserved == 0xb3);
     ASSERT(request_id.clock_seq_low == 0xc9);
-    ASSERT(request_id.node[0] == (char)0x95);
-    ASSERT(request_id.node[1] == (char)0xbf);
-    ASSERT(request_id.node[2] == (char)0x02);
-    ASSERT(request_id.node[3] == (char)0xe0);
-    ASSERT(request_id.node[4] == (char)0x26);
-    ASSERT(request_id.node[5] == (char)0xa2);
+    ASSERT(request_id.node[0] == (unsigned char)0x95);
+    ASSERT(request_id.node[1] == (unsigned char)0xbf);
+    ASSERT(request_id.node[2] == (unsigned char)0x02);
+    ASSERT(request_id.node[3] == (unsigned char)0xe0);
+    ASSERT(request_id.node[4] == (unsigned char)0x26);
+    ASSERT(request_id.node[5] == (unsigned char)0xa2);
 
     // Failed conversion when UUIDString is NULL
     result = _string_to_hpss_reqid(NULL, &request_id);
