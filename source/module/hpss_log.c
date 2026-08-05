@@ -613,12 +613,12 @@ _hpss_uuid_t_ptr(
         UNSIGNED16(uuid_ptr->time_hi_and_version),
         UNSIGNED8(uuid_ptr->clock_seq_hi_and_reserved),
         UNSIGNED8(uuid_ptr->clock_seq_low),
-        HEX8(uuid_ptr->node[0]),
-        HEX8(uuid_ptr->node[1]),
-        HEX8(uuid_ptr->node[2]),
-        HEX8(uuid_ptr->node[3]),
-        HEX8(uuid_ptr->node[4]),
-        HEX8(uuid_ptr->node[5]));
+        HEX8((unsigned char)uuid_ptr->node[0]),
+        HEX8((unsigned char)uuid_ptr->node[1]),
+        HEX8((unsigned char)uuid_ptr->node[2]),
+        HEX8((unsigned char)uuid_ptr->node[3]),
+        HEX8((unsigned char)uuid_ptr->node[4]),
+        HEX8((unsigned char)uuid_ptr->node[5]));
 }
 
 char *
