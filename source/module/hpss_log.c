@@ -606,19 +606,19 @@ _hpss_uuid_t_ptr(
             "time_hi_and_version=%s, "       // uint16_t
             "clock_seq_hi_and_reserved=%s, " // uint8_t
             "clock_seq_low=%s, "             // uint8_t
-            "node=%s"                        // char[6]
+            "node={%s, %s, %s, %s, %s, %s}"  // char[6]
         "}",
         UNSIGNED(uuid_ptr->time_low),
         UNSIGNED16(uuid_ptr->time_mid),
         UNSIGNED16(uuid_ptr->time_hi_and_version),
         UNSIGNED8(uuid_ptr->clock_seq_hi_and_reserved),
         UNSIGNED8(uuid_ptr->clock_seq_low),
-        HEX8(uuid_ptr->node[0]),
-        HEX8(uuid_ptr->node[1]),
-        HEX8(uuid_ptr->node[2]),
-        HEX8(uuid_ptr->node[3]),
-        HEX8(uuid_ptr->node[4]),
-        HEX8(uuid_ptr->node[5]));
+        HEX8((unsigned char)uuid_ptr->node[0]),
+        HEX8((unsigned char)uuid_ptr->node[1]),
+        HEX8((unsigned char)uuid_ptr->node[2]),
+        HEX8((unsigned char)uuid_ptr->node[3]),
+        HEX8((unsigned char)uuid_ptr->node[4]),
+        HEX8((unsigned char)uuid_ptr->node[5]));
 }
 
 char *
