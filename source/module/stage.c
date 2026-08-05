@@ -23,6 +23,8 @@
  * Use this space to record the detailed history of staging with this DSI so that
  * we know why we are heading in the direction we are heading.
  *
+ *                      ********** STAGING VERSION 1 **********
+ *
  * BACKGROUND: The Globus Transfer service drives the staging requests when a
  * retrieve task is submitted for an HPSS endpoint/collection. The Transfer service
  * connects via GridFTP and issues N (<=64) stage requests. Transfer's expectations
@@ -93,8 +95,22 @@
  * seemingly-random-but-predictable request ID that is hopefully unique to this
  * (task,file) tuple.
  *
- * For what it's worth, there is a design (pending funding) to improve this which includes
- * having Transfer keep some state between requests.
+ *            ********** STAGING VERSION 2 (BATCH STAGING) **********
+ *
+ * Version 2.26 introduced batch staging via the STGBEGIN/STGFILE/STGEND/STGCHK commands.
+ * This new implementation makes all staging requests using the Transfer task ID as the
+ * stage request's callback ID. HPSS then responds with the request ID of the stage request,
+ * which coincidentally is equal to the callback ID in current versions of HPSS. The stage
+ * request ID (ie. Transfer task ID) is then passed back to Transfer and then returned in
+ * calls to STGCHK.
+ *
+ * Using the Transfer task ID as the callback ID should give us the added benefit of all
+ * stage requests for the Transfer task appearing under the Task ID in rtmu.
+ *
+ * Initial support for this new staging paradigm is supported by the DSI for HPSS 9.3+.
+ *
+ * NOTE: HPSS v11 has a new callback option that will allow us to get rid of the callback
+ * blackhole.
  */
 
 /*
