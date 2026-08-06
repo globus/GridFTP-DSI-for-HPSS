@@ -1,4 +1,4 @@
-Version 2.26~a4: Thu Aug  6 13:09:27 UTC 2026
+Version 2.26~a5: Thu Aug  6 13:09:27 UTC 2026
 	- Added support for ordered staging
 	- Fix for logging ns_DirEntry_t content
 

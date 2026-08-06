@@ -517,6 +517,79 @@ cleanup:
     return result;
 }
 
+/*
+ * Improved staging logging.
+ *
+ * If INFO log mode is enabled, log:
+ * - FTP command issued by the client (ie. STAGE or STGFILE)
+ * - Path
+ * - Tape ID
+ * - Tape Section
+ * - Tape Section Offset
+ *
+ * Take into account exceptions:
+ * - Files on a disk-only COS
+ * - Files on disk that are not yet on tape
+ */
+static void
+_log_stage_order(const char * Command,
+                 const char * Pathname)
+{
+    int retval = 0;
+    int level = 0;
+    hpss_xfileattr_t xattr;
+
+    // Don't include the lookup overhead if we're not in debug mode
+    if (!GlobusDebugTrue(GLOBUS_GRIDFTP_SERVER_HPSS, LOG_TYPE_INFO))
+        return;
+
+    // Stat the object
+    memset(&xattr, 0, sizeof(hpss_xfileattr_t));
+    retval = Hpss_FileGetXAttributes((char *)Pathname,
+                                     API_GET_STATS_FOR_ALL_LEVELS | API_GET_XATTRS_NO_BLOCK,
+                                     0,
+                                     &xattr);
+
+    if (retval)
+    {
+        ERROR("FAILED TO LOG TAPE FACTS: %s: %d", Pathname, retval);
+	return;
+    }
+
+    for (level = 0; level < HPSS_MAX_STORAGE_LEVELS; level++)
+    {
+        // Break on the first tape storage classes
+        if (xattr.SCAttrib[level].Flags & BFS_BFATTRS_LEVEL_IS_TAPE)
+            break;
+    }
+
+    // No tape storage classes
+    if (level == HPSS_MAX_STORAGE_LEVELS)
+    {
+        INFO("%s) %s: Disk-only COS", Command, Pathname);
+        return;
+    }
+
+    // The file's COS has a tape level but first VV on the COS has not yet
+    // been assigned PVs. This file is on disk and not yet purged so no need
+    // to report tape attributes.
+    if (xattr.SCAttrib[level].VVAttrib[0].PVList == NULL)
+    {
+        INFO("%s) %s: File not yet assigned a tape volume", Command, Pathname);
+        return;
+    }
+
+    INFO("%s) %s: TapeID=%s TapeSection=%"PRId32" TapeSectionOffset=%"PRIu64,
+        Command,
+        Pathname,
+        xattr.SCAttrib[level].VVAttrib[0].PVList->List.List_val[0].Name,
+        xattr.SCAttrib[level].VVAttrib[0].RelPosition,
+        xattr.SCAttrib[level].VVAttrib[0].RelPositionOffset);
+
+    /* Release the hpss_xfileattr_t */
+    free_xfileattr(&xattr);
+}
+
 // DSI entry point
 void
 stage(globus_gfs_operation_t     Operation,
@@ -526,6 +599,9 @@ stage(globus_gfs_operation_t     Operation,
     int             timeout;
     char *          command_output = NULL;
     globus_result_t result;
+
+    // Log the path and its tape facts
+    _log_stage_order("STAGE", CommandInfo->pathname);
 
     result = stage_get_timeout(Operation, CommandInfo, &timeout);
     if (result)
@@ -703,6 +779,9 @@ stgfile(
     batch_stage_t               *  BatchStage,  // IN/OUT
     commands_callback              Callback)    // IN
 {
+    // Log the path and its tape facts
+    _log_stage_order("STGFILE", CommandInfo->pathname);
+
     if (BatchStage == NULL)
     {
         Callback(
