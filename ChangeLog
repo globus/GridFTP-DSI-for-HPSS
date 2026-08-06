@@ -1,6 +1,5 @@
-Version 2.26~a3: Thu Jun 11 04:35:07 PDT 2026
-	- Addeed 'FEAT STAGE' response
-	- Added tape id/sec/pos facts to MLST output
+Version 2.26~a4: Thu Aug  6 13:09:27 UTC 2026
+	- Added support for ordered staging
 	- Fix for logging ns_DirEntry_t content
 
 Version 2.25: Mon Jun 29 11:14:06 2026 -0700
