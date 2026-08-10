@@ -1,5 +1,5 @@
 # Use fedora version formatting, ie. 2.17, 2.17~rc1.
-AC_INIT([globus-gridftp-server-hpss], [2.26~a5], [Globus <support@globus.org>])
+AC_INIT([globus-gridftp-server-hpss], [2.26~a6], [Globus <support@globus.org>])
 # foreign: don't require GNU standard files (ChangeLog, AUTHORS, NEWS, etc.)
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 

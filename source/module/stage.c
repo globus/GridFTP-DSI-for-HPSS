@@ -931,12 +931,12 @@ stgend(
              "250 Remaining files submitted to tape system. Request ID: %s.\r\n",
              request_id_str);
 
+    free(*BatchStage);
+    *BatchStage = NULL;
+
     Callback(Operation, GLOBUS_SUCCESS, response);
     free(request_id_str);
     free(response);
-
-    free(*BatchStage);
-    *BatchStage = NULL;
 }
 
 static globus_result_t
