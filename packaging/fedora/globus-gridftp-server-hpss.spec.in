@@ -1,5 +1,5 @@
 Summary: HPSS Connector for Globus
-Name: @PACKAGE_NAME@-@HPSS_MAJOR@.@HPSS_MINOR@
+Name: @PACKAGE_NAME@@MOCK_SUFFIX@-@HPSS_MAJOR@.@HPSS_MINOR@
 Version: @PACKAGE_VERSION@
 Release: 1%{?dist}+gcsv5
 License: ASL 2.0

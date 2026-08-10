@@ -1,3 +1,10 @@
+/* Identifies the origin tarball so installed libraries are self-describing.
+ * Query:
+ *   strings /usr/lib64/libglobus_gridftp_server_hpss_real.so | grep HPSS_DSI_ORIGIN
+ * Example: HPSS_DSI_ORIGIN: globus-gridftp-server-hpss-2.26~a5.fedora44 */
+static const char dsi_package_origin[] __attribute__((used)) =
+    "HPSS_DSI_ORIGIN: " PACKAGE "-" VERSION "." DISTRO_TAG;
+
 /*
  * System includes
  */

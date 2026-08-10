@@ -43,7 +43,7 @@ tarball: check_distributable
 		libdir=$$([ -f /etc/debian_version ] && echo /usr/lib/x86_64-linux-gnu || echo /usr/lib64)
 	find $(abs_top_builddir)/staging -name 'lib*.la' -delete
 	. /etc/os-release && \
-	tar czf $(PACKAGE)-$(VERSION).$$ID$$VERSION_ID.tar.gz -C $(abs_top_builddir)/staging .
+	tar czf $(PACKAGE)-$(VERSION)@MOCK_SUFFIX@.$$ID$$VERSION_ID.tar.gz -C $(abs_top_builddir)/staging .
 	rm -rf $(abs_top_builddir)/staging
 
 EXTRA_DIST=data

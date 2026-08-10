@@ -171,6 +171,32 @@ LDFLAGS="${SAVE_LDFLAGS}"
 
 
 #
+# Distro Detection
+#
+# Read /etc/os-release to build a distro tag that matches the tarball filename
+# suffix (e.g. "fedora44", "rhel9"). Baked into the installed libraries so
+# `strings libglobus_gridftp_server_hpss_real.so | grep HPSS_DSI_ORIGIN` identifies
+# which tarball a given installation came from.
+#
+AC_MSG_CHECKING([OS distribution tag])
+AS_IF([test -f /etc/os-release],
+    [distro_tag=$(. /etc/os-release 2>/dev/null && printf '%s%s' "$ID" "$VERSION_ID")],
+    [distro_tag=unknown])
+# Mock builds incorporate the mock version so the library ident string and
+# artifact names are fully self-describing: HPSS_DSI_ORIGIN will read
+# "mock1.0.fedora44" instead of "fedora44", tarballs carry -mock1.0, and
+# RPMs are named with -mock1.0.
+AS_IF([test "x$ac_cv_header_hpss_api_test_h" = xyes],
+    [mock_version=$(awk '/#define HPSS_MOCK_VERSION_STRING/ {gsub(/"/, "", $3); print $3}' \
+                        "${HPSS_ROOT}/include/hpss_mock_version.h")
+     distro_tag="mock${mock_version}.${distro_tag}"
+     MOCK_SUFFIX="-mock${mock_version}"],
+    [MOCK_SUFFIX=])
+AC_DEFINE_UNQUOTED([DISTRO_TAG], ["$distro_tag"],
+    [OS distribution tag (ID + VERSION_ID from /etc/os-release) for the library ident string])
+AC_MSG_RESULT([$distro_tag])
+
+#
 # Output
 #
 
@@ -181,6 +207,7 @@ AC_SUBST(HPSS_ROOT)
 AC_SUBST(HPSS_CPPFLAGS)
 AC_SUBST(HPSS_LDFLAGS)
 AC_SUBST(HPSS_LIBS)
+AC_SUBST(MOCK_SUFFIX)
 # %%.*: strip first dot and everything after, leaving just the major number.
 AC_SUBST([MAJOR_VERSION], [${PACKAGE_VERSION%%.*}])
 # Two-step: PACKAGE_VERSION uses ~ for pre-release suffixes (e.g., 2.25~a3);
