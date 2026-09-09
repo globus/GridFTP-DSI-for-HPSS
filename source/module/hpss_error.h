@@ -21,11 +21,61 @@ typedef struct {
 } hpss_error_t;
 
 /*
+ * An HPSS server that reports an ETRANSFER alarm identifies the failed work
+ * only by its HPSS request ID. Correlating that back to a Globus transfer
+ * previously required matching timestamps by hand, because the request ID
+ * sits in hpss_errno_state_t and was printed only by the TRACE-level API
+ * tracing, which is off in production.
+ *
+ * These two macros hold the one field list used to report an HPSS error, so
+ * the request ID reaches both of its destinations from a single definition:
+ *
+ *   - hpss_error_record() logs it to the GridFTP log alongside the user and
+ *     TaskID that every log entry carries, which is what makes the join
+ *     exact. This covers every HPSS error, including ones a caller recovers
+ *     from, discards in favor of another error, or converts into a success.
+ *
+ *   - hpss_error_to_globus_result() puts it in the error returned to the
+ *     client, which is how the request ID reaches sites that do not run the
+ *     GridFTP log at INFO severity. This covers only errors that propagate.
+ *
+ * The delimiter is a parameter because the client-facing response separates
+ * fields with newlines, while a log entry must stay on one line or the
+ * request ID is split from the TaskID that identifies it. The log form uses
+ * " | " rather than a space because an error description may itself contain
+ * spaces, which would leave the field boundaries ambiguous.
+ *
+ * HPSS-Request-ID leads the list so both variants take the same argument
+ * order, which preserves the existing pattern of passing the superset of
+ * arguments and letting the shorter format ignore the excess.
+ */
+#define HPSS_ERROR_FIELDS(D)       \
+    "HPSS-Request-ID: %s"     D    \
+    "HPSS-Reason: %s"         D    \
+    "HPSS-Function: %s"
+
+#define HPSS_ERROR_FIELDS_LAST(D)  \
+    "HPSS-Request-ID: %s"     D    \
+    "HPSS-Reason: %s"         D    \
+    "HPSS-Function: %s"       D    \
+    "HPSS-Last-Error: %s"     D    \
+    "HPSS-Last-Function: %s"
+
+/*
  * Stores the hpss_error_t internally and returns a value that can
  * be used by hpss_error_to_globus_result to lookup the error.
  */
 int
 hpss_error_put(hpss_error_t he);
+
+/*
+ * Logs the error for HPSS request ID correlation, then stores it with
+ * hpss_error_put() and returns that value. This is the single hook used by
+ * the HPSS_ERROR() macro, so every HPSS wrapper that reports an int error is
+ * covered without per-wrapper changes.
+ */
+int
+hpss_error_record(hpss_error_t he);
 
 hpss_error_t
 hpss_error_get(int);

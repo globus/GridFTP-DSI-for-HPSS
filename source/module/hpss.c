@@ -32,8 +32,12 @@ Hpss_ClearLastHPSSErrno(void);
 static hpss_errno_state_t
 Hpss_GetLastHPSSErrno();
  
+/*
+ * hpss_error_record() logs the error for HPSS request ID correlation in
+ * addition to storing it.
+ */
 #define HPSS_ERROR(r, l)  \
-    r >= 0 ? r : hpss_error_put((hpss_error_t){r, __func__, l})
+    r >= 0 ? r : hpss_error_record((hpss_error_t){r, __func__, l})
 
 void
 HpssAPI_ConvertTimeToPosixTime(
