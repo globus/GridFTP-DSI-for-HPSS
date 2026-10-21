@@ -182,6 +182,22 @@ LDFLAGS="${SAVE_LDFLAGS}"
 
 
 #
+# Distro Detection
+#
+# Read /etc/os-release to build a distro tag (e.g. "rhel8.10", "rhel9.6"). Baked
+# into the module library so
+# `strings libglobus_gridftp_server_hpss_real.so | grep HPSS_DSI_ORIGIN` identifies
+# which build or release a given installation came from.
+#
+AC_MSG_CHECKING([OS distribution tag])
+AS_IF([test -f /etc/os-release],
+    [distro_tag=$(. /etc/os-release 2>/dev/null && printf '%s%s' "$ID" "$VERSION_ID")],
+    [distro_tag=unknown])
+AC_DEFINE_UNQUOTED([DISTRO_TAG], ["$distro_tag"],
+    [OS distribution tag (ID + VERSION_ID from /etc/os-release) for the library ident string])
+AC_MSG_RESULT([$distro_tag])
+
+#
 # Output
 #
 
