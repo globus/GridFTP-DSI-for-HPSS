@@ -143,7 +143,7 @@ activate(void)
     const char * error_msg = load_module();
     if (error_msg)
     {
-        loader_log_to_syslog(error_msg);
+        loader_log_to_syslog("%s", error_msg);
         free((void *)error_msg);
         return GLOBUS_FAILURE;
     }
@@ -151,7 +151,7 @@ activate(void)
     globus_gfs_storage_iface_t * dsi_interface = find_symbol(DSI_INTERFACE, &error_msg);
     if (!dsi_interface)
     {
-        loader_log_to_syslog(error_msg);
+        loader_log_to_syslog("%s", error_msg);
         free((void *)error_msg);
         return GLOBUS_FAILURE;
     }
@@ -247,6 +247,8 @@ get_home_directory_ex(const char *  AuthenticationMech, // Location of credentia
         callback(error_msg);
     else
         callback(home_directory);
+    // The callback copies the string; error_msg may be a literal.
+    free((void *)home_directory);
     return rc;
 }
 

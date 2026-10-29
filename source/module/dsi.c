@@ -79,11 +79,15 @@ dsi_init(globus_gfs_operation_t     Operation,
         atoi(major) != HPSS_MAJOR_VERSION ||
         atoi(minor) != HPSS_MINOR_VERSION)
     {
+        // strtok() has cut version_string at the first '.'
         ERROR("The HPSS connector was not built for this version of HPSS. "
-              "Runtime version is %s. Buildtime version was %d.%d",
-              version_string ? version_string : "NULL",
+              "Runtime version is %s%s%s. Buildtime version was %d.%d",
+              major ? major : "NULL",
+              minor ? "." : "",
+              minor ? minor : "",
               HPSS_MAJOR_VERSION,
               HPSS_MINOR_VERSION);
+        free(version_string);
         result  = HPSSWrongVersion();
         goto cleanup;
     }

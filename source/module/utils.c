@@ -15,7 +15,7 @@
 static bool
 _is_hex_str(const char * str, size_t index, size_t len)
 {
-    for (int i = index; i < len; i++)
+    for (size_t i = index; i < index + len; i++)
     {
         if (!isxdigit(str[i]))
             return false;
